@@ -8,7 +8,6 @@ from google import genai
 from google.genai import types
 from openai import OpenAI
 import traceback
-import traceback
 from dotenv import load_dotenv
 import requests
 import markdown
