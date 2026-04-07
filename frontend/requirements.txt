@@ -2,8 +2,8 @@ markdown
 requests
 fastapi
 uvicorn
-google-generativeai
 google-genai
 openai
 python-dotenv
 pydantic
+python-multipart
