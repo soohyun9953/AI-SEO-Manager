@@ -297,7 +297,8 @@ export default function KeywordsPage() {
               return (
                 <div
                   key={idx}
-                  className="glass-card p-7 group interactive-hover relative overflow-hidden shine-effect flex flex-col gap-5"
+                  className="glass-card p-7 group interactive-hover relative overflow-hidden shine-effect flex flex-col gap-5 cursor-pointer"
+                  onClick={() => router.push(`/editor?topic=${encodeURIComponent(topic)}&keyword=${encodeURIComponent(k.keyword)}`)}
                 >
 
                   {/* 상단: 배지 + 황금점수 원형 게이지 */}
