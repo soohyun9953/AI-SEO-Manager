@@ -150,7 +150,7 @@ export default function KeywordsPage() {
   const sorted_keywords = [...keywords].sort((a, b) => {
     if (sort_by === "golden_score") return (b.golden_score || 0) - (a.golden_score || 0);
     if (sort_by === "cpc") {
-      const parse_cpc = (s: string) => parseInt(s.replace(/[^0-9]/g, "") || "0");
+      const parse_cpc = (s: string | undefined) => parseInt((s || "0").replace(/[^0-9]/g, "") || "0");
       return parse_cpc(b.cpc_estimate) - parse_cpc(a.cpc_estimate);
     }
     if (sort_by === "competition") {
