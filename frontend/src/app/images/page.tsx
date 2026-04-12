@@ -13,6 +13,7 @@ export default function ImagesPage() {
     if (!prompt) return;
     setLoading(true);
     setErrorMsg("");
+    setImageUrl(""); // 생성 시작 시 기존 이미지 초기화
     const geminiKey = localStorage.getItem("GEMINI_API_KEY") || "";
     const openaiKey = localStorage.getItem("OPENAI_API_KEY") || "";
     try {

@@ -57,6 +57,10 @@ class 자동_작성_요청(BaseModel):
     tistory_token: Optional[str] = None
     tistory_blog: Optional[str] = None
 
+class 심층_분석_요청(BaseModel):
+    keyword: str
+    topic: str
+
 @app.get("/")
 async def root():
     return {"message": "AI SEO Manager (Gemini 2.5) is running on port 8002"}
@@ -109,6 +113,7 @@ async def get_keywords(
     req: KeywordRequest, 
     x_gemini_key: Optional[str] = Header(None)
 ):
+    """황금 키워드 발굴 API: 수익화 최우선 기준으로 황금점수 포함 키워드 분석"""
     api_key = x_gemini_key or GEMINI_API_KEY
     if not api_key:
         raise HTTPException(status_code=500, detail="Gemini API Key not configured")
@@ -117,17 +122,34 @@ async def get_keywords(
         client = genai.Client(api_key=api_key)
         prompt = f"""
         [현재 시점: 2026년 4월]
-        당신은 SEO 및 키워드 분석 전문가입니다. 
-        주제: '{req.topic}' 
-        
-        요구사항:
-        1. 해당 주제와 밀접한 고단가(High CPC) 키워드 5개를 추출하세요.
-        2. 각 키워드는 검색량이 준수하고 경쟁이 상대적으로 낮은 것을 타겟팅합니다.
-        3. 결과는 반드시 아래 JSON 형식을 따르는 리스트여야 합니다. (마크다운 없이 순수 JSON만)
-        
-        응답 형식:
+        당신은 구글 애드센스·제휴마케팅 수익화 전문 SEO 컨설턴트입니다.
+        분석 주제: '{req.topic}'
+
+        ## 황금 키워드 발굴 기준 (수익화 최우선)
+        황금 키워드 = 높은 CPC × 적정 검색량(1,000~50,000/월) × 낮은 경쟁도
+
+        ## 분석 지시사항
+        1. **구매/상업적 의도**가 높은 키워드를 최우선 선정 (비교, 추천, 가격, 후기, 방법)
+        2. **롱테일 키워드** (2~4단어 조합) 위주로 발굴하여 경쟁 최소화
+        3. **고수익 분야** 우선 탐색: 금융/보험/건강/법률/IT·SaaS/부동산
+        4. 시즌성 없이 **연중 안정적 검색량** 유지하는 키워드 선택
+        5. 황금 점수(golden_score)는 아래 가중치로 100점 만점 산정:
+           - CPC 높을수록 +40점 (₩2,000 이상=40, ₩500~2,000=20~39, 미만=0~19)
+           - 검색량 적정할수록 +30점 (1,000~10,000/월이 최적)
+           - 경쟁도 낮을수록 +30점 (낮음=30, 중간=15, 높음=5)
+        6. 키워드 5개를 황금 점수 내림차순으로 정렬
+
+        ## 응답 형식 (마크다운 없이 순수 JSON 리스트만)
         [
-          {{"keyword": "키워드명", "reason": "추천 사유", "vol": "예상 월간 검색량"}}
+          {{
+            "keyword": "키워드명 (2~4단어 롱테일)",
+            "golden_score": 88,
+            "cpc_estimate": "₩1,500",
+            "monthly_vol": "3,000~5,000",
+            "competition": "낮음",
+            "intent": "구매형",
+            "reason": "수익화 관점의 핵심 추천 사유 (광고주 경쟁, 전환율, 클릭 가치 중심으로 설명)"
+          }}
         ]
         """
         
@@ -135,11 +157,57 @@ async def get_keywords(
         return {"keywords": response.text}
     except Exception as e:
         traceback.print_exc()
-        # API 키 오류 등 상세 정보를 detail에 담아 반환
         error_msg = str(e)
         if "API key not valid" in error_msg:
             error_msg = "Gemini API 키가 유효하지 않습니다. 상단 키 관리바에서 확인해주세요."
         raise HTTPException(status_code=400, detail=error_msg)
+
+
+@app.post("/api/keywords/deep-analyze")
+async def deep_analyze_keyword(
+    req: 심층_분석_요청,
+    x_gemini_key: Optional[str] = Header(None)
+):
+    """황금 키워드 심층 분석 API: 하나의 키워드에서 파생 롱테일 + 글쓰기 각도 추천"""
+    api_key = x_gemini_key or GEMINI_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Gemini API Key not configured")
+
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = f"""
+        [현재 시점: 2026년 4월]
+        당신은 수익형 블로그 SEO 전문가입니다.
+        핵심 키워드: '{req.keyword}' (주제: {req.topic})
+
+        ## 심층 분석 지시사항
+        이 키워드를 중심으로 수익화 극대화를 위한 다음 분석을 수행하세요:
+
+        1. **파생 롱테일 키워드 10개**: 월간 500~10,000 검색량 + CPC 높은 순
+        2. **추천 글쓰기 각도 5가지**: 각 각도별 예상 클릭률(CTR) 높이는 제목 포함
+        3. **수익화 전략**: 이 키워드로 수익을 극대화하는 방법 (애드센스, 제휴 링크 배치 등)
+        4. **연관 고CPC 키워드 3개**: 함께 타겟팅하면 시너지 효과가 있는 키워드
+
+        ## 응답 형식 (마크다운 없이 순수 JSON만)
+        {{
+          "longtail_keywords": [
+            {{"keyword": "파생 롱테일 키워드", "monthly_vol": "1,000~3,000", "cpc_estimate": "₩800", "competition": "낮음"}}
+          ],
+          "content_angles": [
+            {{"angle": "글쓰기 각도명", "title_example": "클릭을 유도하는 제목 예시", "ctr_boost": "높음"}}
+          ],
+          "monetization_tips": "광고 배치, 제휴 링크 활용 등 수익화 전략 설명",
+          "synergy_keywords": [
+            {{"keyword": "연관 키워드", "reason": "시너지 효과 이유"}}
+          ]
+        }}
+        """
+
+        response = safe_generate_content(client, prompt, is_json=True)
+        return {"analysis": response.text}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/topic-recommendations")
 async def get_topic_recommendations(
@@ -278,46 +346,80 @@ async def generate_image(
     x_openai_key: Optional[str] = Header(None)
 ):
     api_key = x_gemini_key or GEMINI_API_KEY
-    if api_key:
-        try:
-            client = genai.Client(api_key=api_key, http_options={'api_version': 'v1alpha'})
-            response = client.models.generate_images(
-                model='imagen-3.0-generate-001',
-                prompt=req.prompt_base,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    output_mime_type='image/png'
-                )
-            )
-            
-            if response.generated_images:
-                img_bytes = response.generated_images[0].image.image_bytes
-                img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                return {"image_url": f"data:image/png;base64,{img_base64}"}
-        except Exception as e:
-            msg = str(e)
-            print(f"Google Imagen 3 failed: {msg}")
-            
-            # 만약 OpenAI 키가 없다면 친절하게 안내 메시지를 에러로 던짐
-            if not x_openai_key and not OPENAI_API_KEY:
-                if "404" in msg or "NOT_FOUND" in msg:
-                    raise HTTPException(status_code=500, detail="Google 계정(무료/지역제한)에서 Imagen 3 API 접근이 아직 허용되지 않았습니다. 상단에 OpenAI API 키를 추가로 입력하시면 DALL-E 3로 즉시 대체 생성할 수 있습니다.")
-                else:
-                    raise HTTPException(status_code=500, detail=f"Imagen 3 에러: {msg}")
 
+    # 1순위: Gemini 네이티브 이미지 생성 (Nano Banana 방식)
+    if api_key:
+        # 시도할 모델 목록
+        # gemini-3.1-flash-image-preview는 무료 플랜 Quota가 0이므로 제외
+        native_image_models = [
+            'gemini-2.5-flash-image',
+        ]
+        last_gemini_error = None
+
+        for model_name in native_image_models:
+            try:
+                print(f"Trying native image model: {model_name}")
+                client = genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[req.prompt_base],
+                    config=types.GenerateContentConfig(
+                        response_modalities=['TEXT', 'IMAGE']
+                    )
+                )
+
+                # 응답에서 이미지 파트 추출
+                for part in response.parts:
+                    if part.inline_data is not None:
+                        img_bytes = part.inline_data.data
+                        img_mime = part.inline_data.mime_type or 'image/png'
+                        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                        print(f"Image generated successfully with {model_name}")
+                        return {"image_url": f"data:{img_mime};base64,{img_base64}"}
+
+                # 응답에 이미지 파트가 없는 경우
+                print(f"{model_name}: 응답에 이미지 데이터 없음. 다음 모델 시도.")
+                last_gemini_error = "응답에 이미지 데이터가 포함되지 않았습니다."
+
+            except Exception as e:
+                msg = str(e)
+                last_gemini_error = msg
+                # Quota 초과(RESOURCE_EXHAUSTED)인 경우 즉시 OpenAI로 폴백 (재시도 불필요)
+                if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+                    print(f"Quota exhausted for {model_name}. Falling back to OpenAI.")
+                    break
+                print(f"Native image generation failed ({model_name}): {msg}")
+                continue
+
+        # Gemini 이미지 생성 모두 실패한 경우
+        print(f"All Gemini native image models failed. Last error: {last_gemini_error}")
+        if not x_openai_key and not OPENAI_API_KEY:
+            # Quota 초과인 경우 별도 안내
+            if last_gemini_error and ("RESOURCE_EXHAUSTED" in last_gemini_error or "429" in last_gemini_error):
+                raise HTTPException(
+                    status_code=429,
+                    detail="Gemini 이미지 생성 무료 한도를 초과했습니다. 내일 다시 시도하거나, 상단 설정에서 OpenAI API 키를 입력하시면 DALL-E 3로 즉시 대체 생성할 수 있습니다."
+                )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Gemini 이미지 생성에 실패했습니다: {last_gemini_error}\n\nOpenAI API 키를 상단 설정에 입력하시면 DALL-E 3로 즉시 대체 생성할 수 있습니다."
+            )
+
+    # 2순위: OpenAI DALL-E 3 (폴백)
     openai_api_key = x_openai_key or OPENAI_API_KEY
     if openai_api_key:
         try:
-            client = OpenAI(api_key=openai_api_key)
-            response = client.images.generate(
+            print("Falling back to OpenAI DALL-E 3")
+            openai_client = OpenAI(api_key=openai_api_key)
+            response = openai_client.images.generate(
                 model="dall-e-3",
                 prompt=req.prompt_base,
                 n=1,
             )
             return {"image_url": response.data[0].url}
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
+            raise HTTPException(status_code=500, detail=f"DALL-E 3 에러: {str(e)}")
+
     return {"image_url": "https://via.placeholder.com/1024x1024.png?text=No+API+Key"}
 
 @app.post("/api/publish-tistory")
