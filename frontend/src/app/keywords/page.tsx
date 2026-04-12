@@ -349,7 +349,7 @@ export default function KeywordsPage() {
                         <span className="text-[11px]">{k.monthly_vol}<span className="text-gray-700">/월</span></span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative z-10">
                       {/* 심층 분석: 카드 클릭과 분리 */}
                       <button
                         onClick={(e) => { e.stopPropagation(); run_deep_analyze(k.keyword); }}
@@ -367,7 +367,7 @@ export default function KeywordsPage() {
                     </div>
                   </div>
 
-                  <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-yellow-600/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                  <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-yellow-600/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
                 </div>
               );
             })}
