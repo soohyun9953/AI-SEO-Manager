@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, DollarSign, LayoutList, Loader2, Zap,
   Trash2, Star, BarChart2, Sparkles,
-  AlertCircle, X, ArrowUpDown
+  AlertCircle, X, ArrowUpDown, PenLine
 } from "lucide-react";
 
 // 황금 키워드 데이터 스키마
@@ -289,7 +289,11 @@ export default function KeywordsPage() {
               const competition_cls = get_competition_color(k.competition);
               const intent_cls = get_intent_color(k.intent);
               return (
-                <div key={idx} className="glass-card p-7 group interactive-hover relative overflow-hidden shine-effect flex flex-col gap-5">
+                <div
+                  key={idx}
+                  className="glass-card p-7 group interactive-hover relative overflow-hidden shine-effect flex flex-col gap-5 cursor-pointer"
+                  onClick={() => router.push(`/editor?topic=${encodeURIComponent(topic)}&keyword=${encodeURIComponent(k.keyword)}`)}
+                >
 
                   {/* 상단: 배지 + 황금점수 원형 게이지 */}
                   <div className="flex items-center justify-between">
@@ -314,10 +318,7 @@ export default function KeywordsPage() {
                   </div>
 
                   {/* 키워드명 */}
-                  <h3
-                    className="text-xl font-bold text-white group-hover:text-yellow-300 transition-colors font-outfit cursor-pointer leading-snug"
-                    onClick={() => router.push(`/editor?topic=${encodeURIComponent(topic)}&keyword=${encodeURIComponent(k.keyword)}`)}
-                  >
+                  <h3 className="text-xl font-bold text-white group-hover:text-yellow-300 transition-colors font-outfit leading-snug">
                     {k.keyword}
                   </h3>
 
@@ -330,8 +331,8 @@ export default function KeywordsPage() {
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${competition_cls}`}>경쟁 {k.competition}</span>
                   </div>
 
-                  {/* 하단: CPC + 검색량 + 심층 분석 */}
-                  <div className="mt-auto pt-4 border-t border-white/[0.05] flex items-center justify-between gap-3">
+                  {/* 하단: CPC + 검색량 + 버튼들 */}
+                  <div className="mt-auto pt-4 border-t border-white/[0.05] flex items-center justify-between gap-2">
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1.5 text-yellow-400">
                         <DollarSign size={14} />
@@ -343,12 +344,22 @@ export default function KeywordsPage() {
                         <span className="text-[11px]">{k.monthly_vol}<span className="text-gray-700">/월</span></span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => run_deep_analyze(k.keyword)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[11px] font-bold hover:bg-yellow-500/20 transition-all active:scale-95 shrink-0"
-                    >
-                      <Sparkles size={12} /> 심층 분석
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* 심층 분석: 카드 클릭과 분리 */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); run_deep_analyze(k.keyword); }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[11px] font-bold hover:bg-yellow-500/20 transition-all active:scale-95 shrink-0"
+                      >
+                        <Sparkles size={12} /> 심층 분석
+                      </button>
+                      {/* 글쓰기 시작 버튼 */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); router.push(`/editor?topic=${encodeURIComponent(topic)}&keyword=${encodeURIComponent(k.keyword)}`); }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[11px] font-bold hover:bg-blue-500/25 transition-all active:scale-95 shrink-0"
+                      >
+                        <PenLine size={12} /> 글쓰기
+                      </button>
+                    </div>
                   </div>
 
                   <div className="absolute -right-8 -bottom-8 w-24 h-24 bg-yellow-600/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
