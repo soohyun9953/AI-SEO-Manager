@@ -134,13 +134,19 @@ export default function KeywordsPage() {
       }
       const data = await res.json();
       const raw = data.analysis;
-      const parsed: 심층_분석_결과 = typeof raw === "string"
-        ? JSON.parse(raw.replace(/```json|```/g, ""))
-        : raw;
+      // JSON 파싱 실패 시에도 모달을 유지하고 에러만 표시
+      let parsed: 심층_분석_결과 | null = null;
+      try {
+        parsed = typeof raw === "string"
+          ? JSON.parse(raw.replace(/```json|```/g, "").trim())
+          : raw;
+      } catch (parseErr) {
+        throw new Error("분석 결과 파싱 실패. AI가 올바른 JSON을 반환하지 않았습니다.");
+      }
       set_analysis_result(parsed);
     } catch (err: any) {
-      set_error_msg(`심층 분석 오류: ${err.message}`);
-      set_analyzing_keyword(null);
+      // 모달은 유지하고 에러메시지만 모달 내부에 표시
+      set_analysis_result({ longtail_keywords: [], content_angles: [], monetization_tips: `오류: ${err.message}`, synergy_keywords: [] });
     } finally {
       set_analysis_loading(false);
     }
@@ -291,8 +297,7 @@ export default function KeywordsPage() {
               return (
                 <div
                   key={idx}
-                  className="glass-card p-7 group interactive-hover relative overflow-hidden shine-effect flex flex-col gap-5 cursor-pointer"
-                  onClick={() => router.push(`/editor?topic=${encodeURIComponent(topic)}&keyword=${encodeURIComponent(k.keyword)}`)}
+                  className="glass-card p-7 group interactive-hover relative overflow-hidden shine-effect flex flex-col gap-5"
                 >
 
                   {/* 상단: 배지 + 황금점수 원형 게이지 */}
