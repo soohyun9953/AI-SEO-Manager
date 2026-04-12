@@ -58,6 +58,10 @@ class 자동_작성_요청(BaseModel):
     tistory_token: Optional[str] = None
     tistory_blog: Optional[str] = None
 
+class 심층_분석_요청(BaseModel):
+    keyword: str
+    topic: str
+
 @app.get("/")
 async def root():
     return {"message": "AI SEO Manager (Vercel Engine) is running"}
@@ -108,13 +112,87 @@ async def get_keywords(req: KeywordRequest, x_gemini_key: Optional[str] = Header
     if not api_key: raise HTTPException(status_code=500, detail="API Key missing")
     
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: 2026년 4월] 주제: '{req.topic}' 관련 고단가 키워드 5개를 JSON 리스트로 추천해줘. [{{'keyword': '...', 'reason': '...', 'vol': '...'}}]"
-    
+    prompt = f"""
+        [현재 시점: 2026년 4월]
+        당신은 구글 애드센스·제휴마케팅 수익화 전문 SEO 컨설턴트입니다.
+        분석 주제: '{req.topic}'
+
+        ## 황금 키워드 발굴 기준 (수익화 최우선)
+        황금 키워드 = 높은 CPC × 적정 검색량(1,000~50,000/월) × 낮은 경쟁도
+
+        ## 분석 지시사항
+        1. **구매/상업적 의도**가 높은 키워드를 최우선 선정 (비교, 추천, 가격, 후기, 방법)
+        2. **롱테일 키워드** (2~4단어 조합) 위주로 발굴하여 경쟁 최소화
+        3. **고수익 분야** 우선 탐색: 금융/보험/건강/법률/IT·SaaS/부동산
+        4. 시즌성 없이 **연중 안정적 검색량** 유지하는 키워드 선택
+        5. 황금 점수(golden_score)는 아래 가중치로 100점 만점 산정:
+           - CPC 높을수록 +40점 (₩2,000 이상=40, ₩500~2,000=20~39, 미만=0~19)
+           - 검색량 적정할수록 +30점 (1,000~10,000/월이 최적)
+           - 경쟁도 낮을수록 +30점 (낮음=30, 중간=15, 높음=5)
+        6. 키워드 5개를 황금 점수 내림차순으로 정렬
+
+        ## 응답 형식 (마크다운 없이 순수 JSON 리스트만)
+        [
+          {{
+            "keyword": "키워드명 (2~4단어 롱테일)",
+            "golden_score": 88,
+            "cpc_estimate": "₩1,500",
+            "monthly_vol": "3,000~5,000",
+            "competition": "낮음",
+            "intent": "구매형",
+            "reason": "수익화 관점의 핵심 추천 사유 (광고주 경쟁, 전환율, 클릭 가치 중심으로 설명)"
+          }}
+        ]
+        """
     try:
         response = await safe_generate_content_async(client, prompt, is_json=True)
         return {"keywords": response.text}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/keywords/deep-analyze")
+async def deep_analyze_keyword(
+    req: 심층_분석_요청,
+    x_gemini_key: Optional[str] = Header(None)
+):
+    api_key = x_gemini_key or GEMINI_API_KEY
+    if not api_key: raise HTTPException(status_code=500, detail="Gemini API Key not configured")
+
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = f"""
+        [현재 시점: 2026년 4월]
+        당신은 수익형 블로그 SEO 전문가입니다.
+        핵심 키워드: '{req.keyword}' (주제: {req.topic})
+
+        ## 심층 분석 지시사항
+        이 키워드를 중심으로 수익화 극대화를 위한 다음 분석을 수행하세요:
+
+        1. **파생 롱테일 키워드 10개**: 월간 500~10,000 검색량 + CPC 높은 순
+        2. **추천 글쓰기 각도 5가지**: 각 각도별 예상 클릭률(CTR) 높이는 제목 포함
+        3. **수익화 전략**: 이 키워드로 수익을 극대화하는 방법 (애드센스, 제휴 링크 배치 등)
+        4. **연관 고CPC 키워드 3개**: 함께 타겟팅하면 시너지 효과가 있는 키워드
+
+        ## 응답 형식 (마크다운 없이 순수 JSON만)
+        {{
+          "longtail_keywords": [
+            {{"keyword": "파생 롱테일 키워드", "monthly_vol": "1,000~3,000", "cpc_estimate": "₩800", "competition": "낮음"}}
+          ],
+          "content_angles": [
+            {{"angle": "글쓰기 각도명", "title_example": "클릭 유도 제목 예시", "ctr_boost": "높음"}}
+          ],
+          "monetization_tips": "광고 배치, 제휴 링크 활용 등 수익화 전략 설명",
+          "synergy_keywords": [
+            {{"keyword": "연관 키워드", "reason": "시너지 효과 이유"}}
+          ]
+        }}
+        """
+
+        response = await safe_generate_content_async(client, prompt, is_json=True)
+        return {"analysis": response.text}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/topic-recommendations")
 async def get_topic_recommendations(req: 분야_추천_요청, x_gemini_key: Optional[str] = Header(None)):
