@@ -82,13 +82,27 @@ export default function KeywordsPage() {
     localStorage.removeItem("seo_golden_keywords");
   };
 
+  // JSON 안전 파싱 헬퍼 함수
+  const safe_parse_error = async (res: Response): Promise<string> => {
+    try {
+      const data = await res.json();
+      return data.detail || `서버 오류: ${res.status}`;
+    } catch {
+      return `서버 오류 (${res.status}): 응답을 파싱할 수 없습니다.`;
+    }
+  };
+
   // 황금 키워드 발굴
   const fetch_keywords = async () => {
     if (!topic) return;
+    const gemini_key = localStorage.getItem("GEMINI_API_KEY") || "";
+    if (!gemini_key) {
+      set_error_msg("⚠️ Gemini API 키가 설정되지 않았습니다. 상단 [API 키 관리] 바에서 키를 입력해주세요.");
+      return;
+    }
     set_loading(true);
     set_error_msg("");
     set_keywords([]);
-    const gemini_key = localStorage.getItem("GEMINI_API_KEY") || "";
     try {
       const res = await fetch("/api/keywords", {
         method: "POST",
@@ -96,14 +110,14 @@ export default function KeywordsPage() {
         body: JSON.stringify({ topic }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || `서버 오류: ${res.status}`);
+        const err_msg = await safe_parse_error(res);
+        throw new Error(err_msg);
       }
       const data = await res.json();
       const raw = data.keywords;
       if (!raw) throw new Error("키워드 데이터가 없습니다.");
       const parsed: 황금_키워드[] = typeof raw === "string"
-        ? JSON.parse(raw.replace(/```json|```/g, ""))
+        ? JSON.parse(raw.replace(/```json\s*|```/g, "").trim())
         : raw;
       if (!Array.isArray(parsed)) throw new Error("응답 형식 오류");
       set_keywords(parsed);
@@ -129,23 +143,22 @@ export default function KeywordsPage() {
         body: JSON.stringify({ keyword, topic }),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "심층 분석 실패");
+        let err_msg = `서버 오류: ${res.status}`;
+        try { const err = await res.json(); err_msg = err.detail || err_msg; } catch {}
+        throw new Error(err_msg);
       }
       const data = await res.json();
       const raw = data.analysis;
-      // JSON 파싱 실패 시에도 모달을 유지하고 에러만 표시
       let parsed: 심층_분석_결과 | null = null;
       try {
         parsed = typeof raw === "string"
-          ? JSON.parse(raw.replace(/```json|```/g, "").trim())
+          ? JSON.parse(raw.replace(/```json\s*|```/g, "").trim())
           : raw;
-      } catch (parseErr) {
+      } catch {
         throw new Error("분석 결과 파싱 실패. AI가 올바른 JSON을 반환하지 않았습니다.");
       }
       set_analysis_result(parsed);
     } catch (err: any) {
-      // 모달은 유지하고 에러메시지만 모달 내부에 표시
       set_analysis_result({ longtail_keywords: [], content_angles: [], monetization_tips: `오류: ${err.message}`, synergy_keywords: [] });
     } finally {
       set_analysis_loading(false);

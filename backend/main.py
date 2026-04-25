@@ -16,7 +16,7 @@ import json
 
 load_dotenv()
 
-app = FastAPI(title="AI SEO Manager Beta (Gemini 2.5 Flash-Lite Stable)")
+app = FastAPI(title="AI SEO Manager Pro (Gemini 2.5 Flash Stable)")
 
 # CORS 설정
 app.add_middleware(
@@ -66,11 +66,16 @@ async def root():
     return {"message": "AI SEO Manager (Gemini 2.5) is running on port 8002"}
 
 def safe_generate_content(client, prompt, config=None, is_json=False):
-    """503/429 에러 발생 시 재시도 및 모델 폴백을 수행하는 함수 (2026년 최적화)"""
+    """
+    503/429 에러 발생 시 재시도 및 모델 폴백을 수행하는 함수.
+    [2026-04-25 업그레이드]
+    - 1순위: gemini-2.5-flash (최고 성능/안정성, 고품질 SEO 콘텐츠 생성)
+    - 2순위: gemini-2.5-flash-lite (초고속/저비용 폴백)
+    - 지원 중단 예정 모델 제거: gemini-2.0-flash (2026-06-01 지원 종료)
+    """
     models_to_try = [
-        'gemini-2.5-flash-lite', 
-        'gemini-2.0-flash',
-        'gemini-1.5-flash-8b' # 2026년에도 하위 호환성을 위해 유지될 수 있는 경량 모델
+        'gemini-2.5-flash',      # 2026년 1순위: 최고 품질 + 안정성
+        'gemini-2.5-flash-lite', # 2026년 2순위: 고속 폴백 (무료 할당량 소진 시)
     ]
     
     last_exception = None
@@ -96,12 +101,14 @@ def safe_generate_content(client, prompt, config=None, is_json=False):
                 last_exception = e
                 err_msg = str(e).upper()
                 # 503(UNAVAILABLE) 또는 429(RESOURCE_EXHAUSTED)인 경우에만 재시도
-                if "503" in err_msg or "UNAVAILABLE" in err_msg or "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                if "RESOURCE_EXHAUSTED" in err_msg or "429" in err_msg:
+                    print(f"Quota exhausted on {model_name}. Switching model immediately...")
+                    break
+                elif "503" in err_msg or "UNAVAILABLE" in err_msg:
                     print(f"Error {err_msg} on {model_name}. Retrying in {sleep_time}s...")
                     time.sleep(sleep_time)
                     continue
                 else:
-                    # 그 외 에러(404 등)는 다음 모델로 즉시 전환
                     print(f"Error {err_msg} on {model_name}. Switching model...")
                     break
         print(f"Model {model_name} failed completely.")
@@ -252,17 +259,27 @@ class 자동_작성_관리자:
         self.client = genai.Client(api_key=api_key)
 
     def 주제_생성(self, category: str) -> List[dict]:
-        prompt = f"[현재 시점: 2026년 4월] '{category}' 분야에서 2026년 기준 수익성 높은 블로그 주제 3개를 JSON 형식으로 추천해줘. [{{\"topic\": \"...\", \"reason\": \"...\"}}]"
+        json_format = '[{"topic": "...", "reason": "..."}]'
+        prompt = f"'{category}' 분야에서 최신 트렌드 기준 수익성 높은 블로그 주제 3개를 JSON 형식으로 추천해줘. {json_format}"
         response = safe_generate_content(self.client, prompt, is_json=True)
         return json.loads(response.text)
 
     def 키워드_추출(self, topic: str) -> str:
-        prompt = f"[현재 시점: 2026년 4월] '{topic}' 주제에 대해 2026년 기준 가장 CPC가 높은 핵심 키워드 1개만 알려줘. 키워드만 텍스트로 응답해."
+        prompt = f"'{topic}' 주제에 대해 최신 트렌드 기준 CPC가 높은 핵심 키워드 1개만 알려줘. 키워드만 텍스트로 응답해."
         response = safe_generate_content(self.client, prompt)
         return response.text.strip()
 
     def 원고_생성(self, topic: str, keyword: str) -> str:
-        prompt = f"[현재 시점: 2026년 4월] '{keyword}' 키워드를 중심으로 '{topic}' 관련 2026년 SEO 최적화 블로그 원고를 마크다운으로 작성해줘. 2024년 등 과거 정보를 현재인 것처럼 작성하지 말고 반드시 2026년 시점임을 명심해."
+        prompt = f"""
+'{keyword}' 키워드를 중심으로 '{topic}' 관련 블로그 원고를 마크다운으로 작성해줘.
+
+[작성 규칙]
+- 최신 정보를 바탕으로 작성하되, 특정 연도·날짜 표현은 사용하지 마세요.
+- 글 내용에서 'SEO', '검색엔진 최적화' 등의 단어는 절대 언급하지 마세요. 자연스럽고 유익한 정보성 글로 작성하세요.
+- H1~H3 태그 구조를 갖추세요.
+- 글 마지막에 관련 키워드를 아래 형식으로 정확히 한 줄로 작성하세요 (# 기호 없이 단어만):
+  키워드1, 키워드2, 키워드3, 키워드4, 키워드5
+"""
         response = safe_generate_content(self.client, prompt)
         return response.text
 
@@ -290,7 +307,7 @@ async def auto_write(
         # 3. 원고 생성
         원고 = 관리자.원고_생성(주제, 키워드)
         
-        # 4. 티스토리 발행 (토큰이 있는 경우)
+        # 4. 티스토리 발행 (토큰이 있는 경우, 티스토리는 HTML만 받으므로 변환 필요)
         발행_결과 = None
         if req.tistory_token and req.tistory_blog:
             try:
@@ -331,13 +348,140 @@ async def generate_article(
     
     try:
         client = genai.Client(api_key=api_key)
-        prompt = f"[현재 시점: 2026년 4월] '{req.keyword}' 키워드를 중심으로 '{req.topic}' 관련 2026년 SEO 상위 노출을 위한 블로그 원고를 작성해줘. H1~H3 태그 구조를 갖추고 메타 설명도 포함해줘. 2024년 정보가 아닌 2026년 최신 정보를 바탕으로 작성해줘. 글의 맨 마지막에는 본문과 잘 어울리는 추천 해시태그 5~7개를 추가해줘. 전체 결과는 마크다운 형식으로 작성해줘."
+        prompt = f"""
+'{req.keyword}' 키워드를 중심으로 '{req.topic}' 관련 블로그 원고를 마크다운으로 작성해줘.
+
+[작성 규칙]
+- 최신 정보를 바탕으로 작성하되, 특정 연도·날짜 표현은 사용하지 마세요.
+- 글 내용에서 'SEO', '검색엔진 최적화' 등의 단어는 절대 언급하지 마세요. 자연스럽고 유익한 정보성 글로 작성하세요.
+- H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요.
+- 글 마지막에 관련 키워드를 아래 형식으로 정확히 한 줄로 작성하세요 (# 기호 없이 단어만):
+  키워드1, 키워드2, 키워드3, 키워드4, 키워드5, 키워드6, 키워드7
+"""
         
         response = safe_generate_content(client, prompt)
         return {"article": response.text}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+def translate_prompt_to_english(prompt: str, api_key: Optional[str] = None) -> str:
+    """
+    한국어 주제어를 블로그 썸네일 전용 영어 이미지 프롬프트로 변환.
+    단순 번역이 아닌, 주제에 최적화된 장면·구도·스타일을 Gemini가 직접 설계.
+    """
+    # 이미 영어인지 간단히 판별 (한글 유니코드 범위: AC00~D7A3)
+    has_korean = any('\uAC00' <= c <= '\uD7A3' for c in prompt)
+    if not has_korean:
+        print("프롬프트가 이미 영어입니다. 번역 생략.")
+        return prompt
+
+    if not api_key:
+        print("Gemini API 키 없음. 원본 프롬프트 사용.")
+        return prompt
+
+    try:
+        client = genai.Client(api_key=api_key)
+        translation_prompt = f"""당신은 AI 이미지 생성 전문 프롬프트 엔지니어입니다.
+아래 한국어 블로그 주제어를 보고, 그 주제를 가장 잘 표현하는 블로그 썸네일 이미지를 위한 영어 프롬프트를 작성하세요.
+
+[핵심 규칙]
+1. 주제와 직접적으로 관련된 구체적인 장면과 피사체를 묘사할 것
+   예) "미국 배당주 장기투자" → Wall Street building, stock dividend chart, American dollar bills, long-term growth graph
+2. 사용자가 요청한 이미지 스타일이 있다면 그 스타일(예: 일러스트, 수채화, 3D 등)을 완벽하게 반영하는 영어 태그를 넣고, 지정된 스타일이 없다면 기본적으로 사실적이고 전문적인 사진(photorealistic, 8K) 스타일로 지시할 것
+3. 구도와 분위기도 포함할 것
+   예) wide shot, cinematic composition, dramatic lighting, high contrast
+4. 반드시 영어 텍스트만 출력하고, 설명·번역·따옴표는 절대 포함하지 말 것
+
+[한국어 주제어]
+{prompt}
+
+[영어 이미지 프롬프트 출력]"""
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=translation_prompt
+        )
+        translated = response.text.strip()
+        print(f"프롬프트 번역 완료:\n  원본: {prompt}\n  번역: {translated}")
+        return translated
+    except Exception as e:
+        print(f"Gemini 번역 실패 ({e}). MyMemory 무료 번역 API로 2차 시도...")
+        try:
+            import urllib.parse
+            encoded_query = urllib.parse.quote(prompt)
+            res = requests.get(f"https://api.mymemory.translated.net/get?q={encoded_query}&langpair=ko|en", timeout=10)
+            if res.status_code == 200:
+                translated = res.json().get('responseData', {}).get('translatedText', prompt)
+                print(f"무료 API 번역 완료: {translated}")
+                return translated
+        except Exception as e2:
+            print(f"2차 번역 실패 ({e2}). 원본 프롬프트 사용.")
+            
+        return prompt
+
+
+
+async def generate_pollinations_image(prompt: str, api_key: Optional[str] = None) -> dict:
+    """
+    Pollinations.ai를 이용한 무료 이미지 생성 (API 키 불필요)
+    Gemini/OpenAI 실패 시 자동 폴백으로 사용.
+    한국어 프롬프트는 Gemini로 영어 번역 후 전달.
+    blocking requests.get은 executor로 비동기 처리.
+    """
+    import urllib.parse
+    import asyncio
+
+    # 한국어 → 영어 번역 (동기 함수를 executor로 비동기 실행)
+    loop = asyncio.get_event_loop()
+    english_prompt = await loop.run_in_executor(
+        None, translate_prompt_to_english, prompt, api_key
+    )
+
+    def _fetch_image(url: str) -> requests.Response:
+        """blocking HTTP GET을 별도 스레드에서 실행 (DNS/네트워크 오류 대비 재시도 로직)"""
+        import time
+        last_error = None
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        for attempt in range(3):
+            try:
+                return requests.get(url, headers=headers, timeout=45)
+            except Exception as e:
+                last_error = e
+                print(f"Pollinations.ai 요청 실패 (시도 {attempt+1}/3) - 1초 후 재시도: {e}")
+                time.sleep(1)
+        raise last_error
+
+    try:
+        encoded_prompt = urllib.parse.quote(english_prompt)
+        image_url = (
+            f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+            f"?width=1024&height=1024&nologo=true&enhance=true&model=flux"
+        )
+        print(f"Pollinations.ai 요청 URL: {image_url[:120]}...")
+
+        # blocking HTTP 요청을 executor로 비동기 실행
+        response = await loop.run_in_executor(None, _fetch_image, image_url)
+
+        if response.status_code == 200 and "image" in response.headers.get("content-type", ""):
+            img_base64 = base64.b64encode(response.content).decode("utf-8")
+            img_mime = response.headers.get("content-type", "image/jpeg").split(";")[0]
+            print(f"Pollinations.ai 성공 ({len(response.content):,} bytes)")
+            return {"image_url": f"data:{img_mime};base64,{img_base64}", "source": "pollinations"}
+        else:
+            raise Exception(f"Pollinations.ai 응답 오류: HTTP {response.status_code}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Pollinations.ai 실패: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"이미지 생성에 실패했습니다. 잠시 후 다시 시도해주세요. (오류: {str(e)})"
+        )
+
+
+IMAGE_CACHE = {}
 
 @app.post("/api/generate-image")
 async def generate_image(
@@ -346,81 +490,103 @@ async def generate_image(
     x_openai_key: Optional[str] = Header(None)
 ):
     api_key = x_gemini_key or GEMINI_API_KEY
+    cache_key = f"{req.prompt_base}"
+    
+    # 동일 프롬프트 연속 요청 시 캐시 활용 (429 방지)
+    if cache_key in IMAGE_CACHE:
+        print(f"이미지 캐시 히트! 이전 생성 결과 반환: {req.prompt_base}")
+        return IMAGE_CACHE[cache_key]
 
-    # 1순위: Gemini 네이티브 이미지 생성 (Nano Banana 방식)
-    if api_key:
-        # 시도할 모델 목록
-        # gemini-3.1-flash-image-preview는 무료 플랜 Quota가 0이므로 제외
-        native_image_models = [
-            'gemini-2.5-flash-image',
-        ]
-        last_gemini_error = None
+    try:
+        # 1순위: Gemini 네이티브 이미지 생성 (Nano Banana 방식)
+        if api_key:
+            native_image_models = ['gemini-2.5-flash-image']
+            last_gemini_error = None
 
-        for model_name in native_image_models:
+            for model_name in native_image_models:
+                try:
+                    print(f"Trying native image model: {model_name}")
+                    
+                    def _call_gemini():
+                        client = genai.Client(api_key=api_key)
+                        return client.models.generate_content(
+                            model=model_name,
+                            contents=[req.prompt_base],
+                            config=types.GenerateContentConfig(
+                                response_modalities=['TEXT', 'IMAGE']
+                            )
+                        )
+                        
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    response = await loop.run_in_executor(None, _call_gemini)
+
+                    # 응답에서 이미지 파트 추출
+                    for part in response.parts:
+                        if part.inline_data is not None:
+                            img_bytes = part.inline_data.data
+                            img_mime = part.inline_data.mime_type or 'image/png'
+                            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                            print(f"Image generated successfully with {model_name}")
+                            IMAGE_CACHE[cache_key] = {"image_url": f"data:{img_mime};base64,{img_base64}", "source": "gemini"}
+                            return IMAGE_CACHE[cache_key]
+
+                    print(f"{model_name}: 응답에 이미지 데이터 없음. 다음 모델 시도.")
+                    last_gemini_error = "응답에 이미지 데이터가 포함되지 않았습니다."
+
+                except Exception as e:
+                    msg = str(e)
+                    last_gemini_error = msg
+                    if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+                        print(f"Quota exhausted for {model_name}. Falling back to OpenAI.")
+                        break
+                    print(f"Native image generation failed ({model_name}): {msg}")
+                    continue
+
+            print(f"All Gemini native image models failed. Last error: {last_gemini_error}")
+            
+            # OpenAI 키가 없으면 → Pollinations.ai 무료 폴백으로 바로 이동
+            if not x_openai_key and not OPENAI_API_KEY:
+                print("OpenAI 키 없음. Pollinations.ai 무료 폴백으로 이동합니다.")
+                IMAGE_CACHE[cache_key] = await generate_pollinations_image(req.prompt_base, api_key)
+                return IMAGE_CACHE[cache_key]
+
+        # 2순위: OpenAI DALL-E 3 (폴백)
+        openai_api_key = x_openai_key or OPENAI_API_KEY
+        if openai_api_key:
             try:
-                print(f"Trying native image model: {model_name}")
-                client = genai.Client(api_key=api_key)
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=[req.prompt_base],
-                    config=types.GenerateContentConfig(
-                        response_modalities=['TEXT', 'IMAGE']
+                print("Falling back to OpenAI DALL-E 3")
+                openai_client = OpenAI(api_key=openai_api_key)
+                
+                def _call_openai():
+                    return openai_client.images.generate(
+                        model="dall-e-3",
+                        prompt=req.prompt_base,
+                        n=1,
                     )
-                )
-
-                # 응답에서 이미지 파트 추출
-                for part in response.parts:
-                    if part.inline_data is not None:
-                        img_bytes = part.inline_data.data
-                        img_mime = part.inline_data.mime_type or 'image/png'
-                        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                        print(f"Image generated successfully with {model_name}")
-                        return {"image_url": f"data:{img_mime};base64,{img_base64}"}
-
-                # 응답에 이미지 파트가 없는 경우
-                print(f"{model_name}: 응답에 이미지 데이터 없음. 다음 모델 시도.")
-                last_gemini_error = "응답에 이미지 데이터가 포함되지 않았습니다."
-
+                
+                import asyncio
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(None, _call_openai)
+                IMAGE_CACHE[cache_key] = {"image_url": response.data[0].url, "source": "openai"}
+                return IMAGE_CACHE[cache_key]
             except Exception as e:
-                msg = str(e)
-                last_gemini_error = msg
-                # Quota 초과(RESOURCE_EXHAUSTED)인 경우 즉시 OpenAI로 폴백 (재시도 불필요)
-                if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
-                    print(f"Quota exhausted for {model_name}. Falling back to OpenAI.")
-                    break
-                print(f"Native image generation failed ({model_name}): {msg}")
-                continue
+                print(f"DALL-E 3 실패: {e}. Pollinations.ai로 폴백.")
+                IMAGE_CACHE[cache_key] = await generate_pollinations_image(req.prompt_base, api_key)
+                return IMAGE_CACHE[cache_key]
 
-        # Gemini 이미지 생성 모두 실패한 경우
-        print(f"All Gemini native image models failed. Last error: {last_gemini_error}")
-        if not x_openai_key and not OPENAI_API_KEY:
-            # Quota 초과인 경우 별도 안내
-            if last_gemini_error and ("RESOURCE_EXHAUSTED" in last_gemini_error or "429" in last_gemini_error):
-                raise HTTPException(
-                    status_code=429,
-                    detail="Gemini 이미지 생성 무료 한도를 초과했습니다. 내일 다시 시도하거나, 상단 설정에서 OpenAI API 키를 입력하시면 DALL-E 3로 즉시 대체 생성할 수 있습니다."
-                )
-            raise HTTPException(
-                status_code=500,
-                detail=f"Gemini 이미지 생성에 실패했습니다: {last_gemini_error}\n\nOpenAI API 키를 상단 설정에 입력하시면 DALL-E 3로 즉시 대체 생성할 수 있습니다."
-            )
+        # 3순위: Pollinations.ai (완전 무료, API 키 불필요)
+        IMAGE_CACHE[cache_key] = await generate_pollinations_image(req.prompt_base, api_key)
+        return IMAGE_CACHE[cache_key]
 
-    # 2순위: OpenAI DALL-E 3 (폴백)
-    openai_api_key = x_openai_key or OPENAI_API_KEY
-    if openai_api_key:
-        try:
-            print("Falling back to OpenAI DALL-E 3")
-            openai_client = OpenAI(api_key=openai_api_key)
-            response = openai_client.images.generate(
-                model="dall-e-3",
-                prompt=req.prompt_base,
-                n=1,
-            )
-            return {"image_url": response.data[0].url}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"DALL-E 3 에러: {str(e)}")
-
-    return {"image_url": "https://via.placeholder.com/1024x1024.png?text=No+API+Key"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Top-level error in generate_image: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"이미지 생성 중 내부 오류가 발생했습니다. (오류: {str(e)})"
+        )
 
 @app.post("/api/publish-tistory")
 async def publish_tistory(
@@ -434,7 +600,16 @@ async def publish_tistory(
     try:
         # 1. 텍스트 원고(Markdown) 생성
         client = genai.Client(api_key=api_key)
-        prompt = f"[현재 시점: 2026년 4월] '{req.keyword}' 키워드를 중심으로 '{req.topic}' 관련 2026년 SEO 상위 노출을 위한 블로그 원고를 작성해줘. H1~H3 태그 구조를 갖추고 메타 설명도 포함해줘. 마크다운 형식으로 작성해주고, 마지막에 해시태그 5개를 추가해줘. 과거(2024년 등) 시점의 내용이 포함되지 않도록 주의해."
+        prompt = f"""
+'{req.keyword}' 키워드를 중심으로 '{req.topic}' 관련 블로그 원고를 마크다운으로 작성해줘.
+
+[작성 규칙]
+- 최신 정보를 바탕으로 작성하되, 특정 연도·날짜 표현은 사용하지 마세요.
+- 글 내용에서 'SEO', '검색엔진 최적화' 등의 단어는 절대 언급하지 마세요. 자연스럽고 유익한 정보성 글로 작성하세요.
+- H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요.
+- 글 마지막에 관련 키워드를 아래 형식으로 정확히 한 줄로 작성하세요 (# 기호 없이 단어만):
+  키워드1, 키워드2, 키워드3, 키워드4, 키워드5
+"""
         
         response = safe_generate_content(client, prompt)
         article_md = response.text

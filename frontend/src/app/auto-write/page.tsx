@@ -69,16 +69,27 @@ export default function AutoWritePage() {
 
   const saveToStorage = (articles: SavedArticle[]) => {
     setSavedArticles(articles);
-    localStorage.setItem("seo_saved_articles", JSON.stringify(articles));
+    try {
+      localStorage.setItem("seo_saved_articles", JSON.stringify(articles));
+    } catch (e) {
+      console.error("Failed to save to localStorage:", e);
+      alert("⚠️ 브라우저의 저장 용량이 가득 찼습니다. 기존에 작성된 원고 중 불필요한 것을 삭제해 주셔야 계속 보관이 가능합니다.");
+    }
   };
 
   const fetchTopics = async (category: string) => {
     setSelectedCategory(category);
+
+    const geminiKey = localStorage.getItem("GEMINI_API_KEY") || "";
+    if (!geminiKey) {
+      alert("⚠️ Gemini API 키가 설정되지 않았습니다. 상단 [API 키 관리] 바에서 키를 입력해주세요.");
+      return;
+    }
+
     setLoadingTopics(true);
     setTopics([]);
     setCurrentStep(2);
 
-    const geminiKey = localStorage.getItem("GEMINI_API_KEY") || "";
     try {
       const res = await fetch("/api/topic-recommendations", {
         method: "POST",
@@ -90,17 +101,19 @@ export default function AutoWritePage() {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "주제 추천을 가져오는데 실패했습니다.");
+        let err_msg = `서버 오류: ${res.status}`;
+        try { const err = await res.json(); err_msg = err.detail || err_msg; } catch {}
+        throw new Error(err_msg);
       }
       const data = await res.json();
       const parsedTopics = typeof data.topics === 'string' 
-        ? JSON.parse(data.topics.replace(/```json|```/g, "")) 
+        ? JSON.parse(data.topics.replace(/```json\s*|```/g, "").trim()) 
         : data.topics;
       setTopics(parsedTopics);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("주제 추천을 가져오는데 실패했습니다.");
+      alert(`주제 추청을 가져오는데 실패했습니다:\n${error.message}`);
+      setCurrentStep(1);
     } finally {
       setLoadingTopics(false);
     }
@@ -121,7 +134,11 @@ export default function AutoWritePage() {
         body: JSON.stringify({ category: selectedCategory, topic }),
       });
 
-      if (!res.ok) throw new Error("Auto-write failed");
+      if (!res.ok) {
+        let err_msg = `서버 오류: ${res.status}`;
+        try { const err = await res.json(); err_msg = err.detail || err_msg; } catch {}
+        throw new Error(err_msg);
+      }
       const data = await res.json();
       
       const newArticle: SavedArticle = {
@@ -136,9 +153,9 @@ export default function AutoWritePage() {
       setGeneratedResult(newArticle);
       saveToStorage([newArticle, ...savedArticles]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("글 생성에 실패했습니다.");
+      alert(`글 생성에 실패했습니다: ${error.message}`);
       setCurrentStep(2);
     } finally {
       setGeneratingArticle(false);

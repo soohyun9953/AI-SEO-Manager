@@ -1,22 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { ImageIcon, Send, Download, Copy, Loader2, Zap, Layout, Sparkles, RefreshCw, Layers } from "lucide-react";
+import { ImageIcon, Send, Download, Copy, Loader2, Zap, Layout, Sparkles, RefreshCw, Layers, Palette } from "lucide-react";
+
+const IMAGE_STYLES = [
+  { id: "default", label: "✨ 자동 최적화", promptSuffix: "" },
+  { id: "photo", label: "📸 실사 사진", promptSuffix: "실사 사진처럼, 8K 해상도, 전문적인 사진 촬영 스타일" },
+  { id: "3d", label: "🧊 3D 렌더링", promptSuffix: "고품질 3D 렌더링, 시네마틱 라이팅, 언리얼 엔진 스타일" },
+  { id: "illustration", label: "🎨 일러스트", promptSuffix: "세련된 디지털 일러스트레이션, 선명한 색감, 트렌디한 아트 스타일" },
+  { id: "watercolor", label: "🖌️ 수채화", promptSuffix: "아름다운 수채화 스타일, 부드러운 파스텔 톤, 예술적인 느낌" },
+  { id: "cyberpunk", label: "🌃 사이버펑크", promptSuffix: "사이버펑크 스타일, 네온 조명, 미래지향적 분위기" }
+];
 
 export default function ImagesPage() {
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [imageSource, setImageSource] = useState<"gemini" | "openai" | "pollinations" | null>(null);
+  const [selectedStyle, setSelectedStyle] = useState(IMAGE_STYLES[0]);
 
   const generateImage = async () => {
     if (!prompt) return;
     setLoading(true);
     setErrorMsg("");
     setImageUrl(""); // 생성 시작 시 기존 이미지 초기화
+    setImageSource(null);
     const geminiKey = localStorage.getItem("GEMINI_API_KEY") || "";
     const openaiKey = localStorage.getItem("OPENAI_API_KEY") || "";
     try {
+      const finalPrompt = selectedStyle.promptSuffix 
+        ? `${prompt} (스타일: ${selectedStyle.promptSuffix})` 
+        : prompt;
+
       const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: { 
@@ -24,16 +40,23 @@ export default function ImagesPage() {
           "X-Gemini-Key": geminiKey,
           "X-OpenAI-Key": openaiKey
         },
-        body: JSON.stringify({ prompt_base: prompt }),
+        body: JSON.stringify({ prompt_base: finalPrompt }),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Image generation failed");
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await res.json();
+          throw new Error(errorData.detail || "이미지 생성 실패");
+        } else {
+          const textError = await res.text();
+          throw new Error(`서버 연결 오류: ${textError || "백엔드 서버를 확인해주세요."}`);
+        }
       }
 
       const data = await res.json();
       setImageUrl(data.image_url || "");
+      setImageSource(data.source === "pollinations" ? "pollinations" : (data.image_url?.startsWith("data:") ? "gemini" : "openai"));
     } catch (error: any) {
       console.error("Generation failed", error);
       setErrorMsg(error.message);
@@ -53,7 +76,7 @@ export default function ImagesPage() {
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-white font-outfit">이미지 생성기 <span className="text-emerald-400 font-light italic">Visualization.</span></h1>
         <p className="text-gray-400 text-lg leading-relaxed max-w-2xl">
-           Google Imagen 3 모델을 활용하여 인상적인 블로그 썸네일을 생성하세요. <br />
+           Gemini 이미지 모델로 블로그 썸네일을 생성하세요. 무료 한도 초과 시 <span className="text-emerald-400 font-medium">Pollinations AI</span>로 자동 전환됩니다. <br />
            텍스트 프롬프트만으로 클릭을 유도하는 전문적인 시각적 콘텐츠를 완성합니다.
         </p>
       </div>
@@ -86,6 +109,29 @@ export default function ImagesPage() {
                     className="w-full bg-white/[0.03] border border-white/[0.05] rounded-3xl p-6 text-white text-base focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-gray-700 min-h-[160px] resize-none leading-relaxed shadow-inner"
                   />
                   <div className="absolute right-4 bottom-4 text-[10px] text-gray-600 font-medium tracking-tight">AI Optimizer Active</div>
+                </div>
+              </div>
+
+              {/* Image Style Selection */}
+              <div className="flex flex-col gap-4 relative z-10">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Palette size={12} className="text-emerald-500/60" />
+                  아트 스타일 선택
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {IMAGE_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      onClick={() => setSelectedStyle(style)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all border ${
+                        selectedStyle.id === style.id
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                          : "bg-white/[0.02] border-white/[0.05] text-gray-400 hover:bg-white/[0.05] hover:text-gray-300"
+                      }`}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -163,6 +209,29 @@ export default function ImagesPage() {
 
               {imageUrl && !errorMsg && (
                 <div className="w-full h-full p-4 relative group animate-in zoom-in-95 fade-in duration-1000">
+                  {/* 이미지 생성 엔진 배지 */}
+                  {imageSource && (
+                    <div className="absolute top-8 left-8 z-10">
+                      {imageSource === "pollinations" && (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase tracking-widest backdrop-blur-md">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                          Pollinations AI (무료 폴백)
+                        </span>
+                      )}
+                      {imageSource === "gemini" && (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-widest backdrop-blur-md">
+                          <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                          Gemini AI
+                        </span>
+                      )}
+                      {imageSource === "openai" && (
+                        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-400 text-[10px] font-bold uppercase tracking-widest backdrop-blur-md">
+                          <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" />
+                          DALL-E 3
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl shadow-emerald-950/20">
                     <img 
                       src={imageUrl} 
