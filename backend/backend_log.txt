@@ -1,0 +1,562 @@
+﻿python : INFO:     Started server process [17568]
+위치 줄:1 문자:68
++ ... esktop\AI Coding\ai-seo-manager\backend'; python main.py *>&1 | Out-F ...
++                                               ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO:     Started server process [17568]:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8002 (Press CTRL+C to quit)
+Attempting gemini-2.5-flash (Attempt 1)...
+[gemini-2.5-flash] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 20, MODEL: GEMINI-2.5-FLASH\NPLEASE RETRY IN 56.316104681S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'MODEL': 'GEMINI-2.5-FLASH', 'LOCATION': 'GLOBAL'}, 'QUOTAVALUE': '20'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '56S'}]}})
+-> 5초 후 다음 순위 모델 [gemini-2.5-flash-lite]에 접속을 시도합니다.
+Model gemini-2.5-flash failed completely.
+Attempting gemini-2.5-flash-lite (Attempt 1)...
+INFO:     127.0.0.1:60373 - "POST /api/keywords HTTP/1.1" 200 OK
+Attempting gemini-2.5-flash (Attempt 1)...
+[gemini-2.5-flash] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 20, MODEL: GEMINI-2.5-FLASH\NPLEASE RETRY IN 41.403743941S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-FLASH'}, 'QUOTAVALUE': '20'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '41S'}]}})
+-> 5초 후 다음 순위 모델 [gemini-2.5-flash-lite]에 접속을 시도합니다.
+Model gemini-2.5-flash failed completely.
+Attempting gemini-2.5-flash-lite (Attempt 1)...
+INFO:     127.0.0.1:50673 - "POST /api/generate-article HTTP/1.1" 200 OK
+Trying native image model: gemini-2.5-flash-image
+Quota exhausted for gemini-2.5-flash-image. Falling back to OpenAI.
+All Gemini native image models failed. Last error: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5-flash-preview-image\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5-flash-preview-image\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.5-flash-preview-image\nPlease retry in 2.873989496s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-preview-image'}}, {'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-preview-image'}}, {'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_input_token_count', 'quotaId': 'GenerateContentInputTokensPerModelPerMinute-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-preview-image'}}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '2s'}]}}
+OpenAI 키 없음. Pollinations.ai 무료 폴백으로 이동합니다.
+Gemini 번역 실패 (429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 1.540157126s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '1s'}]}}). MyMemory 무료 번역 API로 2차 시도...
+무료 API 번역 완료: US Dividend Stock
+Pollinations.ai 요청 URL: https://image.pollinations.ai/prompt/US%20Dividend%20Stock?width=1024&height=1024&nologo=true&enhance=true&model=flux...
+Pollinations.ai 성공 (88,983 bytes)
+INFO:     127.0.0.1:62193 - "POST /api/generate-image HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 250, in get_topic_recommendations
+    response = safe_generate_content(client, prompt, is_json=True, target_model=req.model_name)
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 120, in safe_generate_content
+    raise last_exception
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 93, in safe_generate_content
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 6021, in gener
+ate_content
+    response = self._generate_content(
+        model=model, contents=contents, config=parsed_config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 4683, in _gene
+rate_content
+    response = self._api_client.request(
+        'post', path, request_dict, http_options
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1532, in 
+request
+    response = self._request(http_request, http_options, stream=False)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1327, in 
+_request
+    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 470, in __call__
+    do = self.iter(retry_state=retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 413, in exc_chec
+k
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 473, in __call__
+    result = fn(*args, **kwargs)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1304, in 
+_request_once
+    errors.APIError.raise_for_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 155, in raise_
+for_response
+    cls.raise_error(response.status_code, response_json, response)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 184, in raise_
+error
+    raise ClientError(status_code, response_json, response)
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current 
+quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/g
+emini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for m
+etric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPleas
+e retry in 53.133303519s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help'
+, 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-li
+mits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.g
+oogleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'qu
+otaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.
+com/google.rpc.RetryInfo', 'retryDelay': '53s'}]}}
+Attempting gemini-2.5-flash (Attempt 1)...
+[gemini-2.5-flash] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 20, MODEL: GEMINI-2.5-FLASH\NPLEASE RETRY IN 53.133303519S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-FLASH'}, 'QUOTAVALUE': '20'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '53S'}]}})
+Model gemini-2.5-flash failed completely.
+Topic recommendation error: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 53.133303519s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '53s'}]}}
+INFO:     127.0.0.1:62892 - "POST /api/topic-recommendations HTTP/1.1" 400 Bad Request
+Attempting gemini-2.5-flash-lite (Attempt 1)...
+INFO:     127.0.0.1:52702 - "POST /api/topic-recommendations HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 309, in auto_write
+    키워드 = 관리자.키워드_추출(주제, target_model=req.model_name)
+             ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 273, in 키워드_추출
+    response = safe_generate_content(self.client, prompt, target_model=target_model)
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 120, in safe_generate_content
+    raise last_exception
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 93, in safe_generate_content
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 6021, in gener
+ate_content
+    response = self._generate_content(
+        model=model, contents=contents, config=parsed_config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 4683, in _gene
+rate_content
+    response = self._api_client.request(
+        'post', path, request_dict, http_options
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1532, in 
+request
+    response = self._request(http_request, http_options, stream=False)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1327, in 
+_request
+    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 470, in __call__
+    do = self.iter(retry_state=retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 413, in exc_chec
+k
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 473, in __call__
+    result = fn(*args, **kwargs)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1304, in 
+_request_once
+    errors.APIError.raise_for_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 155, in raise_
+for_response
+    cls.raise_error(response.status_code, response_json, response)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 184, in raise_
+error
+    raise ClientError(status_code, response_json, response)
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current 
+quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/g
+emini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for m
+etric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPleas
+e retry in 38.912926127s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help'
+, 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-li
+mits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.g
+oogleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'qu
+otaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.
+com/google.rpc.RetryInfo', 'retryDelay': '38s'}]}}
+Attempting gemini-2.5-flash (Attempt 1)...
+[gemini-2.5-flash] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 20, MODEL: GEMINI-2.5-FLASH\NPLEASE RETRY IN 38.912926127S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-FLASH'}, 'QUOTAVALUE': '20'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '38S'}]}})
+Model gemini-2.5-flash failed completely.
+INFO:     127.0.0.1:57750 - "POST /api/auto-write HTTP/1.1" 500 Internal Server Error
+Traceback (most recent call last):
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 312, in auto_write
+    원고 = 관리자.원고_생성(주제, 키워드, target_model=req.model_name)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 287, in 원고_생성
+    response = safe_generate_content(self.client, prompt, target_model=target_model)
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 120, in safe_generate_content
+    raise last_exception
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 93, in safe_generate_content
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 6021, in gener
+ate_content
+    response = self._generate_content(
+        model=model, contents=contents, config=parsed_config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 4683, in _gene
+rate_content
+    response = self._api_client.request(
+        'post', path, request_dict, http_options
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1532, in 
+request
+    response = self._request(http_request, http_options, stream=False)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1327, in 
+_request
+    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 470, in __call__
+    do = self.iter(retry_state=retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 413, in exc_chec
+k
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 473, in __call__
+    result = fn(*args, **kwargs)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1304, in 
+_request_once
+    errors.APIError.raise_for_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 155, in raise_
+for_response
+    cls.raise_error(response.status_code, response_json, response)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 184, in raise_
+error
+    raise ClientError(status_code, response_json, response)
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current 
+quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/g
+emini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for m
+etric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\n
+Please retry in 31.510106646s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.
+Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/ra
+te-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelangu
+age.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier'
+, 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.g
+oogleapis.com/google.rpc.RetryInfo', 'retryDelay': '31s'}]}}
+Attempting gemini-2.5-flash-lite (Attempt 1)...
+Attempting gemini-2.5-flash-lite (Attempt 1)...
+[gemini-2.5-flash-lite] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 20, MODEL: GEMINI-2.5-FLASH-LITE\NPLEASE RETRY IN 31.510106646S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-FLASH-LITE'}, 'QUOTAVALUE': '20'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '31S'}]}})
+Model gemini-2.5-flash-lite failed completely.
+INFO:     127.0.0.1:51700 - "POST /api/auto-write HTTP/1.1" 500 Internal Server Error
+Traceback (most recent call last):
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 309, in auto_write
+    키워드 = 관리자.키워드_추출(주제, target_model=req.model_name)
+             ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 273, in 키워드_추출
+    response = safe_generate_content(self.client, prompt, target_model=target_model)
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 120, in safe_generate_content
+    raise last_exception
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 93, in safe_generate_content
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 6021, in gener
+ate_content
+    response = self._generate_content(
+        model=model, contents=contents, config=parsed_config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 4683, in _gene
+rate_content
+    response = self._api_client.request(
+        'post', path, request_dict, http_options
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1532, in 
+request
+    response = self._request(http_request, http_options, stream=False)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1327, in 
+_request
+    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 470, in __call__
+    do = self.iter(retry_state=retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 413, in exc_chec
+k
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 473, in __call__
+    result = fn(*args, **kwargs)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1304, in 
+_request_once
+    errors.APIError.raise_for_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 155, in raise_
+for_response
+    cls.raise_error(response.status_code, response_json, response)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 184, in raise_
+error
+    raise ClientError(status_code, response_json, response)
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current 
+quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/g
+emini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for m
+etric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5-pro\n* Quota 
+exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5
+-pro\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limi
+t: 0, model: gemini-2.5-pro\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_
+input_token_count, limit: 0, model: gemini-2.5-pro\nPlease retry in 25.264428866s.', 'status': 'RESOURCE_EXHAUSTED', 'd
+etails': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quota
+s', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailu
+re', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId':
+ 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pr
+o'}}, {'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequ
+estsPerMinutePerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}, {'quo
+taMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_input_token_count', 'quotaId': 'GenerateConten
+tInputTokensPerModelPerMinute-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}, {'quota
+Metric': 'generativelanguage.googleapis.com/generate_content_free_tier_input_token_count', 'quotaId': 'GenerateContentI
+nputTokensPerModelPerDay-FreeTier', 'quotaDimensions': {'model': 'gemini-2.5-pro', 'location': 'global'}}]}, {'@type': 
+'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '25s'}]}}
+Attempting gemini-2.5-pro (Attempt 1)...
+[gemini-2.5-pro] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 0, MODEL: GEMINI-2.5-PRO\N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 0, MODEL: GEMINI-2.5-PRO\N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT, LIMIT: 0, MODEL: GEMINI-2.5-PRO\N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT, LIMIT: 0, MODEL: GEMINI-2.5-PRO\NPLEASE RETRY IN 25.264428866S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-PRO'}}, {'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERMINUTEPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-PRO'}}, {'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT', 'QUOTAID': 'GENERATECONTENTINPUTTOKENSPERMODELPERMINUTE-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-PRO'}}, {'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT', 'QUOTAID': 'GENERATECONTENTINPUTTOKENSPERMODELPERDAY-FREETIER', 'QUOTADIMENSIONS': {'MODEL': 'GEMINI-2.5-PRO', 'LOCATION': 'GLOBAL'}}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '25S'}]}})
+Model gemini-2.5-pro failed completely.
+INFO:     127.0.0.1:55496 - "POST /api/auto-write HTTP/1.1" 500 Internal Server Error
+Traceback (most recent call last):
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 250, in get_topic_recommendations
+    response = safe_generate_content(client, prompt, is_json=True, target_model=req.model_name)
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 120, in safe_generate_content
+    raise last_exception
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 93, in safe_generate_content
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 6021, in gener
+ate_content
+    response = self._generate_content(
+        model=model, contents=contents, config=parsed_config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 4683, in _gene
+rate_content
+    response = self._api_client.request(
+        'post', path, request_dict, http_options
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1532, in 
+request
+    response = self._request(http_request, http_options, stream=False)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1327, in 
+_request
+    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 470, in __call__
+    do = self.iter(retry_state=retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 413, in exc_chec
+k
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 473, in __call__
+    result = fn(*args, **kwargs)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1304, in 
+_request_once
+    errors.APIError.raise_for_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 155, in raise_
+for_response
+    cls.raise_error(response.status_code, response_json, response)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 184, in raise_
+error
+    raise ClientError(status_code, response_json, response)
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current 
+quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/g
+emini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for m
+etric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPleas
+e retry in 6.419473561s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help',
+ 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-lim
+its'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.go
+ogleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quo
+taDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.c
+om/google.rpc.RetryInfo', 'retryDelay': '6s'}]}}
+Attempting gemini-2.5-flash (Attempt 1)...
+[gemini-2.5-flash] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 20, MODEL: GEMINI-2.5-FLASH\NPLEASE RETRY IN 6.419473561S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-FLASH'}, 'QUOTAVALUE': '20'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '6S'}]}})
+Model gemini-2.5-flash failed completely.
+Topic recommendation error: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash\nPlease retry in 6.419473561s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '6s'}]}}
+INFO:     127.0.0.1:57080 - "POST /api/topic-recommendations HTTP/1.1" 400 Bad Request
+Traceback (most recent call last):
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 250, in get_topic_recommendations
+    response = safe_generate_content(client, prompt, is_json=True, target_model=req.model_name)
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 120, in safe_generate_content
+    raise last_exception
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 93, in safe_generate_content
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 6021, in gener
+ate_content
+    response = self._generate_content(
+        model=model, contents=contents, config=parsed_config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 4683, in _gene
+rate_content
+    response = self._api_client.request(
+        'post', path, request_dict, http_options
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1532, in 
+request
+    response = self._request(http_request, http_options, stream=False)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1327, in 
+_request
+    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 470, in __call__
+    do = self.iter(retry_state=retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 413, in exc_chec
+k
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 473, in __call__
+    result = fn(*args, **kwargs)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1304, in 
+_request_once
+    errors.APIError.raise_for_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 155, in raise_
+for_response
+    cls.raise_error(response.status_code, response_json, response)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 184, in raise_
+error
+    raise ClientError(status_code, response_json, response)
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current 
+quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/g
+emini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for m
+etric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\n
+Please retry in 59.85548251s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.H
+elp', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rat
+e-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelangua
+ge.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier',
+ 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.go
+ogleapis.com/google.rpc.RetryInfo', 'retryDelay': '59s'}]}}
+Attempting gemini-2.5-flash-lite (Attempt 1)...
+[gemini-2.5-flash-lite] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 20, MODEL: GEMINI-2.5-FLASH-LITE\NPLEASE RETRY IN 59.85548251S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-FLASH-LITE'}, 'QUOTAVALUE': '20'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '59S'}]}})
+Model gemini-2.5-flash-lite failed completely.
+Topic recommendation error: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash-lite\nPlease retry in 59.85548251s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-flash-lite'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '59s'}]}}
+INFO:     127.0.0.1:57439 - "POST /api/topic-recommendations HTTP/1.1" 400 Bad Request
+Traceback (most recent call last):
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 250, in get_topic_recommendations
+    response = safe_generate_content(client, prompt, is_json=True, target_model=req.model_name)
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 120, in safe_generate_content
+    raise last_exception
+  File "C:\Users\JEJU_MEC_3\Desktop\AI Coding\ai-seo-manager\backend\main.py", line 93, in safe_generate_content
+    response = client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+        config=config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 6021, in gener
+ate_content
+    response = self._generate_content(
+        model=model, contents=contents, config=parsed_config
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\models.py", line 4683, in _gene
+rate_content
+    response = self._api_client.request(
+        'post', path, request_dict, http_options
+    )
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1532, in 
+request
+    response = self._request(http_request, http_options, stream=False)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1327, in 
+_request
+    return self._retry(self._request_once, http_request, stream)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 470, in __call__
+    do = self.iter(retry_state=retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 371, in iter
+    result = action(retry_state)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 413, in exc_chec
+k
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 443, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\Python314\Lib\concurrent\futures\_base.py", line 395, in __get_result
+    raise self._exception
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\tenacity\__init__.py", line 473, in __call__
+    result = fn(*args, **kwargs)
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\_api_client.py", line 1304, in 
+_request_once
+    errors.APIError.raise_for_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 155, in raise_
+for_response
+    cls.raise_error(response.status_code, response_json, response)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\JEJU_MEC_3\AppData\Roaming\Python\Python314\site-packages\google\genai\errors.py", line 184, in raise_
+error
+    raise ClientError(status_code, response_json, response)
+google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current 
+quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/g
+emini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for m
+etric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5-pro\n* Quota 
+exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5
+-pro\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limi
+t: 0, model: gemini-2.5-pro\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_
+input_token_count, limit: 0, model: gemini-2.5-pro\nPlease retry in 53.665252391s.', 'status': 'RESOURCE_EXHAUSTED', 'd
+etails': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quota
+s', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailu
+re', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId':
+ 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pr
+o'}}, {'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequ
+estsPerMinutePerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}, {'quo
+taMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_input_token_count', 'quotaId': 'GenerateConten
+tInputTokensPerModelPerMinute-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}, {'quota
+Metric': 'generativelanguage.googleapis.com/generate_content_free_tier_input_token_count', 'quotaId': 'GenerateContentI
+nputTokensPerModelPerDay-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}]}, {'@type': 
+'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '53s'}]}}
+Attempting gemini-2.5-pro (Attempt 1)...
+[gemini-2.5-pro] 모델 작동 실패! (사유: 429 RESOURCE_EXHAUSTED. {'ERROR': {'CODE': 429, 'MESSAGE': 'YOU EXCEEDED YOUR CURRENT QUOTA, PLEASE CHECK YOUR PLAN AND BILLING DETAILS. FOR MORE INFORMATION ON THIS ERROR, HEAD TO: HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS. TO MONITOR YOUR CURRENT USAGE, HEAD TO: HTTPS://AI.DEV/RATE-LIMIT. \N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 0, MODEL: GEMINI-2.5-PRO\N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS, LIMIT: 0, MODEL: GEMINI-2.5-PRO\N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT, LIMIT: 0, MODEL: GEMINI-2.5-PRO\N* QUOTA EXCEEDED FOR METRIC: GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT, LIMIT: 0, MODEL: GEMINI-2.5-PRO\NPLEASE RETRY IN 53.665252391S.', 'STATUS': 'RESOURCE_EXHAUSTED', 'DETAILS': [{'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.HELP', 'LINKS': [{'DESCRIPTION': 'LEARN MORE ABOUT GEMINI API QUOTAS', 'URL': 'HTTPS://AI.GOOGLE.DEV/GEMINI-API/DOCS/RATE-LIMITS'}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.QUOTAFAILURE', 'VIOLATIONS': [{'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERDAYPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-PRO'}}, {'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_REQUESTS', 'QUOTAID': 'GENERATEREQUESTSPERMINUTEPERPROJECTPERMODEL-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-PRO'}}, {'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT', 'QUOTAID': 'GENERATECONTENTINPUTTOKENSPERMODELPERMINUTE-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-PRO'}}, {'QUOTAMETRIC': 'GENERATIVELANGUAGE.GOOGLEAPIS.COM/GENERATE_CONTENT_FREE_TIER_INPUT_TOKEN_COUNT', 'QUOTAID': 'GENERATECONTENTINPUTTOKENSPERMODELPERDAY-FREETIER', 'QUOTADIMENSIONS': {'LOCATION': 'GLOBAL', 'MODEL': 'GEMINI-2.5-PRO'}}]}, {'@TYPE': 'TYPE.GOOGLEAPIS.COM/GOOGLE.RPC.RETRYINFO', 'RETRYDELAY': '53S'}]}})
+Model gemini-2.5-pro failed completely.
+Topic recommendation error: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5-pro\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-2.5-pro\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.5-pro\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-2.5-pro\nPlease retry in 53.665252391s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}, {'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}, {'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_input_token_count', 'quotaId': 'GenerateContentInputTokensPerModelPerMinute-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}, {'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_input_token_count', 'quotaId': 'GenerateContentInputTokensPerModelPerDay-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-2.5-pro'}}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '53s'}]}}
+INFO:     127.0.0.1:55808 - "POST /api/topic-recommendations HTTP/1.1" 400 Bad Request
