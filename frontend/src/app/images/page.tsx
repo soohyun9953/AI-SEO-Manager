@@ -5,11 +5,23 @@ import { ImageIcon, Send, Download, Copy, Loader2, Zap, Layout, Sparkles, Refres
 
 const IMAGE_STYLES = [
   { id: "default", label: "✨ 자동 최적화", promptSuffix: "" },
-  { id: "photo", label: "📸 실사 사진", promptSuffix: "실사 사진처럼, 8K 해상도, 전문적인 사진 촬영 스타일" },
-  { id: "3d", label: "🧊 3D 렌더링", promptSuffix: "고품질 3D 렌더링, 시네마틱 라이팅, 언리얼 엔진 스타일" },
-  { id: "illustration", label: "🎨 일러스트", promptSuffix: "세련된 디지털 일러스트레이션, 선명한 색감, 트렌디한 아트 스타일" },
-  { id: "watercolor", label: "🖌️ 수채화", promptSuffix: "아름다운 수채화 스타일, 부드러운 파스텔 톤, 예술적인 느낌" },
-  { id: "cyberpunk", label: "🌃 사이버펑크", promptSuffix: "사이버펑크 스타일, 네온 조명, 미래지향적 분위기" }
+  { id: "photo", label: "📸 실사 사진", promptSuffix: "photorealistic, 8K resolution, professional photography style" },
+  { id: "3d", label: "🧊 3D 렌더링", promptSuffix: "high quality 3D render, cinematic lighting, Unreal Engine style" },
+  { id: "illustration", label: "🎨 일러스트", promptSuffix: "sophisticated digital illustration, vibrant colors, trendy art style" },
+  { id: "watercolor", label: "🖌️ 수채화", promptSuffix: "beautiful watercolor style, soft pastel tones, artistic feel" },
+  { id: "cyberpunk", label: "🌃 사이버펑크", promptSuffix: "cyberpunk style, neon lighting, futuristic atmosphere" },
+  { id: "lineart", label: "✒️ 라인 아트", promptSuffix: "minimalist line art, clean strokes, white background, elegant" },
+  { id: "oilpainting", label: "🖼️ 클래식 유화", promptSuffix: "oil painting, thick texture, masterpiece, rich colors, canvas texture" },
+  { id: "anime", label: "🌸 애니메이션", promptSuffix: "anime style, vibrant colors, expressive characters, high quality anime art" },
+  { id: "pixelart", label: "👾 픽셀 아트", promptSuffix: "retro pixel art, 16-bit, game asset style" },
+  { id: "popart", label: "💥 팝아트", promptSuffix: "pop art style, bold outlines, vibrant solid colors, Andy Warhol feel" }
+];
+
+const RESOLUTIONS = [
+  { id: "512x512", label: "1:1 소형 (512x512)" },
+  { id: "1024x1024", label: "1:1 정사각형 (1024x1024)" },
+  { id: "1792x1024", label: "16:9 가로형 (1792x1024)" },
+  { id: "1024x1792", label: "9:16 세로형 (1024x1792)" }
 ];
 
 export default function ImagesPage() {
@@ -19,49 +31,86 @@ export default function ImagesPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [imageSource, setImageSource] = useState<"gemini" | "openai" | "pollinations" | null>(null);
   const [selectedStyle, setSelectedStyle] = useState(IMAGE_STYLES[0]);
+  const [selectedResolution, setSelectedResolution] = useState(RESOLUTIONS[0].id);
+  const [progressMessage, setProgressMessage] = useState("");
 
   const generateImage = async () => {
     if (!prompt) return;
     setLoading(true);
     setErrorMsg("");
-    setImageUrl(""); // 생성 시작 시 기존 이미지 초기화
+    setImageUrl(""); 
     setImageSource(null);
+    setProgressMessage("0단계: 프롬프트 분석 및 최적화 중...");
+
     const geminiKey = localStorage.getItem("GEMINI_API_KEY") || "";
     const openaiKey = localStorage.getItem("OPENAI_API_KEY") || "";
     try {
       const finalPrompt = selectedStyle.promptSuffix 
-        ? `${prompt} (스타일: ${selectedStyle.promptSuffix})` 
+        ? `${prompt}, ${selectedStyle.promptSuffix}` 
         : prompt;
 
-      const res = await fetch("/api/generate-image", {
+      const res = await fetch("http://127.0.0.1:8002/api/generate-image", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
           "X-Gemini-Key": geminiKey,
           "X-OpenAI-Key": openaiKey
         },
-        body: JSON.stringify({ prompt_base: finalPrompt }),
+        body: JSON.stringify({ 
+          prompt_base: finalPrompt,
+          resolution: selectedResolution
+        }),
       });
 
       if (!res.ok) {
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await res.json();
-          throw new Error(errorData.detail || "이미지 생성 실패");
-        } else {
-          const textError = await res.text();
-          throw new Error(`서버 연결 오류: ${textError || "백엔드 서버를 확인해주세요."}`);
-        }
+        throw new Error("서버 통신 오류가 발생했습니다.");
       }
 
-      const data = await res.json();
-      setImageUrl(data.image_url || "");
-      setImageSource(data.source === "pollinations" ? "pollinations" : (data.image_url?.startsWith("data:") ? "gemini" : "openai"));
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error("데이터 스트림을 읽을 수 없습니다.");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data: ")) {
+            try {
+              const jsonStr = trimmed.substring(6).trim();
+              const data = JSON.parse(jsonStr);
+              
+              if (data.status === "progress") {
+                setProgressMessage(data.message);
+              } else if (data.status === "success") {
+                setImageUrl(data.image_url);
+                setImageSource(data.source);
+              } else if (data.status === "error") {
+                throw new Error(data.message);
+              }
+            } catch (e: any) {
+              if (e.message.includes("5단계 오류") || e.message.includes("시간 초과")) {
+                throw e;
+              }
+            }
+          }
+        }
+      }
     } catch (error: any) {
       console.error("Generation failed", error);
       setErrorMsg(error.message);
     } finally {
       setLoading(false);
+      setProgressMessage("");
     }
   };
 
@@ -135,6 +184,29 @@ export default function ImagesPage() {
                 </div>
               </div>
 
+              {/* Resolution Selection */}
+              <div className="flex flex-col gap-4 relative z-10">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Layout size={12} className="text-emerald-500/60" />
+                  해상도 선택
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {RESOLUTIONS.map((resOpt) => (
+                    <button
+                      key={resOpt.id}
+                      onClick={() => setSelectedResolution(resOpt.id)}
+                      className={`px-4 py-2 rounded-xl text-xs font-medium transition-all border ${
+                        selectedResolution === resOpt.id
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                          : "bg-white/[0.02] border-white/[0.05] text-gray-400 hover:bg-white/[0.05] hover:text-gray-300"
+                      }`}
+                    >
+                      {resOpt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button 
                 onClick={generateImage}
                 disabled={loading || !prompt}
@@ -181,9 +253,9 @@ export default function ImagesPage() {
                   </div>
                   <div className="flex flex-col items-center gap-2">
                      <p className="text-2xl font-bold text-white tracking-tight font-outfit">Dreaming up your vision</p>
-                     <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-[0.3em]">
-                        <div className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
-                        Imagen 3 Processing...
+                     <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                        {progressMessage || "생성 중..."}
                      </div>
                   </div>
                 </div>

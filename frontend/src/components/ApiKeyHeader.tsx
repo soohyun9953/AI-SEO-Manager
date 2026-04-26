@@ -56,7 +56,8 @@ export default function ApiKeyHeader() {
                 type="password" 
                 value={geminiKey}
                 onChange={(e) => setGeminiKey(e.target.value)}
-                placeholder="Google Gemini API Key"
+                placeholder="Gemini API 키 (콤마로 다중 입력)"
+                title="여러 개의 키를 콤마(,)로 구분하여 입력하시면 자동으로 순차 적용(Rate Limit 우회)됩니다."
                 className="bg-white/[0.03] border border-white/[0.05] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50 w-64 transition-all hover:bg-white/[0.05]"
               />
             </div>
@@ -67,8 +68,9 @@ export default function ApiKeyHeader() {
                 type="password" 
                 value={openaiKey}
                 onChange={(e) => setOpenaiKey(e.target.value)}
-                placeholder="OpenAI API Key (Optional)"
-                className="bg-white/[0.03] border border-white/[0.05] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50 w-48 transition-all hover:bg-white/[0.05]"
+                placeholder="OpenAI API 키 (콤마로 다중 입력)"
+                title="여러 개의 키를 콤마(,)로 구분하여 입력하시면 자동으로 순차 적용(Rate Limit 우회)됩니다."
+                className="bg-white/[0.03] border border-white/[0.05] rounded-xl pl-10 pr-4 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500/50 w-56 transition-all hover:bg-white/[0.05]"
               />
             </div>
         </div>

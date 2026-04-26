@@ -55,6 +55,8 @@ export default function AutoWritePage() {
   const [generatedResult, setGeneratedResult] = useState<SavedArticle | null>(null);
   const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
   const [viewingArticle, setViewingArticle] = useState<SavedArticle | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [fallbackStatus, setFallbackStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("seo_saved_articles");
@@ -90,32 +92,50 @@ export default function AutoWritePage() {
     setTopics([]);
     setCurrentStep(2);
 
-    try {
-      const res = await fetch("/api/topic-recommendations", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "X-Gemini-Key": geminiKey
-        },
-        body: JSON.stringify({ category }),
-      });
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'];
+    const modelLabels = ['Gemini 2.5 Flash', 'Gemini 2.5 Flash Lite', 'Gemini 3 Fresh'];
 
-      if (!res.ok) {
-        let err_msg = `서버 오류: ${res.status}`;
-        try { const err = await res.json(); err_msg = err.detail || err_msg; } catch {}
-        throw new Error(err_msg);
+    try {
+      let success = false;
+      for (let i = 0; i < models.length; i++) {
+        try {
+          setFallbackStatus(null);
+          const res = await fetch("/api/topic-recommendations", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "X-Gemini-Key": geminiKey
+            },
+            body: JSON.stringify({ category, model_name: models[i] }),
+          });
+
+          if (!res.ok) {
+            let err_msg = `서버 오류: ${res.status}`;
+            try { const err = await res.json(); err_msg = err.detail || err_msg; } catch {}
+            throw new Error(err_msg);
+          }
+          const data = await res.json();
+          const parsedTopics = typeof data.topics === 'string' 
+            ? JSON.parse(data.topics.replace(/```json\s*|```/g, "").trim()) 
+            : data.topics;
+          setTopics(parsedTopics);
+          success = true;
+          break;
+        } catch (err: any) {
+          console.error(err);
+          if (i < models.length - 1) {
+            setFallbackStatus(`⚠️ [${modelLabels[i]}] 모델 작동 실패! 5초 후 다음 순위 모델 [${modelLabels[i+1]}]에 접속을 시도합니다.`);
+            await new Promise(r => setTimeout(r, 5000));
+          } else {
+            throw new Error(`모든 AI 모델 접근 실패: ${err.message}`);
+          }
+        }
       }
-      const data = await res.json();
-      const parsedTopics = typeof data.topics === 'string' 
-        ? JSON.parse(data.topics.replace(/```json\s*|```/g, "").trim()) 
-        : data.topics;
-      setTopics(parsedTopics);
-    } catch (error: any) {
-      console.error(error);
-      alert(`주제 추청을 가져오는데 실패했습니다:\n${error.message}`);
-      setCurrentStep(1);
+    } catch (err: any) {
+      setError(`주제 추천 실패: ${err.message}`);
     } finally {
       setLoadingTopics(false);
+      setFallbackStatus(null);
     }
   };
 
@@ -124,41 +144,58 @@ export default function AutoWritePage() {
     setCurrentStep(3);
     
     const geminiKey = localStorage.getItem("GEMINI_API_KEY") || "";
+    const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'];
+    const modelLabels = ['Gemini 2.5 Flash', 'Gemini 2.5 Flash Lite', 'Gemini 3 Fresh'];
+
     try {
-      const res = await fetch("/api/auto-write", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "X-Gemini-Key": geminiKey
-        },
-        body: JSON.stringify({ category: selectedCategory, topic }),
-      });
+      let success = false;
+      for (let i = 0; i < models.length; i++) {
+        try {
+          setFallbackStatus(null);
+          const res = await fetch("/api/auto-write", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "X-Gemini-Key": geminiKey
+            },
+            body: JSON.stringify({ category: selectedCategory, topic, model_name: models[i] }),
+          });
 
-      if (!res.ok) {
-        let err_msg = `서버 오류: ${res.status}`;
-        try { const err = await res.json(); err_msg = err.detail || err_msg; } catch {}
-        throw new Error(err_msg);
+          if (!res.ok) {
+            let err_msg = `서버 오류: ${res.status}`;
+            try { const err = await res.json(); err_msg = err.detail || err_msg; } catch {}
+            throw new Error(err_msg);
+          }
+          const data = await res.json();
+          
+          const newArticle: SavedArticle = {
+            id: Date.now().toString(),
+            category: selectedCategory,
+            topic: data.topic,
+            keyword: data.keyword,
+            article: data.article,
+            date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          };
+
+          setGeneratedResult(newArticle);
+          saveToStorage([newArticle, ...savedArticles]);
+          success = true;
+          break;
+        } catch (err: any) {
+          console.error(err);
+          if (i < models.length - 1) {
+            setFallbackStatus(`⚠️ [${modelLabels[i]}] 모델 작동 실패! 5초 후 다음 순위 모델 [${modelLabels[i+1]}]에 접속을 시도합니다.`);
+            await new Promise(r => setTimeout(r, 5000));
+          } else {
+            throw new Error(`모든 AI 모델 접근 실패: ${err.message}`);
+          }
+        }
       }
-      const data = await res.json();
-      
-      const newArticle: SavedArticle = {
-        id: Date.now().toString(),
-        category: selectedCategory,
-        topic: data.topic,
-        keyword: data.keyword,
-        article: data.article,
-        date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-      };
-
-      setGeneratedResult(newArticle);
-      saveToStorage([newArticle, ...savedArticles]);
-
-    } catch (error: any) {
-      console.error(error);
-      alert(`글 생성에 실패했습니다: ${error.message}`);
-      setCurrentStep(2);
+    } catch (err: any) {
+      setError(`글 생성 실패: ${err.message}`);
     } finally {
       setGeneratingArticle(false);
+      setFallbackStatus(null);
     }
   };
 
@@ -246,6 +283,11 @@ export default function AutoWritePage() {
                    <div className="absolute inset-0 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 </div>
                 <p className="text-gray-400 font-medium tracking-tight animate-pulse">수익성 높은 주제들을 시뮬레이션 중입니다...</p>
+                {fallbackStatus && (
+                  <p className="mt-4 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl animate-bounce">
+                    {fallbackStatus}
+                  </p>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4">
@@ -286,6 +328,11 @@ export default function AutoWritePage() {
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2 font-outfit">고품질 원고 생성 중...</h2>
                 <p className="text-gray-500 font-medium tracking-tight">AI가 전문적인 SEO 글을 작성하고 있습니다. 약 10~20초 정도 소요됩니다.</p>
+                {fallbackStatus && (
+                  <p className="mt-6 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-4 py-2 rounded-xl animate-bounce">
+                    {fallbackStatus}
+                  </p>
+                )}
               </div>
             ) : (
               generatedResult && (
@@ -456,6 +503,28 @@ export default function AutoWritePage() {
                  </button>
               </div>
            </div>
+        </div>
+      )}
+      {/* Error Modal */}
+      {error && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="glass-card w-full max-w-md p-8 flex flex-col items-center border border-red-500/20 shadow-2xl">
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-6 border border-red-500/20">
+              <span className="text-red-500 text-2xl font-bold">⚠️</span>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2 font-outfit">오류가 발생했습니다</h3>
+            <p className="text-gray-400 text-sm text-center mb-8 max-w-sm whitespace-pre-wrap leading-relaxed">{error}</p>
+            <button 
+              onClick={() => {
+                setError(null);
+                if (currentStep === 3) setCurrentStep(2);
+                else if (currentStep === 2) setCurrentStep(1);
+              }}
+              className="w-full bg-red-600 hover:bg-red-500 text-white py-4 rounded-2xl font-bold transition-all shadow-lg shadow-red-600/30 active:scale-95"
+            >
+              내용을 확인했습니다
+            </button>
+          </div>
         </div>
       )}
     </div>
