@@ -5,6 +5,8 @@ import traceback
 import asyncio
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Header
+from fastapi.responses import StreamingResponse
+
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
@@ -42,6 +44,7 @@ class ArticleRequest(BaseModel):
 
 class ImageRequest(BaseModel):
     prompt_base: str
+    resolution: Optional[str] = "1024x1024"
 
 class PublishRequest(BaseModel):
     topic: str
@@ -253,26 +256,195 @@ async def generate_article(req: ArticleRequest, x_gemini_key: Optional[str] = He
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/generate-image")
-async def generate_image(req: ImageRequest, x_gemini_key: Optional[str] = Header(None), x_openai_key: Optional[str] = Header(None)):
-    api_key = x_gemini_key or GEMINI_API_KEY
-    if api_key:
-        try:
-            client = genai.Client(api_key=api_key, http_options={'api_version': 'v1alpha'})
-            response = client.models.generate_images(model='imagen-3.0-generate-001', prompt=req.prompt_base)
-            if response.generated_images:
-                img_bytes = response.generated_images[0].image.image_bytes
-                return {"image_url": f"data:image/png;base64,{base64.b64encode(img_bytes).decode('utf-8')}"}
-        except: pass
+def translate_prompt_to_english(prompt: str, api_key: Optional[str] = None) -> str:
+    """
+    한국어 주제어를 블로그 썸네일 전용 영어 이미지 프롬프트로 변환.
+    단순 번역이 아닌, 주제에 최적화된 장면·구도·스타일을 Gemini가 직접 설계.
+    """
+    has_korean = any('\uAC00' <= c <= '\uD7A3' for c in prompt)
+    if not has_korean:
+        return prompt
 
-    openai_key = x_openai_key or OPENAI_API_KEY
-    if openai_key:
+    if not api_key:
+        return prompt
+
+    try:
+        translation_prompt = f"""당신은 AI 이미지 생성 전문 프롬프트 엔지니어입니다.
+아래 한국어 블로그 주제어를 보고, 그 주제를 가장 잘 표현하는 블로그 썸네일 이미지를 위한 영어 프롬프트를 작성하세요.
+
+[핵심 규칙]
+1. 주제와 직접적으로 관련된 구체적인 장면과 피사체를 묘사할 것
+   예) "미국 배당주 장기투자" → Wall Street building, stock dividend chart, American dollar bills, long-term growth graph
+2. 사용자가 요청한 이미지 스타일이 있다면 그 스타일(예: 일러스트, 수채화, 3D 등)을 완벽하게 반영하는 영어 태그를 넣고, 지정된 스타일이 없다면 기본적으로 사실적이고 전문적인 사진(photorealistic, 8K) 스타일로 지시할 것
+3. 구도와 분위기도 포함할 것
+   예) wide shot, cinematic composition, dramatic lighting, high contrast
+4. 반드시 영어 텍스트만 출력하고, 설명·번역·따옴표는 절대 포함하지 말 것
+
+[한국어 주제어]
+{prompt}
+
+[영어 이미지 프롬프트 출력]"""
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash-lite',
+            contents=translation_prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"Gemini 번역 실패 ({e}). MyMemory 무료 번역 API로 2차 시도...")
         try:
-            client = OpenAI(api_key=openai_key)
-            response = client.images.generate(model="dall-e-3", prompt=req.prompt_base)
-            return {"image_url": response.data[0].url}
-        except: pass
-    return {"image_url": "https://via.placeholder.com/1024x1024.png?text=Error"}
+            import urllib.parse
+            encoded_query = urllib.parse.quote(prompt)
+            res = requests.get(f"https://api.mymemory.translated.net/get?q={encoded_query}&langpair=ko|en", timeout=10)
+            if res.status_code == 200:
+                return res.json().get('responseData', {}).get('translatedText', prompt)
+        except Exception as e2:
+            print(f"2차 번역 실패 ({e2}). 원본 프롬프트 사용.")
+            
+        return prompt
+
+
+async def generate_pollinations_image(prompt: str, api_key: Optional[str] = None, resolution: str = "1024x1024") -> dict:
+    import urllib.parse
+    import asyncio
+
+    loop = asyncio.get_event_loop()
+    english_prompt = await loop.run_in_executor(
+        None, translate_prompt_to_english, prompt, api_key
+    )
+
+    def _fetch_image(url: str) -> requests.Response:
+        import time
+        last_error = None
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        for attempt in range(3):
+            try:
+                return requests.get(url, headers=headers, timeout=20)
+            except Exception as e:
+                last_error = e
+                time.sleep(1)
+        raise last_error
+
+    try:
+        width, height = 1024, 1024
+        if "x" in resolution:
+            try:
+                width = int(resolution.split("x")[0])
+                height = int(resolution.split("x")[1])
+            except:
+                pass
+
+        encoded_prompt = urllib.parse.quote(english_prompt)
+        image_url = (
+            f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+            f"?width={width}&height={height}&nologo=true&enhance=false"
+        )
+
+        response = await loop.run_in_executor(None, _fetch_image, image_url)
+
+        if response.status_code == 200 and "image" in response.headers.get("content-type", ""):
+            img_base64 = base64.b64encode(response.content).decode("utf-8")
+            img_mime = response.headers.get("content-type", "image/jpeg").split(";")[0]
+            return {"image_url": f"data:{img_mime};base64,{img_base64}", "source": "pollinations"}
+        else:
+            raise Exception(f"Pollinations.ai 응답 오류: HTTP {response.status_code}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"이미지 생성에 실패했습니다. 잠시 후 다시 시도해주세요. (오류: {str(e)})"
+        )
+
+
+IMAGE_CACHE = {}
+
+@app.post("/api/generate-image")
+async def generate_image(
+    req: ImageRequest, 
+    x_gemini_key: Optional[str] = Header(None),
+    x_openai_key: Optional[str] = Header(None)
+):
+    import json
+
+    async def event_generator():
+        api_key = x_gemini_key or GEMINI_API_KEY
+        cache_key = f"{req.prompt_base}"
+        
+        if cache_key in IMAGE_CACHE:
+            yield f"data: {json.dumps({'status': 'progress', 'message': '이미지 캐시 히트! 이전 생성 결과 반환 중...'})}\n\n"
+            yield f"data: {json.dumps({'status': 'success', 'image_url': IMAGE_CACHE[cache_key]['image_url'], 'source': IMAGE_CACHE[cache_key]['source']})}\n\n"
+            return
+
+        yield f"data: {json.dumps({'status': 'progress', 'message': '0단계: 프롬프트 분석 및 최적화 중...'})}\n\n"
+
+        if api_key:
+            api_keys = [k.strip() for k in api_key.split(",") if k.strip()]
+            for index, api_key_single in enumerate(api_keys):
+                yield f"data: {json.dumps({'status': 'progress', 'message': f'1단계: Gemini {index+1}번 API 키로 고화질 이미지 생성 시도 중...'})}\n\n"
+                try:
+                    def _call_gemini():
+                        client = genai.Client(api_key=api_key_single)
+                        return client.models.generate_content(
+                            model='gemini-2.5-flash-image',
+                            contents=[f"{req.prompt_base} (Resolution/Aspect Ratio: {req.resolution})"],
+                            config=types.GenerateContentConfig(
+                                response_modalities=['TEXT', 'IMAGE']
+                            )
+                        )
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    response = await loop.run_in_executor(None, _call_gemini)
+
+                    for part in response.parts:
+                        if part.inline_data is not None:
+                            img_bytes = part.inline_data.data
+                            img_mime = part.inline_data.mime_type or 'image/png'
+                            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                            IMAGE_CACHE[cache_key] = {"image_url": f"data:{img_mime};base64,{img_base64}", "source": "gemini"}
+                            yield f"data: {json.dumps({'status': 'success', 'image_url': f'data:{img_mime};base64,{img_base64}', 'source': 'gemini'})}\n\n"
+                            return
+                except Exception as e:
+                    print(f"Gemini {index+1}번 키 실패: {e}")
+                    yield f"data: {json.dumps({'status': 'progress', 'message': f'Gemini {index+1}번 키 실패 (할당량 초과/오류). 다음 옵션 탐색 중...'})}\n\n"
+
+        openai_api_key = x_openai_key or OPENAI_API_KEY
+        if openai_api_key:
+            openai_keys = [k.strip() for k in openai_api_key.split(",") if k.strip()]
+            for index, o_key in enumerate(openai_keys):
+                yield f"data: {json.dumps({'status': 'progress', 'message': f'2단계 (폴백): OpenAI {index+1}번 API 키로 이미지 생성 시도 중...'})}\n\n"
+                try:
+                    openai_client = OpenAI(api_key=o_key)
+                    def _call_openai():
+                        return openai_client.images.generate(
+                            model="dall-e-3",
+                            prompt=req.prompt_base,
+                            size=req.resolution,
+                            n=1,
+                        )
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    response = await loop.run_in_executor(None, _call_openai)
+                    IMAGE_CACHE[cache_key] = {"image_url": response.data[0].url, "source": "openai"}
+                    yield f"data: {json.dumps({'status': 'success', 'image_url': response.data[0].url, 'source': 'openai'})}\n\n"
+                    return
+                except Exception as e:
+                    print(f"OpenAI {index+1}번 키 실패: {e}")
+                    yield f"data: {json.dumps({'status': 'progress', 'message': f'OpenAI {index+1}번 키 실패. 다음 옵션 탐색 중...'})}\n\n"
+
+        yield f"data: {json.dumps({'status': 'progress', 'message': '3단계 (폴백): Pollinations AI 활용을 위한 프롬프트 영문 번역 중...'})}\n\n"
+        yield f"data: {json.dumps({'status': 'progress', 'message': '4단계: Pollinations AI 무료 엔진을 통한 최종 이미지 렌더링 중...'})}\n\n"
+        try:
+            pollinations_result = await generate_pollinations_image(req.prompt_base, api_key, req.resolution)
+            IMAGE_CACHE[cache_key] = pollinations_result
+            yield f"data: {json.dumps({'status': 'success', 'image_url': pollinations_result['image_url'], 'source': pollinations_result['source']})}\n\n"
+        except Exception as e:
+            print(f"Pollinations AI 생성 실패: {e}")
+            yield f"data: {json.dumps({'status': 'error', 'message': '5단계 오류: 무료 생성 엔진(Pollinations AI)이 응답하지 않거나 시간 초과가 발생했습니다. 유효한 Gemini API 키를 등록하시거나 잠시 후 다시 시도해 주세요.'})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.post("/api/publish-tistory")
 async def publish_tistory(req: PublishRequest, x_gemini_key: Optional[str] = Header(None)):

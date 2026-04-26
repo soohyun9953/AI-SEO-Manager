@@ -49,7 +49,7 @@ export default function ImagesPage() {
         ? `${prompt}, ${selectedStyle.promptSuffix}` 
         : prompt;
 
-      const res = await fetch("http://127.0.0.1:8002/api/generate-image", {
+      const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
