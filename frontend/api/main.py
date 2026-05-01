@@ -227,7 +227,7 @@ class 자동_작성_관리자:
         return res.text.strip()
 
     async def 원고_생성(self, topic: str, keyword: str):
-        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{keyword}' 중심 '{topic}' 관련 2026년 SEO 원고 작성 (마크다운)"
+        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{keyword}' 중심 '{topic}' 블로그 원고 작성. [규칙] 30년차 IT컨설턴트가 재테크/IT/라이프 주제를 단순하고 고상하게 경험 위주 작성. 'SEO' 단어 절대 금지 (마크다운)"
         res = await safe_generate_content_async(self.client, prompt)
         return res.text
 
@@ -250,7 +250,7 @@ async def auto_write(req: 자동_작성_요청, x_gemini_key: Optional[str] = He
 async def generate_article(req: ArticleRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 2026년 SEO 원고 작성"
+    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 블로그 원고 작성. 30년차 IT컨설턴트가 단순하고 고상하게 경험 위주 작성. 'SEO' 단어 절대 금지"
     try:
         response = await safe_generate_content_async(client, prompt)
         return {"article": response.text}
@@ -451,7 +451,7 @@ async def generate_image(
 async def publish_tistory(req: PublishRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' SEO 원고"
+    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 원고. 30년차 IT컨설턴트가 단순/고상하게 경험 위주 작성. 'SEO' 단어 금지"
     try:
         response = await safe_generate_content_async(client, prompt)
         html = markdown.markdown(response.text, extensions=['fenced_code', 'tables'])
