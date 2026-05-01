@@ -13,6 +13,7 @@ import requests
 import markdown
 import time
 import json
+from datetime import datetime
 
 load_dotenv()
 
@@ -143,7 +144,7 @@ async def get_keywords(
     try:
         client = genai.Client(api_key=api_key)
         prompt = f"""
-        [현재 시점: 2026년 4월]
+        [현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}]
         당신은 구글 애드센스·제휴마케팅 수익화 전문 SEO 컨설턴트입니다.
         분석 주제: '{req.topic}'
 
@@ -198,7 +199,7 @@ async def deep_analyze_keyword(
     try:
         client = genai.Client(api_key=api_key)
         prompt = f"""
-        [현재 시점: 2026년 4월]
+        [현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}]
         당신은 수익형 블로그 SEO 전문가입니다.
         핵심 키워드: '{req.keyword}' (주제: {req.topic})
 

@@ -3,6 +3,7 @@ import base64
 import json
 import traceback
 import asyncio
+from datetime import datetime
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import StreamingResponse
@@ -116,7 +117,7 @@ async def get_keywords(req: KeywordRequest, x_gemini_key: Optional[str] = Header
     
     client = genai.Client(api_key=api_key)
     prompt = f"""
-        [현재 시점: 2026년 4월]
+        [현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}]
         당신은 구글 애드센스·제휴마케팅 수익화 전문 SEO 컨설턴트입니다.
         분석 주제: '{req.topic}'
 
@@ -164,7 +165,7 @@ async def deep_analyze_keyword(
     try:
         client = genai.Client(api_key=api_key)
         prompt = f"""
-        [현재 시점: 2026년 4월]
+        [현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}]
         당신은 수익형 블로그 SEO 전문가입니다.
         핵심 키워드: '{req.keyword}' (주제: {req.topic})
 
@@ -203,7 +204,7 @@ async def get_topic_recommendations(req: 분야_추천_요청, x_gemini_key: Opt
     if not api_key: raise HTTPException(status_code=500, detail="API Key missing")
     
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: 2026년 4월] '{req.category}' 분야에서 2026년 트렌드를 반영한 수익성 높은 주제 3개를 JSON으로 추천해줘. [{{'topic': '...', 'reason': '...', 'expected_cpc': '...'}}]"
+    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.category}' 분야에서 2026년 트렌드를 반영한 수익성 높은 주제 3개를 JSON으로 추천해줘. [{{'topic': '...', 'reason': '...', 'expected_cpc': '...'}}]"
     
     try:
         response = await safe_generate_content_async(client, prompt, is_json=True)
@@ -216,17 +217,17 @@ class 자동_작성_관리자:
         self.client = genai.Client(api_key=api_key)
 
     async def 주제_생성(self, category: str):
-        prompt = f"[현재 시점: 2026년 4월] '{category}' 주제 3개 추천 (JSON)"
+        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{category}' 주제 3개 추천 (JSON)"
         res = await safe_generate_content_async(self.client, prompt, is_json=True)
         return json.loads(res.text)
 
     async def 키워드_추출(self, topic: str):
-        prompt = f"[현재 시점: 2026년 4월] '{topic}' 주제 고단가 키워드 1개 전송"
+        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{topic}' 주제 고단가 키워드 1개 전송"
         res = await safe_generate_content_async(self.client, prompt)
         return res.text.strip()
 
     async def 원고_생성(self, topic: str, keyword: str):
-        prompt = f"[현재 시점: 2026년 4월] '{keyword}' 중심 '{topic}' 관련 2026년 SEO 원고 작성 (마크다운)"
+        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{keyword}' 중심 '{topic}' 관련 2026년 SEO 원고 작성 (마크다운)"
         res = await safe_generate_content_async(self.client, prompt)
         return res.text
 
@@ -249,7 +250,7 @@ async def auto_write(req: 자동_작성_요청, x_gemini_key: Optional[str] = He
 async def generate_article(req: ArticleRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: 2026년 4월] '{req.keyword}' 중심 '{req.topic}' 2026년 SEO 원고 작성"
+    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 2026년 SEO 원고 작성"
     try:
         response = await safe_generate_content_async(client, prompt)
         return {"article": response.text}
@@ -450,7 +451,7 @@ async def generate_image(
 async def publish_tistory(req: PublishRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: 2026년 4월] '{req.keyword}' 중심 '{req.topic}' SEO 원고"
+    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' SEO 원고"
     try:
         response = await safe_generate_content_async(client, prompt)
         html = markdown.markdown(response.text, extensions=['fenced_code', 'tables'])
