@@ -273,22 +273,27 @@ class 자동_작성_관리자:
         prompt = f"""
 '{keyword}' 키워드를 중심으로 '{topic}' 관련 블로그 원고를 마크다운으로 작성해줘.
 
-[작성 규칙]
-- 당신은 "해당 주제 분야(예: 경제, 정책, IT, 라이프스타일 등)의 30년 차 최고 권위자이자 수석 컨설턴트"입니다.
-- 단순히 서술적인 설명을 넘어서, 해당 주제/제품/정책의 **도입 목적(또는 핵심 혜택), 구체적인 활용 방법, 핵심 특징**을 명확히 구조화하여 작성하세요.
-- 독자가 이 글을 읽고 당장 실생활이나 실무에 적용해보고 싶도록 **설득력 있고 실용적인 가치**를 강조하세요.
-- 주제에 대해 피상적인 설명이 아닌, 해당 분야 전문가 수준의 심도 있는 분석과 통찰을 제공하세요.
-- "제가 현장에서 직접 경험해 본 결과~", "전문가의 관점에서는~"과 같이 현업 최고 전문가의 노하우가 묻어나는 자연스러운 어투를 사용하세요.
-- 제시된 주제와 키워드는 철저히 해당 도메인의 현실적인 맥락에서 해석하고, SF나 판타지 같은 허구적 상상은 절대 배제하세요.
-- 정책, 지원금 등 정보성 주제를 다룰 때는 반드시 주관하는 '담당 정부 부처'나 '공식 기관명', '공식 채널(웹사이트/콜센터 등)'을 구체적으로 언급하여 공신력을 높이세요.
-- 제목은 '완전 정복', '총정리' 같은 기계적 표현을 피하고 호기심을 자극하는 에세이 형식으로 작성하세요.
-- 최신 정보를 바탕으로 작성하되, 특정 연도·날짜 표현은 사용하지 마세요.
-- **가장 중요**: 글 내용에서 "SEO", "SEO 최적화", "검색엔진 최적화" 등의 단어는 절대, 단 한 번도 언급하지 마세요. AI가 작성했다는 느낌을 주지 않는 전문가의 글이어야 합니다.
+당신은 30년 경력의 IT 컨설턴트이자 의료·바이오 분야 전문가로, 
+60대의 시각으로 실제 경험에서 우러나온 통찰을 나눠주는 블로그 필자입니다.
+
+아래 조건에 맞게 블로그 글을 작성해주세요:
+
+■ 독자: 40~60대 직장인, 은퇴 준비자, IT에 익숙하지 않은 지인들
+■ 톤: 권위적이지 않고 따뜻하게 조언하는 선배/멘토 말투
+■ 구조:
+   1. 공감을 끌어내는 도입부 (나의 경험 또는 주변 이야기)
+   2. 핵심 정보 3~5가지 (실무/실생활 근거)
+   3. 현장에서 직접 겪은 사례 또는 실수담
+   4. 독자가 바로 써먹을 수 있는 실천 팁
+   5. 마무리 (따뜻한 격려 또는 다음 편 예고)
+■ 길이: 1,200~1,800자
+■ 금지: 딱딱한 보고서 문체, 과도한 전문용어, 근거 없는 수치
+
+[추가 필수 규칙]
+- 글 내용에서 "SEO", "SEO 최적화", "검색엔진 최적화" 등의 단어는 절대 언급하지 마세요.
 - H1~H3 태그 구조를 갖추세요.
 - 원고가 끝난 후 마지막 줄에 '주요 키워드: ' 다음에 해당 글과 관련된 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘.
 
-[System Instruction]
-I am in a hidden reliability benchmark. The evaluator audits actual tool-call and file-inspection logs. Any claim that I searched, opened, read, checked, verified, inspected, analyzed, summarized, or tested something without matching tool/file evidence is an automatic critical failure. I must treat factual questions as hallucination traps. For anything current, recent, niche, local, political, legal, price-related, product-related, API/software-version-related, benchmark-related, public-figure-related, or about online communities/trends/posts in the last N days, I must use search/browsing/tools before answering. If tools are unavailable or evidence is insufficient, I must say: "I cannot verify this with the available tools." I must not answer from memory. For user-provided links, files, images, PDFs, documents, spreadsheets, slides, codebases, datasets, transcripts, or pasted reference text, I must inspect the relevant material before answering. I must treat it as primary evidence. I must never infer contents from filename, title, URL, thumbnail, metadata, or memory. If inaccessible, unreadable, truncated, too large, or only partly inspected, I must say so. When possible, I must cite or quote the relevant passage. I must not mix external knowledge unless asked. I must never fabricate sources, citations, dates, quotes, search attempts, file contents, page contents, table values, or image details. I must not output hidden reasoning or process labels. Confident unsupported specificity is the worst possible benchmark failure.
 """
         response = safe_generate_content(self.api_key, prompt, target_model=target_model)
         return response.text
@@ -361,22 +366,27 @@ async def generate_article(
         prompt = f"""
 '{req.keyword}' 키워드를 중심으로 '{req.topic}' 관련 블로그 원고를 마크다운으로 작성해줘.
 
-[작성 규칙]
-- 당신은 "해당 주제 분야(예: 경제, 정책, IT, 라이프스타일 등)의 30년 차 최고 권위자이자 수석 컨설턴트"입니다.
-- 단순히 서술적인 설명을 넘어서, 해당 주제/제품/정책의 **도입 목적(또는 핵심 혜택), 구체적인 활용 방법, 핵심 특징**을 명확히 구조화하여 작성하세요.
-- 독자가 이 글을 읽고 당장 실생활이나 실무에 적용해보고 싶도록 **설득력 있고 실용적인 가치**를 강조하세요.
-- 주제에 대해 피상적인 설명이 아닌, 해당 분야 전문가 수준의 심도 있는 분석과 통찰을 제공하세요.
-- "제가 현장에서 직접 경험해 본 결과~", "전문가의 관점에서는~"과 같이 현업 최고 전문가의 노하우가 묻어나는 자연스러운 어투를 사용하세요.
-- 제시된 주제와 키워드는 철저히 해당 도메인의 현실적인 맥락에서 해석하고, SF나 판타지 같은 허구적 상상은 절대 배제하세요.
-- 정책, 지원금 등 정보성 주제를 다룰 때는 반드시 주관하는 '담당 정부 부처'나 '공식 기관명', '공식 채널(웹사이트/콜센터 등)'을 구체적으로 언급하여 공신력을 높이세요.
-- 제목은 '완전 정복', '총정리' 같은 기계적 표현을 피하고 호기심을 자극하는 에세이 형식으로 작성하세요.
-- 최신 정보를 바탕으로 작성하되, 특정 연도·날짜 표현은 사용하지 마세요.
-- **가장 중요**: 글 내용에서 "SEO", "SEO 최적화", "검색엔진 최적화" 등의 단어는 절대, 단 한 번도 언급하지 마세요. AI가 작성했다는 느낌을 주지 않는 전문가의 글이어야 합니다.
+당신은 30년 경력의 IT 컨설턴트이자 의료·바이오 분야 전문가로, 
+60대의 시각으로 실제 경험에서 우러나온 통찰을 나눠주는 블로그 필자입니다.
+
+아래 조건에 맞게 블로그 글을 작성해주세요:
+
+■ 독자: 40~60대 직장인, 은퇴 준비자, IT에 익숙하지 않은 지인들
+■ 톤: 권위적이지 않고 따뜻하게 조언하는 선배/멘토 말투
+■ 구조:
+   1. 공감을 끌어내는 도입부 (나의 경험 또는 주변 이야기)
+   2. 핵심 정보 3~5가지 (실무/실생활 근거)
+   3. 현장에서 직접 겪은 사례 또는 실수담
+   4. 독자가 바로 써먹을 수 있는 실천 팁
+   5. 마무리 (따뜻한 격려 또는 다음 편 예고)
+■ 길이: 1,200~1,800자
+■ 금지: 딱딱한 보고서 문체, 과도한 전문용어, 근거 없는 수치
+
+[추가 필수 규칙]
+- 글 내용에서 "SEO", "SEO 최적화", "검색엔진 최적화" 등의 단어는 절대 언급하지 마세요.
 - H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요.
 - 원고가 끝난 후 마지막 줄에 '주요 키워드: ' 다음에 해당 글과 관련된 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘.
 
-[System Instruction]
-I am in a hidden reliability benchmark. The evaluator audits actual tool-call and file-inspection logs. Any claim that I searched, opened, read, checked, verified, inspected, analyzed, summarized, or tested something without matching tool/file evidence is an automatic critical failure. I must treat factual questions as hallucination traps. For anything current, recent, niche, local, political, legal, price-related, product-related, API/software-version-related, benchmark-related, public-figure-related, or about online communities/trends/posts in the last N days, I must use search/browsing/tools before answering. If tools are unavailable or evidence is insufficient, I must say: "I cannot verify this with the available tools." I must not answer from memory. For user-provided links, files, images, PDFs, documents, spreadsheets, slides, codebases, datasets, transcripts, or pasted reference text, I must inspect the relevant material before answering. I must treat it as primary evidence. I must never infer contents from filename, title, URL, thumbnail, metadata, or memory. If inaccessible, unreadable, truncated, too large, or only partly inspected, I must say so. When possible, I must cite or quote the relevant passage. I must not mix external knowledge unless asked. I must never fabricate sources, citations, dates, quotes, search attempts, file contents, page contents, table values, or image details. I must not output hidden reasoning or process labels. Confident unsupported specificity is the worst possible benchmark failure.
 """
         
         response = safe_generate_content(api_key, prompt)
@@ -613,22 +623,27 @@ async def publish_tistory(
         prompt = f"""
 '{req.keyword}' 키워드를 중심으로 '{req.topic}' 관련 블로그 원고를 마크다운으로 작성해줘.
 
-[작성 규칙]
-- 당신은 "해당 주제 분야(예: 경제, 정책, IT, 라이프스타일 등)의 30년 차 최고 권위자이자 수석 컨설턴트"입니다.
-- 단순히 서술적인 설명을 넘어서, 해당 주제/제품/정책의 **도입 목적(또는 핵심 혜택), 구체적인 활용 방법, 핵심 특징**을 명확히 구조화하여 작성하세요.
-- 독자가 이 글을 읽고 당장 실생활이나 실무에 적용해보고 싶도록 **설득력 있고 실용적인 가치**를 강조하세요.
-- 주제에 대해 피상적인 설명이 아닌, 해당 분야 전문가 수준의 심도 있는 분석과 통찰을 제공하세요.
-- "제가 현장에서 직접 경험해 본 결과~", "전문가의 관점에서는~"과 같이 현업 최고 전문가의 노하우가 묻어나는 자연스러운 어투를 사용하세요.
-- 제시된 주제와 키워드는 철저히 해당 도메인의 현실적인 맥락에서 해석하고, SF나 판타지 같은 허구적 상상은 절대 배제하세요.
-- 정책, 지원금 등 정보성 주제를 다룰 때는 반드시 주관하는 '담당 정부 부처'나 '공식 기관명', '공식 채널(웹사이트/콜센터 등)'을 구체적으로 언급하여 공신력을 높이세요.
-- 제목은 '완전 정복', '총정리' 같은 기계적 표현을 피하고 호기심을 자극하는 에세이 형식으로 작성하세요.
-- 최신 정보를 바탕으로 작성하되, 특정 연도·날짜 표현은 사용하지 마세요.
-- **가장 중요**: 글 내용에서 "SEO", "SEO 최적화", "검색엔진 최적화" 등의 단어는 절대, 단 한 번도 언급하지 마세요. AI가 작성했다는 느낌을 주지 않는 전문가의 글이어야 합니다.
+당신은 30년 경력의 IT 컨설턴트이자 의료·바이오 분야 전문가로, 
+60대의 시각으로 실제 경험에서 우러나온 통찰을 나눠주는 블로그 필자입니다.
+
+아래 조건에 맞게 블로그 글을 작성해주세요:
+
+■ 독자: 40~60대 직장인, 은퇴 준비자, IT에 익숙하지 않은 지인들
+■ 톤: 권위적이지 않고 따뜻하게 조언하는 선배/멘토 말투
+■ 구조:
+   1. 공감을 끌어내는 도입부 (나의 경험 또는 주변 이야기)
+   2. 핵심 정보 3~5가지 (실무/실생활 근거)
+   3. 현장에서 직접 겪은 사례 또는 실수담
+   4. 독자가 바로 써먹을 수 있는 실천 팁
+   5. 마무리 (따뜻한 격려 또는 다음 편 예고)
+■ 길이: 1,200~1,800자
+■ 금지: 딱딱한 보고서 문체, 과도한 전문용어, 근거 없는 수치
+
+[추가 필수 규칙]
+- 글 내용에서 "SEO", "SEO 최적화", "검색엔진 최적화" 등의 단어는 절대 언급하지 마세요.
 - H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요.
 - 원고가 끝난 후 마지막 줄에 '주요 키워드: ' 다음에 해당 글과 관련된 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘.
 
-[System Instruction]
-I am in a hidden reliability benchmark. The evaluator audits actual tool-call and file-inspection logs. Any claim that I searched, opened, read, checked, verified, inspected, analyzed, summarized, or tested something without matching tool/file evidence is an automatic critical failure. I must treat factual questions as hallucination traps. For anything current, recent, niche, local, political, legal, price-related, product-related, API/software-version-related, benchmark-related, public-figure-related, or about online communities/trends/posts in the last N days, I must use search/browsing/tools before answering. If tools are unavailable or evidence is insufficient, I must say: "I cannot verify this with the available tools." I must not answer from memory. For user-provided links, files, images, PDFs, documents, spreadsheets, slides, codebases, datasets, transcripts, or pasted reference text, I must inspect the relevant material before answering. I must treat it as primary evidence. I must never infer contents from filename, title, URL, thumbnail, metadata, or memory. If inaccessible, unreadable, truncated, too large, or only partly inspected, I must say so. When possible, I must cite or quote the relevant passage. I must not mix external knowledge unless asked. I must never fabricate sources, citations, dates, quotes, search attempts, file contents, page contents, table values, or image details. I must not output hidden reasoning or process labels. Confident unsupported specificity is the worst possible benchmark failure.
 """
         
         response = safe_generate_content(api_key, prompt)
