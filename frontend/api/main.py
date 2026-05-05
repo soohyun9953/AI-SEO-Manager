@@ -227,7 +227,7 @@ class 자동_작성_관리자:
         return res.text.strip()
 
     async def 원고_생성(self, topic: str, keyword: str):
-        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{keyword}' 중심 '{topic}' 블로그 원고 작성. [규칙] 당신은 30년차 수석 IT 아키텍트입니다. 단순 서술을 넘어 도입 목적, 구체적인 사용 방법, 핵심 특징을 명확히 구조화하세요. 독자가 당장 실무에 적용하고 싶도록 설득력 있고 실용적인 가치를 강조하며, 기술적 원리와 실무 적용 사례 등 심도 있는 통찰을 제공하세요. 주제와 키워드는 최신 IT, AI, 소프트웨어 트렌드 맥락에서만 해석하고 SF 등 허구적 상상은 배제하세요. 'SEO' 단어 절대 금지. 마지막 줄에 '주요 키워드: ' 다음에 핵심 키워드 5개를 쉼표(,)로 구분하여 추가해줘. (마크다운)"
+        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{keyword}' 중심 '{topic}' 블로그 원고 작성. [규칙] 당신은 해당 주제 분야(예: 경제, 정책, IT 등)의 30년 차 최고 권위자입니다. 단순 서술을 넘어 도입 목적(또는 혜택), 구체적인 활용 방법, 핵심 특징을 명확히 구조화하세요. 독자가 당장 실생활이나 실무에 적용하고 싶도록 설득력 있고 실용적인 가치를 강조하며, 해당 분야 최고 전문가 수준의 심도 있는 통찰을 제공하세요. 제시된 주제와 키워드는 철저히 해당 도메인의 현실적인 맥락에서 해석하고 SF 등 허구적 상상은 배제하세요. 'SEO' 단어 절대 금지. 마지막 줄에 '주요 키워드: ' 다음에 핵심 키워드 5개를 쉼표(,)로 구분하여 추가해줘. (마크다운)"
         res = await safe_generate_content_async(self.client, prompt)
         return res.text
 
@@ -250,7 +250,7 @@ async def auto_write(req: 자동_작성_요청, x_gemini_key: Optional[str] = He
 async def generate_article(req: ArticleRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 블로그 원고 작성. 30년차 수석 IT 아키텍트로서 단순 서술을 넘어 도입 목적, 구체적인 사용 방법, 핵심 특징을 명확히 구조화하세요. 독자가 당장 실무에 적용하고 싶도록 설득력 있고 실용적인 가치를 강조하고, 심도 있는 통찰을 제공하세요. 주제와 키워드는 최신 IT, AI, 소프트웨어 트렌드 맥락에서만 해석하고 SF 등 허구적 상상은 배제하세요. 'SEO' 단어 절대 금지. 마지막에는 '주요 키워드: ' 문구와 함께 관련 키워드 5개를 쉼표(,)로 구분하여 추가해줘."
+    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 블로그 원고 작성. 당신은 해당 주제 분야의 30년 차 최고 권위자입니다. 단순 서술을 넘어 도입 목적(혜택), 활용 방법, 핵심 특징을 구조화하세요. 독자가 당장 적용하고 싶도록 설득력 있고 실용적인 가치를 강조하고, 분야 최고 전문가 수준의 심도 있는 통찰을 제공하세요. 주제와 키워드는 해당 도메인의 현실적인 맥락에서 해석하고 SF 등 허구적 상상은 배제하세요. 'SEO' 단어 절대 금지. 마지막에는 '주요 키워드: ' 문구와 함께 관련 키워드 5개를 쉼표(,)로 구분하여 추가해줘."
     try:
         response = await safe_generate_content_async(client, prompt)
         return {"article": response.text}
@@ -451,7 +451,7 @@ async def generate_image(
 async def publish_tistory(req: PublishRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 원고. 30년차 수석 IT 아키텍트로서 단순 서술을 넘어 목적, 사용 방법, 특징을 구조화하여 독자가 당장 써보고 싶도록 설득력 있게 작성할 것. 심도 있는 통찰 필수. 주제와 키워드는 최신 IT 맥락에서만 해석하고 SF적 상상은 배제할 것. 'SEO' 단어 금지. 마지막에 '주요 키워드: '와 함께 키워드 5개를 쉼표(,)로 구분하여 추가할 것."
+    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 원고. 해당 분야의 30년 차 최고 권위자로서 단순 서술을 넘어 목적, 활용 방법, 특징을 구조화하여 독자가 당장 적용해보고 싶도록 설득력 있게 작성할 것. 최고 수준의 심도 있는 통찰 필수. 주제와 키워드는 현실적/실무적 맥락에서 해석하고 SF적 상상은 배제할 것. 'SEO' 단어 금지. 마지막에 '주요 키워드: '와 함께 키워드 5개를 쉼표(,)로 구분하여 추가할 것."
     try:
         response = await safe_generate_content_async(client, prompt)
         html = markdown.markdown(response.text, extensions=['fenced_code', 'tables'])
