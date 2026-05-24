@@ -54,6 +54,7 @@ export default function RootLayout({
                <div className="relative z-10">
                   <p className="text-xs font-bold text-white mb-1 leading-tight">Pro Plan Active</p>
                   <p className="text-[10px] text-gray-400">Gemini 2.5 Flash & Imagen 3 Enabled</p>
+                  <p className="text-[9px] text-gray-500 mt-1">배포일자: 2026.05.24</p>
                </div>
                <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-blue-600/20 blur-2xl group-hover:scale-150 transition-all duration-500" />
             </div>

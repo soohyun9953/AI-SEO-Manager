@@ -39,6 +39,8 @@ class KeywordRequest(BaseModel):
 class ArticleRequest(BaseModel):
     keyword: str
     topic: str
+    adsense_optimize: Optional[bool] = False
+    affiliate_optimize: Optional[bool] = False
 
 class ImageRequest(BaseModel):
     prompt_base: str
@@ -50,6 +52,8 @@ class PublishRequest(BaseModel):
     keyword: str
     tistory_token: str
     tistory_blog: str
+    adsense_optimize: Optional[bool] = False
+    affiliate_optimize: Optional[bool] = False
 
 class 분야_추천_요청(BaseModel):
     category: str
@@ -61,10 +65,98 @@ class 자동_작성_요청(BaseModel):
     tistory_token: Optional[str] = None
     tistory_blog: Optional[str] = None
     model_name: Optional[str] = None
+    adsense_optimize: Optional[bool] = False
+    affiliate_optimize: Optional[bool] = False
 
 class 심층_분석_요청(BaseModel):
     keyword: str
     topic: str
+
+
+class 수익성_극대화_관리자:
+    """블로그 수익 및 SEO를 극대화하는 보조 유틸리티 클래스 (글로벌 룰 준수)"""
+    
+    @staticmethod
+    def 애드센스_광고_삽입(원고: str, 활성화: bool = False) -> str:
+        """
+        원고의 적절한 위치(H2, H3 태그 전후 또는 긴 단락 사이)에 구글 애드센스 광고 플레이스홀더를 삽입합니다.
+        """
+        if not 활성화:
+            return 원고
+            
+        lines = 원고.split("\n")
+        new_lines = []
+        h2_count = 0
+        
+        for line in lines:
+            trimmed = line.strip()
+            # H2, H3 소제목 태그 매칭
+            if trimmed.startswith("## ") or trimmed.startswith("### "):
+                h2_count += 1
+                # 첫 번째와 세 번째 소제목 상단에 광고 삽입
+                if h2_count in [1, 3]:
+                    new_lines.append("\n<!-- [구글 애드센스 본문 광고 영역 - 수익 극대화] -->")
+                    new_lines.append('<div class="adsense-placeholder" style="margin: 20px 0; text-align: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(168,85,247,0.3); padding: 30px; border-radius: 12px; color: #a855f7; font-size: 13px; font-weight: bold;">💰 여기에 구글 애드센스 광고 코드를 삽입하세요 (수익형 본문 광고)</div>\n')
+            new_lines.append(line)
+            
+        # 마지막 문단 아래에 하단 광고 추가
+        new_lines.append("\n<!-- [구글 애드센스 본문 하단 광고 영역] -->")
+        new_lines.append('<div class="adsense-placeholder" style="margin: 20px 0; text-align: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(168,85,247,0.3); padding: 30px; border-radius: 12px; color: #a855f7; font-size: 13px; font-weight: bold;">💰 여기에 구글 애드센스 광고 코드를 삽입하세요 (수익형 하단 광고)</div>\n')
+        
+        return "\n".join(new_lines)
+        
+    @staticmethod
+    def 구조화_데이터_생성(주제: str, 키워드: str, 요약: str = "") -> dict:
+        """
+        구글 검색 노출율(SEO)을 비약적으로 끌어올리는 Schema.org JSON-LD 구조화 데이터를 자동 빌드합니다.
+        """
+        현재_시간 = datetime.now().isoformat()
+        키워드_목록 = [kw.strip() for kw in 키워드.split(",") if kw.strip()]
+        
+        구조화_객체 = {
+            "@context": "https://schema.org",
+            "@type": "BlogPosting",
+            "headline": 주제,
+            "description": 요약 or 주제,
+            "keywords": 키워드_목록,
+            "datePublished": 현재_시간,
+            "dateModified": 현재_시간,
+            "author": {
+                "@type": "Person",
+                "name": "AI SEO Writer"
+            },
+            "publisher": {
+                "@type": "Organization",
+                "name": "AI SEO Manager Pro",
+                "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://example.com/logo.png"
+                }
+            },
+            "mainEntityOfPage": {
+                "@type": "WebPage",
+                "@id": "https://example.com/blog"
+            }
+        }
+        return 구조화_객체
+        
+    @staticmethod
+    def 제휴_링크_앵커_추천(원고: str, 활성화: bool = False) -> str:
+        """
+        구매 전환 및 가입 유도(Affiliate)를 위한 고전환율 앵커 텍스트 구절을 삽입합니다.
+        """
+        if not 활성화:
+            return 원고
+            
+        추가_텍스트 = """
+
+---
+
+### 💡 실전 추천 및 추가 정보
+> **[이 주제와 관련된 추천 상품 및 리얼한 사용자 리뷰 정보 최저가 확인하기](제휴마케팅_링크_입력_자리)**
+*이 포스팅은 제휴 마케팅 활동의 일환으로, 일정액의 수수료를 제공받을 수 있으며 블로그 운영에 큰 힘이 됩니다.*
+"""
+        return 원고 + 추가_텍스트
 
 @app.get("/")
 async def root():
@@ -325,18 +417,29 @@ async def auto_write(
         # 3. 원고 생성
         원고 = 관리자.원고_생성(주제, 키워드, target_model=req.model_name)
         
+        # 수익 극대화 로직 적용 (글로벌 룰 준수하여 스네이크 케이스 및 한글 클래스 호출)
+        최종_원고 = 수익성_극대화_관리자.애드센스_광고_삽입(원고, req.adsense_optimize)
+        최종_원고 = 수익성_극대화_관리자.제휴_링크_앵커_추천(최종_원고, req.affiliate_optimize)
+        
+        # 요약 및 구조화 데이터 빌드
+        요약_텍스트 = 원고[:150].replace("\n", " ").strip() + "..."
+        구조화_데이터 = 수익성_극대화_관리자.구조화_데이터_생성(주제, 키워드, 요약_텍스트)
+        json_ld_string = json.dumps(구조화_데이터, ensure_ascii=False, indent=2)
+        
         # 4. 티스토리 발행 (토큰이 있는 경우, 티스토리는 HTML만 받으므로 변환 필요)
         발행_결과 = None
         if req.tistory_token and req.tistory_blog:
             try:
-                article_html = markdown.markdown(원고, extensions=['fenced_code', 'tables'])
+                article_html = markdown.markdown(최종_원고, extensions=['fenced_code', 'tables'])
+                seo_optimized_html = f"<script type=\"application/ld+json\">\n{json_ld_string}\n</script>\n\n{article_html}"
+                
                 tistory_url = "https://www.tistory.com/apis/post/write"
                 data = {
                     "access_token": req.tistory_token,
                     "output": "json",
                     "blogName": req.tistory_blog,
                     "title": f"[{키워드}] {주제}",
-                    "content": article_html,
+                    "content": seo_optimized_html,
                     "visibility": 0
                 }
                 res = requests.post(tistory_url, data=data)
@@ -348,7 +451,8 @@ async def auto_write(
             "success": True,
             "topic": 주제,
             "keyword": 키워드,
-            "article": 원고,
+            "article": 최종_원고,
+            "json_ld": 구조화_데이터,
             "publish_result": 발행_결과
         }
     except Exception as e:
@@ -396,7 +500,24 @@ async def generate_article(
 """
         
         response = safe_generate_content(api_key, prompt)
-        return {"article": response.text}
+        원고 = response.text
+        
+        # 수익 극대화 로직 적용 (글로벌 룰 준수하여 스네이크 케이스 및 한글 클래스 호출)
+        최종_원고 = 수익성_극대화_관리자.애드센스_광고_삽입(원고, req.adsense_optimize)
+        최종_원고 = 수익성_극대화_관리자.제휴_링크_앵커_추천(최종_원고, req.affiliate_optimize)
+        
+        # 요약본을 간단하게 생성 (첫 도입부 150글자 활용)
+        요약_텍스트 = 원고[:150].replace("\n", " ").strip() + "..."
+        구조화_데이터 = 수익성_극대화_관리자.구조화_데이터_생성(req.topic, req.keyword, 요약_텍스트)
+        
+        # HTML로 변환된 최종 원고 생성
+        html_원고 = markdown.markdown(최종_원고, extensions=['fenced_code', 'tables'])
+        
+        return {
+            "article": 최종_원고,
+            "html_article": html_원고,
+            "json_ld": 구조화_데이터
+        }
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -426,7 +547,8 @@ def translate_prompt_to_english(prompt: str, api_key: Optional[str] = None) -> s
 2. 사용자가 요청한 이미지 스타일이 있다면 그 스타일(예: 일러스트, 수채화, 3D 등)을 완벽하게 반영하는 영어 태그를 넣고, 지정된 스타일이 없다면 기본적으로 사실적이고 전문적인 사진(photorealistic, 8K) 스타일로 지시할 것
 3. 구도와 분위기도 포함할 것
    예) wide shot, cinematic composition, dramatic lighting, high contrast
-4. 반드시 영어 텍스트만 출력하고, 설명·번역·따옴표는 절대 포함하지 말 것
+4. 블로그 썸네일로서의 클릭률(CTR)과 가독성을 극대화하기 위해, 시선을 사로잡는 선명한 대조(vibrant contrast)를 이루게 할 것. 또한 나중에 이미지 위에 중앙 정렬 텍스트가 얹어지기 적당한 세련되고 깔끔한 레이아웃 여백 배치(clean, negative space in the center, or a simple neat backdrop for text overlay)를 보장하도록 프롬프트를 보강할 것.
+5. 반드시 영어 텍스트만 출력하고, 설명·번역·따옴표는 절대 포함하지 말 것
 
 [한국어 주제어]
 {prompt}
@@ -658,8 +780,18 @@ async def publish_tistory(
         response = safe_generate_content(api_key, prompt)
         article_md = response.text
         
-        # Markdown을 HTML로 변환
-        article_html = markdown.markdown(article_md, extensions=['fenced_code', 'tables'])
+        # 수익 극대화 로직 적용 (글로벌 룰 준수하여 스네이크 케이스 및 한글 클래스 호출)
+        최종_원고 = 수익성_극대화_관리자.애드센스_광고_삽입(article_md, req.adsense_optimize)
+        최종_원고 = 수익성_극대화_관리자.제휴_링크_앵커_추천(최종_원고, req.affiliate_optimize)
+        
+        # 요약 및 구조화 데이터 생성
+        요약_텍스트 = article_md[:150].replace("\n", " ").strip() + "..."
+        구조화_데이터 = 수익성_극대화_관리자.구조화_데이터_생성(req.topic, req.keyword, 요약_텍스트)
+        json_ld_string = json.dumps(구조화_데이터, ensure_ascii=False, indent=2)
+        
+        # HTML 변환 및 머리에 JSON-LD 스크립트 추가
+        article_html = markdown.markdown(최종_원고, extensions=['fenced_code', 'tables'])
+        seo_optimized_html = f"<script type=\"application/ld+json\">\n{json_ld_string}\n</script>\n\n{article_html}"
         
         # 3. 티스토리에 발행 (임시저장)
         tistory_url = "https://www.tistory.com/apis/post/write"
@@ -668,7 +800,7 @@ async def publish_tistory(
             "output": "json",
             "blogName": req.tistory_blog,
             "title": f"[{req.keyword}] {req.topic} 핵심 정리",
-            "content": article_html,
+            "content": seo_optimized_html,
             "visibility": 0  # 0: 비공개(임시저장), 3: 발행
         }
         res = requests.post(tistory_url, data=data)
@@ -679,7 +811,8 @@ async def publish_tistory(
                 return {
                     "success": True, 
                     "url": post_url,
-                    "article": article_html
+                    "article": seo_optimized_html,
+                    "json_ld": 구조화_데이터
                 }
             else:
                 raise Exception(str(result))

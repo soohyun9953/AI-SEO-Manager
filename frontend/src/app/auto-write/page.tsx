@@ -158,7 +158,13 @@ export default function AutoWritePage() {
               "Content-Type": "application/json",
               "X-Gemini-Key": geminiKey
             },
-            body: JSON.stringify({ category: selectedCategory, topic, model_name: models[i] }),
+            body: JSON.stringify({ 
+              category: selectedCategory, 
+              topic, 
+              model_name: models[i],
+              adsense_optimize: true, // 자동 대량 생성 시 기본적으로 고수익 애드센스 배치 적용
+              affiliate_optimize: true // 제휴 마케팅 CTA 적용
+            }),
           });
 
           if (!res.ok) {
@@ -176,6 +182,14 @@ export default function AutoWritePage() {
             article: data.article,
             date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
           };
+
+          // 상세 SEO 라이터 에디터에 원활하게 캐시가 연동되도록 로컬 스토리지 동기화
+          localStorage.setItem("seo_editor_topic", data.topic);
+          localStorage.setItem("seo_editor_keyword", data.keyword);
+          localStorage.setItem("seo_editor_article", data.article);
+          if (data.json_ld) {
+            localStorage.setItem("seo_editor_json_ld", JSON.stringify(data.json_ld));
+          }
 
           setGeneratedResult(newArticle);
           saveToStorage([newArticle, ...savedArticles]);

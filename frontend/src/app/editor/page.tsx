@@ -12,9 +12,13 @@ function EditorContent() {
   const [topic, setTopic] = useState(urlTopic || "");
   const [keyword, setKeyword] = useState(urlKeyword || "");
   const [article, setArticle] = useState("");
+  const [htmlArticle, setHtmlArticle] = useState("");
+  const [jsonLd, setJsonLd] = useState<any>(null);
+  const [adsenseOptimize, setAdsenseOptimize] = useState(true); // 기본값 true로 애드센스 극대화 장려
+  const [affiliateOptimize, setAffiliateOptimize] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [activeTab, setActiveTab] = useState<"editor" | "preview" | "seo" | "html">("editor");
   const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
@@ -35,7 +39,15 @@ function EditorContent() {
     const savedArticle = localStorage.getItem("seo_editor_article");
     if (savedArticle) {
       setArticle(savedArticle);
-      setShowPreview(true);
+      setActiveTab("preview");
+    }
+
+    const savedHtml = localStorage.getItem("seo_editor_html_article");
+    if (savedHtml) setHtmlArticle(savedHtml);
+
+    const savedJsonLd = localStorage.getItem("seo_editor_json_ld");
+    if (savedJsonLd) {
+      try { setJsonLd(JSON.parse(savedJsonLd)); } catch (e) {}
     }
   }, [urlTopic, urlKeyword]);
 
@@ -43,10 +55,14 @@ function EditorContent() {
     setTopic("");
     setKeyword("");
     setArticle("");
-    setShowPreview(false);
+    setHtmlArticle("");
+    setJsonLd(null);
+    setActiveTab("editor");
     localStorage.removeItem("seo_editor_topic");
     localStorage.removeItem("seo_editor_keyword");
     localStorage.removeItem("seo_editor_article");
+    localStorage.removeItem("seo_editor_html_article");
+    localStorage.removeItem("seo_editor_json_ld");
   };
 
   const handleArticleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -66,7 +82,12 @@ function EditorContent() {
           "Content-Type": "application/json",
           "X-Gemini-Key": geminiKey
         },
-        body: JSON.stringify({ topic, keyword }),
+        body: JSON.stringify({ 
+          topic, 
+          keyword,
+          adsense_optimize: adsenseOptimize,
+          affiliate_optimize: affiliateOptimize
+        }),
       });
 
       if (!res.ok) {
@@ -76,12 +97,16 @@ function EditorContent() {
 
       const data = await res.json();
       setArticle(data.article || "");
+      setHtmlArticle(data.html_article || "");
+      setJsonLd(data.json_ld || null);
       localStorage.setItem("seo_editor_topic", topic);
       localStorage.setItem("seo_editor_keyword", keyword);
       
       if (data.article) {
         localStorage.setItem("seo_editor_article", data.article);
-        setShowPreview(true);
+        localStorage.setItem("seo_editor_html_article", data.html_article || "");
+        localStorage.setItem("seo_editor_json_ld", JSON.stringify(data.json_ld) || "");
+        setActiveTab("preview");
       }
     } catch (error) {
       console.error("Generation failed", error);
@@ -100,6 +125,8 @@ function EditorContent() {
 
     setPublishing(true);
     let finalArticle = article;
+    let finalHtml = htmlArticle;
+    let finalJsonLd = jsonLd;
     
     // 원고가 없으면 백엔드에서 원고 생성부터 처리
     if (!finalArticle) {
@@ -111,13 +138,22 @@ function EditorContent() {
             "Content-Type": "application/json",
             "X-Gemini-Key": geminiKey
           },
-          body: JSON.stringify({ topic, keyword }),
+          body: JSON.stringify({ 
+            topic, 
+            keyword,
+            adsense_optimize: adsenseOptimize,
+            affiliate_optimize: affiliateOptimize
+          }),
         });
         if (!res.ok) throw new Error("Article generation failed");
         const data = await res.json();
         finalArticle = data.article || "";
+        finalHtml = data.html_article || "";
+        finalJsonLd = data.json_ld || null;
         setArticle(finalArticle);
-        setShowPreview(true);
+        setHtmlArticle(finalHtml);
+        setJsonLd(finalJsonLd);
+        setActiveTab("preview");
       } catch (error) {
         console.error(error);
         alert("원고 생성에 실패했습니다. Gemini API 키를 확인해주세요.");
@@ -127,14 +163,21 @@ function EditorContent() {
     }
 
     try {
-      // 1. 원고 클립보드 복사
-      await navigator.clipboard.writeText(finalArticle);
+      // 1. 고수익 원고+JSON-LD 결합 클립보드 복사
+      const jsonLdStr = finalJsonLd ? `<script type="application/ld+json">\n${JSON.stringify(finalJsonLd, null, 2)}\n</script>\n\n` : "";
+      const copyText = finalHtml ? (jsonLdStr + finalHtml) : finalArticle;
+      
+      await navigator.clipboard.writeText(copyText);
       
       // 2. 사용자의 티스토리 글쓰기 URL 새 탭으로 열기
       const writeUrl = `https://${tistoryBlog}.tistory.com/manage/post`;
       window.open(writeUrl, '_blank');
       
-      alert("✅ 원고가 생성되고 클립보드에 복사되었습니다!\n새 탭으로 열린 티스토리에서 [기본모드 -> 마크다운]으로 변경 후 바로 'Ctrl+V' 하세요.");
+      if (finalHtml) {
+        alert("✅ 구글 SEO 구조화 데이터(JSON-LD) 및 애드센스 광고 영역이 내장된 '고수익 최적화 HTML' 패키지가 클립보드에 복사되었습니다!\n\n새 탭으로 열린 티스토리에서 우측 상단 [기본모드 -> HTML]로 변경하신 후 바로 'Ctrl+V'를 눌러 붙여넣기 하세요.");
+      } else {
+        alert("✅ 원고가 생성되고 클립보드에 복사되었습니다!\n새 탭으로 열린 티스토리에서 [기본모드 -> 마크다운]으로 변경 후 바로 'Ctrl+V' 하세요.");
+      }
     } catch (e: any) {
       console.error(e);
       alert("클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.");
@@ -144,7 +187,15 @@ function EditorContent() {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(article);
+    let copyText = article;
+    if (activeTab === "seo" && jsonLd) {
+      copyText = `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>`;
+    } else if (activeTab === "html" && htmlArticle) {
+      const jsonLdStr = jsonLd ? `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>\n\n` : "";
+      copyText = jsonLdStr + htmlArticle;
+    }
+
+    navigator.clipboard.writeText(copyText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -205,6 +256,42 @@ function EditorContent() {
                   className="bg-white/[0.03] border border-white/[0.05] rounded-2xl px-5 py-4 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all placeholder:text-gray-700"
                 />
               </div>
+
+              {/* 수익 극대화 솔루션 토글 그룹 */}
+              <div className="border-t border-white/[0.05] pt-5 flex flex-col gap-4">
+                <label className="text-[10px] font-bold text-purple-400 uppercase tracking-widest flex items-center gap-2">
+                  <Zap size={12} className="text-purple-400 animate-pulse" />
+                  수익 극대화 솔루션
+                </label>
+                
+                <div className="flex items-center justify-between bg-white/[0.02] border border-white/[0.03] p-3.5 rounded-2xl hover:border-purple-500/20 transition-all cursor-pointer select-none" onClick={() => setAdsenseOptimize(!adsenseOptimize)}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-white">💰 애드센스 황금 광고 배치</span>
+                    <span className="text-[9px] text-gray-500 leading-normal">본문 소제목 아래 광고 삽입용 자동 지표 슬롯</span>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    checked={adsenseOptimize}
+                    onChange={(e) => setAdsenseOptimize(e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 accent-purple-500 cursor-pointer shrink-0"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between bg-white/[0.02] border border-white/[0.03] p-3.5 rounded-2xl hover:border-purple-500/20 transition-all cursor-pointer select-none" onClick={() => setAffiliateOptimize(!affiliateOptimize)}>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-white">🔗 제휴 마케팅 CTA 자동 삽입</span>
+                    <span className="text-[9px] text-gray-500 leading-normal">고전환율 앵커 텍스트 영역을 하단에 자동 탑재</span>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    checked={affiliateOptimize}
+                    onChange={(e) => setAffiliateOptimize(e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 accent-purple-500 cursor-pointer shrink-0"
+                  />
+                </div>
+              </div>
             </div>
 
             <button 
@@ -239,20 +326,34 @@ function EditorContent() {
         {/* Right: Premium Premium Editor/Preview Workspace */}
         <div className="lg:col-span-8 flex flex-col gap-6">
           <div className="flex justify-between items-center bg-[#0a0a0f]/40 backdrop-blur-xl p-2 rounded-2xl border border-white/[0.05]">
-            <div className="flex p-1 gap-1">
+            <div className="flex p-1 gap-1 flex-wrap">
               <button 
-                onClick={() => setShowPreview(false)}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${!showPreview ? 'bg-white/[0.05] text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                onClick={() => setActiveTab("editor")}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'editor' ? 'bg-white/[0.05] text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
               >
                 에디터 모드
               </button>
               <button 
-                onClick={() => setShowPreview(true)}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${showPreview ? 'bg-white/[0.05] text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+                onClick={() => setActiveTab("preview")}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${activeTab === 'preview' ? 'bg-white/[0.05] text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
               >
                 미리보기 <Eye size={14} />
               </button>
-              <div className="w-[1px] h-6 bg-white/[0.1] my-auto mx-2" />
+              <button 
+                onClick={() => setActiveTab("seo")}
+                disabled={!jsonLd}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-20 disabled:pointer-events-none ${activeTab === 'seo' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                구글 SEO (JSON-LD)
+              </button>
+              <button 
+                onClick={() => setActiveTab("html")}
+                disabled={!htmlArticle}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-20 disabled:pointer-events-none ${activeTab === 'html' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-gray-500 hover:text-gray-300'}`}
+              >
+                HTML 최종 원고
+              </button>
+              <div className="w-[1px] h-6 bg-white/[0.1] my-auto mx-2 hidden sm:block" />
               <button 
                 onClick={clearEditor}
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all text-red-400 hover:text-red-300 hover:bg-red-500/10"
@@ -267,7 +368,7 @@ function EditorContent() {
               className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.03] hover:bg-white/[0.08] text-gray-300 rounded-xl text-xs font-bold transition-all border border-white/[0.05] active:scale-95 disabled:opacity-20 translate-x-[-4px]"
             >
               {copied ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
-              티스토리로 최적화 복사
+              {activeTab === "seo" ? "구조화 데이터 복사" : activeTab === "html" ? "HTML 최종본 복사" : "티스토리로 최적화 복사"}
             </button>
           </div>
 
@@ -298,19 +399,36 @@ function EditorContent() {
             )}
             
             <div className="h-full overflow-y-auto custom-scrollbar relative">
-              {showPreview ? (
+              {activeTab === "preview" && (
                 <div className="p-12 prose prose-invert max-w-none prose-headings:text-white prose-p:text-gray-300 prose-headings:font-outfit animate-in fade-in duration-700">
                   <pre className="whitespace-pre-wrap font-sans text-gray-300 leading-relaxed text-base">
                     {article}
                   </pre>
                 </div>
-              ) : (
+              )}
+              {activeTab === "editor" && (
                 <textarea 
                   value={article}
                   onChange={handleArticleChange}
                   className="w-full h-full bg-transparent p-12 text-gray-300 font-mono text-sm focus:outline-none resize-none leading-relaxed selection:bg-purple-500/20"
                   placeholder="AI가 생성한 원고가 이곳에 표시됩니다..."
                 />
+              )}
+              {activeTab === "seo" && jsonLd && (
+                <div className="p-12 animate-in fade-in duration-700">
+                  <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-4">Google Search Schema.org JSON-LD (Rich Snippet)</p>
+                  <pre className="p-6 bg-white/[0.02] border border-white/[0.05] rounded-2xl text-purple-300 font-mono text-xs overflow-x-auto leading-relaxed max-w-full">
+                    {`<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>`}
+                  </pre>
+                </div>
+              )}
+              {activeTab === "html" && htmlArticle && (
+                <div className="p-12 animate-in fade-in duration-700">
+                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-4">SEO Optimized Article HTML Template (Including Ad Placeholder)</p>
+                  <pre className="p-6 bg-white/[0.02] border border-white/[0.05] rounded-2xl text-emerald-300 font-mono text-xs overflow-x-auto leading-relaxed max-w-full whitespace-pre-wrap">
+                    {`${jsonLd ? `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>\n\n` : ""}${htmlArticle}`}
+                  </pre>
+                </div>
               )}
             </div>
           </div>
