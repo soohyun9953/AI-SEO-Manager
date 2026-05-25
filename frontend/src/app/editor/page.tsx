@@ -205,9 +205,12 @@ function EditorContent() {
       
       {/* Header Section */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 w-fit">
-           <PenTool size={14} className="text-purple-500" />
-           <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest font-outfit">Content Generation Engine</span>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 w-fit">
+             <PenTool size={14} className="text-purple-500" />
+             <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest font-outfit">Content Generation Engine</span>
+          </div>
+          <span className="text-xs font-medium text-gray-500 font-outfit">최종 배포일: 2026.05.24</span>
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-white font-outfit">친근한 지식 메이트 <span className="text-purple-400 font-light italic">Story.</span></h1>
         <p className="text-gray-400 text-lg leading-relaxed max-w-2xl">
@@ -433,9 +436,6 @@ function EditorContent() {
             </div>
           </div>
         </div>
-      </div>
-      <div className="text-center text-[10px] text-gray-600 mt-4">
-        최종 배포일: 2026.05.24
       </div>
     </div>
   );
