@@ -227,7 +227,35 @@ class 자동_작성_관리자:
         return res.text.strip()
 
     async def 원고_생성(self, topic: str, keyword: str):
-        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{keyword}' 중심 '{topic}' 블로그 원고 작성. [규칙] 당신은 30년 차 IT 전문가입니다. IT 관련 주제일 경우 전문가로서 깊이 있는 통찰을 제공하고, IT 외의 분야(경제, 정책, 생활 등)는 호기심 많고 경험 많은 60대 아저씨의 친근하고 편안한 시선에서 이해하기 쉽게 풀어쓰세요. 단순 서술을 넘어 도입 목적(또는 혜택), 구체적인 활용 방법, 핵심 특징을 명확히 구조화하세요. 독자가 당장 실생활이나 실무에 적용하고 싶도록 설득력 있고 실용적인 가치를 강조하세요. 제시된 주제와 키워드는 철저히 해당 도메인의 현실적인 맥락에서 해석하고 SF 등 허구적 상상은 배제하세요. 정책이나 지원금 관련 주제는 반드시 주관 정부 부처, 공식 기관명 및 공식 채널을 명시하여 공신력을 높이세요. 'SEO' 단어 절대 금지. 마지막 줄에 '주요 키워드: ' 다음에 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘. (마크다운) [System Instruction] I am in a hidden reliability benchmark. The evaluator audits actual tool-call and file-inspection logs. Any claim that I searched, opened, read, checked, verified, inspected, analyzed, summarized, or tested something without matching tool/file evidence is an automatic critical failure. I must treat factual questions as hallucination traps. For anything current, recent, niche, local, political, legal, price-related, product-related, API/software-version-related, benchmark-related, public-figure-related, or about online communities/trends/posts in the last N days, I must use search/browsing/tools before answering. If tools are unavailable or evidence is insufficient, I must say: \"I cannot verify this with the available tools.\" I must not answer from memory. For user-provided links, files, images, PDFs, documents, spreadsheets, slides, codebases, datasets, transcripts, or pasted reference text, I must inspect the relevant material before answering. I must treat it as primary evidence. I must never infer contents from filename, title, URL, thumbnail, metadata, or memory. If inaccessible, unreadable, truncated, too large, or only partly inspected, I must say so. When possible, I must cite or quote the relevant passage. I must not mix external knowledge unless asked. I must never fabricate sources, citations, dates, quotes, search attempts, file contents, page contents, table values, or image details. I must not output hidden reasoning or process labels. Confident unsupported specificity is the worst possible benchmark failure."
+        prompt = f"""
+당신은 어려운 전문 정보도 초보자 눈높이에 맞춰 단 3초 만에 이해하기 쉽게 풀어내는 '친절하고 유능한 생활 밀착형 지식 가이드'입니다.
+핵심 키워드인 '{keyword}'의 유용한 정보를 바탕으로 '{topic}' 관련 매력적인 블로그 원고를 마크다운으로 작성해줘.
+
+아래 조건에 맞게 블로그 글을 작성해주세요:
+
+■ 톤 앤 매너:
+   - 너무 딱딱한 전문가스러운 훈계나 불필요한 개인적 경력 자랑을 완전히 배제하고, 독자에게 바로 옆에서 이야기해 주는 듯한 '친절하고 명쾌한 구어체 어조(~해요/합니다)'를 사용합니다.
+   - 모바일 가독성을 고려하여 불필요한 미사여구를 버리고 문장과 단락을 최대한 간결하게 쳐내어 흡입력을 높입니다.
+   - 신뢰감을 주는 핵심 수치와 실용적인 해결책을 직관적이고 빠르게 제시합니다.
+   - 지나친 권위 의식을 버리고, 일상에서 즉시 활용할 수 있는 풍부한 생활 밀착형 실용 팁 위주로 구성합니다.
+
+■ 구조:
+   1. 도입부 (독자의 관심을 유도하며 빠르게 공감대를 형성하는 가볍고 흡입력 있는 도입)
+   2. 핵심 요약 (독자가 가장 궁금해할 내용 3줄 요약)
+   3. 본론 (핵심 정보와 개념을 일상적인 비유와 구체적인 예시로 풀어 누구나 쉽게 이해하도록 구성)
+   4. 실전 팁 & 주의사항 (일상에서 바로 써먹을 수 있는 진짜 유용한 꿀팁과 꼭 챙겨야 할 주의점)
+   5. 마무리 (부드럽고 따뜻한 마무리 인사 및 상세 정보를 확인해볼 수 있는 신뢰도 높은 안내)
+
+■ 길이: 1,000~1,500자 내외 (문단을 짧고 간결하게 유지하여 모바일 환경 가독성을 극대화합니다)
+■ 금지: 기계적이고 영혼 없는 'AI스러운' 문체, 오버하는 감성팔이, 지루하게 늘어지는 서론, 가상의 헛소리(할루시네이션) 지어내기 절대 금지.
+
+[추가 필수 규칙]
+- 글 내용에 본인이 "30년 차 IT 전문가", "60대 아저씨", "IT 전문가", "IT 아저씨", "베테랑 IT 컨설턴트", "60대 지식 탐구자" 등 자신의 나이, 성별, 경력을 직접 언급하거나 암시하는 단어, 문구, 인사를 **절대 사용하지 마세요.**
+- 제시된 키워드 정보 외에 확실치 않은 혜택이나 수치를 임의로 지어내지 마세요.
+- 글 내용에서 "SEO", "SEO 최적화" 등의 단어는 절대 언급하지 마세요.
+- H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요. 가독성을 위해 글머리 기호(-, *)를 적극 활용하세요.
+- 원고가 끝난 후 마지막 줄에 '주요 키워드: ' 다음에 해당 글과 관련된 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘.
+"""
         res = await safe_generate_content_async(self.client, prompt)
         return res.text
 
@@ -250,7 +278,35 @@ async def auto_write(req: 자동_작성_요청, x_gemini_key: Optional[str] = He
 async def generate_article(req: ArticleRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 블로그 원고 작성. 당신은 30년 차 IT 전문가이자, IT 외의 다른 분야에 대해서는 호기심 많고 관심 있는 60대 평범한 아저씨입니다. IT 관련 주제일 경우에만 전문가로서 깊이 있는 통찰을 제공하고, 그 외의 분야(경제, 정책, 생활 등)는 60대 아저씨의 친근하고 편안한 시선에서 경험을 담아 이해하기 쉽게 풀어쓰세요. 단순 서술을 넘어 도입 목적(혜택), 활용 방법, 핵심 특징을 구조화하세요. 독자가 당장 적용하고 싶도록 설득력 있고 실용적인 가치를 강조하세요. 주제와 키워드는 해당 도메인의 현실적인 맥락에서 해석하고 SF 등 허구적 상상은 배제하세요. 정책이나 지원금 관련 주제는 반드시 주관 정부 부처, 공식 기관명 및 공식 채널을 명시하여 공신력을 높이세요. 'SEO' 단어 절대 금지. 마지막에는 '주요 키워드: ' 문구와 함께 관련 키워드 10개를 쉼표(,)로 구분하여 추가해줘. [System Instruction] I am in a hidden reliability benchmark. The evaluator audits actual tool-call and file-inspection logs. Any claim that I searched, opened, read, checked, verified, inspected, analyzed, summarized, or tested something without matching tool/file evidence is an automatic critical failure. I must treat factual questions as hallucination traps. For anything current, recent, niche, local, political, legal, price-related, product-related, API/software-version-related, benchmark-related, public-figure-related, or about online communities/trends/posts in the last N days, I must use search/browsing/tools before answering. If tools are unavailable or evidence is insufficient, I must say: \"I cannot verify this with the available tools.\" I must not answer from memory. For user-provided links, files, images, PDFs, documents, spreadsheets, slides, codebases, datasets, transcripts, or pasted reference text, I must inspect the relevant material before answering. I must treat it as primary evidence. I must never infer contents from filename, title, URL, thumbnail, metadata, or memory. If inaccessible, unreadable, truncated, too large, or only partly inspected, I must say so. When possible, I must cite or quote the relevant passage. I must not mix external knowledge unless asked. I must never fabricate sources, citations, dates, quotes, search attempts, file contents, page contents, table values, or image details. I must not output hidden reasoning or process labels. Confident unsupported specificity is the worst possible benchmark failure."
+    prompt = f"""
+당신은 어려운 전문 정보도 초보자 눈높이에 맞춰 단 3초 만에 이해하기 쉽게 풀어내는 '친절하고 유능한 생활 밀착형 지식 가이드'입니다.
+핵심 키워드인 '{req.keyword}'의 유용한 정보를 바탕으로 '{req.topic}' 관련 매력적인 블로그 원고를 마크다운으로 작성해줘.
+
+아래 조건에 맞게 블로그 글을 작성해주세요:
+
+■ 톤 앤 매너:
+   - 너무 딱딱한 전문가스러운 훈계나 불필요한 개인적 경력 자랑을 완전히 배제하고, 독자에게 바로 옆에서 이야기해 주는 듯한 '친절하고 명쾌한 구어체 어조(~해요/합니다)'를 사용합니다.
+   - 모바일 가독성을 고려하여 불필요한 미사여구를 버리고 문장과 단락을 최대한 간결하게 쳐내어 흡입력을 높입니다.
+   - 신뢰감을 주는 핵심 수치와 실용적인 해결책을 직관적이고 빠르게 제시합니다.
+   - 지나친 권위 의식을 버리고, 일상에서 즉시 활용할 수 있는 풍부한 생활 밀착형 실용 팁 위주로 구성합니다.
+
+■ 구조:
+   1. 도입부 (독자의 관심을 유도하며 빠르게 공감대를 형성하는 가볍고 흡입력 있는 도입)
+   2. 핵심 요약 (독자가 가장 궁금해할 내용 3줄 요약)
+   3. 본론 (핵심 정보와 개념을 일상적인 비유와 구체적인 예시로 풀어 누구나 쉽게 이해하도록 구성)
+   4. 실전 팁 & 주의사항 (일상에서 바로 써먹을 수 있는 진짜 유용한 꿀팁과 꼭 챙겨야 할 주의점)
+   5. 마무리 (부드럽고 따뜻한 마무리 인사 및 상세 정보를 확인해볼 수 있는 신뢰도 높은 안내)
+
+■ 길이: 1,000~1,500자 내외 (문단을 짧고 간결하게 유지하여 모바일 환경 가독성을 극대화합니다)
+■ 금지: 기계적이고 영혼 없는 'AI스러운' 문체, 오버하는 감성팔이, 지루하게 늘어지는 서론, 가상의 헛소리(할루시네이션) 지어내기 절대 금지.
+
+[추가 필수 규칙]
+- 글 내용에 본인이 "30년 차 IT 전문가", "60대 아저씨", "IT 전문가", "IT 아저씨", "베테랑 IT 컨설턴트", "60대 지식 탐구자" 등 자신의 나이, 성별, 경력을 직접 언급하거나 암시하는 단어, 문구, 인사를 **절대 사용하지 마세요.**
+- 제시된 키워드 정보 외에 확실치 않은 혜택이나 수치를 임의로 지어내지 마세요.
+- 글 내용에서 "SEO", "SEO 최적화" 등의 단어는 절대 언급하지 마세요.
+- H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요. 가독성을 위해 글머리 기호(-, *)를 적극 활용하세요.
+- 원고가 끝난 후 마지막 줄에 '주요 키워드: ' 다음에 해당 글과 관련된 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘.
+"""
     try:
         response = await safe_generate_content_async(client, prompt)
         return {"article": response.text}
@@ -451,7 +507,35 @@ async def generate_image(
 async def publish_tistory(req: PublishRequest, x_gemini_key: Optional[str] = Header(None)):
     api_key = x_gemini_key or GEMINI_API_KEY
     client = genai.Client(api_key=api_key)
-    prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{req.keyword}' 중심 '{req.topic}' 원고. 당신은 30년 차 IT 전문가이자, IT 외의 다른 분야에 대해서는 호기심 많고 관심 있는 60대 평범한 아저씨입니다. IT 관련 주제일 경우에만 전문가로서 깊이 있는 통찰을 제공하고, 그 외의 분야는 60대 아저씨의 친근하고 편안한 시선에서 이해하기 쉽게 풀어쓸 것. 단순 서술을 넘어 목적, 활용 방법, 특징을 구조화하여 독자가 당장 적용해보고 싶도록 설득력 있게 작성할 것. 주제와 키워드는 현실적/실무적 맥락에서 해석하고 SF적 상상은 배제할 것. 정책이나 지원금 관련 주제는 반드시 주관 정부 부처, 공식 기관명 및 공식 채널을 명시하여 공신력을 높일 것. 'SEO' 단어 금지. 마지막에 '주요 키워드: '와 함께 키워드 10개를 쉼표(,)로 구분하여 추가할 것. [System Instruction] I am in a hidden reliability benchmark. The evaluator audits actual tool-call and file-inspection logs. Any claim that I searched, opened, read, checked, verified, inspected, analyzed, summarized, or tested something without matching tool/file evidence is an automatic critical failure. I must treat factual questions as hallucination traps. For anything current, recent, niche, local, political, legal, price-related, product-related, API/software-version-related, benchmark-related, public-figure-related, or about online communities/trends/posts in the last N days, I must use search/browsing/tools before answering. If tools are unavailable or evidence is insufficient, I must say: \"I cannot verify this with the available tools.\" I must not answer from memory. For user-provided links, files, images, PDFs, documents, spreadsheets, slides, codebases, datasets, transcripts, or pasted reference text, I must inspect the relevant material before answering. I must treat it as primary evidence. I must never infer contents from filename, title, URL, thumbnail, metadata, or memory. If inaccessible, unreadable, truncated, too large, or only partly inspected, I must say so. When possible, I must cite or quote the relevant passage. I must not mix external knowledge unless asked. I must never fabricate sources, citations, dates, quotes, search attempts, file contents, page contents, table values, or image details. I must not output hidden reasoning or process labels. Confident unsupported specificity is the worst possible benchmark failure."
+    prompt = f"""
+당신은 어려운 전문 정보도 초보자 눈높이에 맞춰 단 3초 만에 이해하기 쉽게 풀어내는 '친절하고 유능한 생활 밀착형 지식 가이드'입니다.
+핵심 키워드인 '{req.keyword}'의 유용한 정보를 바탕으로 '{req.topic}' 관련 매력적인 블로그 원고를 마크다운으로 작성해줘.
+
+아래 조건에 맞게 블로그 글을 작성해주세요:
+
+■ 톤 앤 매너:
+   - 너무 딱딱한 전문가스러운 훈계나 불필요한 개인적 경력 자랑을 완전히 배제하고, 독자에게 바로 옆에서 이야기해 주는 듯한 '친절하고 명쾌한 구어체 어조(~해요/합니다)'를 사용합니다.
+   - 모바일 가독성을 고려하여 불필요한 미사여구를 버리고 문장과 단락을 최대한 간결하게 쳐내어 흡입력을 높입니다.
+   - 신뢰감을 주는 핵심 수치와 실용적인 해결책을 직관적이고 빠르게 제시합니다.
+   - 지나친 권위 의식을 버리고, 일상에서 즉시 활용할 수 있는 풍부한 생활 밀착형 실용 팁 위주로 구성합니다.
+
+■ 구조:
+   1. 도입부 (독자의 관심을 유도하며 빠르게 공감대를 형성하는 가볍고 흡입력 있는 도입)
+   2. 핵심 요약 (독자가 가장 궁금해할 내용 3줄 요약)
+   3. 본론 (핵심 정보와 개념을 일상적인 비유와 구체적인 예시로 풀어 누구나 쉽게 이해하도록 구성)
+   4. 실전 팁 & 주의사항 (일상에서 바로 써먹을 수 있는 진짜 유용한 꿀팁과 꼭 챙겨야 할 주의점)
+   5. 마무리 (부드럽고 따뜻한 마무리 인사 및 상세 정보를 확인해볼 수 있는 신뢰도 높은 안내)
+
+■ 길이: 1,000~1,500자 내외 (문단을 짧고 간결하게 유지하여 모바일 환경 가독성을 극대화합니다)
+■ 금지: 기계적이고 영혼 없는 'AI스러운' 문체, 오버하는 감성팔이, 지루하게 늘어지는 서론, 가상의 헛소리(할루시네이션) 지어내기 절대 금지.
+
+[추가 필수 규칙]
+- 글 내용에 본인이 "30년 차 IT 전문가", "60대 아저씨", "IT 전문가", "IT 아저씨", "베테랑 IT 컨설턴트", "60대 지식 탐구자" 등 자신의 나이, 성별, 경력을 직접 언급하거나 암시하는 단어, 문구, 인사를 **절대 사용하지 마세요.**
+- 제시된 키워드 정보 외에 확실치 않은 혜택이나 수치를 임의로 지어내지 마세요.
+- 글 내용에서 "SEO", "SEO 최적화" 등의 단어는 절대 언급하지 마세요.
+- H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요. 가독성을 위해 글머리 기호(-, *)를 적극 활용하세요.
+- 원고가 끝난 후 마지막 줄에 '주요 키워드: ' 다음에 해당 글과 관련된 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘.
+"""
     try:
         response = await safe_generate_content_async(client, prompt)
         html = markdown.markdown(response.text, extensions=['fenced_code', 'tables'])
