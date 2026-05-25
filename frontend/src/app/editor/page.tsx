@@ -209,10 +209,10 @@ function EditorContent() {
            <PenTool size={14} className="text-purple-500" />
            <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest font-outfit">Content Generation Engine</span>
         </div>
-        <h1 className="text-4xl font-bold tracking-tight text-white font-outfit">SEO 라이터 <span className="text-purple-400 font-light italic">Composition.</span></h1>
+        <h1 className="text-4xl font-bold tracking-tight text-white font-outfit">친근한 지식 메이트 <span className="text-purple-400 font-light italic">Story.</span></h1>
         <p className="text-gray-400 text-lg leading-relaxed max-w-2xl">
-           구조화된 시맨틱 태그와 최적의 키워드 밀도를 갖춘 전문적인 포스팅을 즉시 생성하세요. <br />
-           Gemini 1.5 Pro의 강력한 문장력을 통해 검색 상위 노출을 지원합니다.
+           어려운 전문 지식도 누구나 단 3초 만에 이해할 수 있게 쉽게 풀어 쓰는 매력적인 블로그 원고를 즉시 생성해 보세요. <br />
+           최신 Gemini 2.5 Flash 엔진이 독자에게 친근하게 다가가는 고수익 생활 밀착형 원고 작성을 지원합니다.
         </p>
       </div>
 
@@ -313,12 +313,12 @@ function EditorContent() {
           </div>
 
           <div className="glass-card p-6 border-dashed border-white/[0.05] flex flex-col gap-4 opacity-70">
-             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">포함될 SEO 요소</h3>
+             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">원고 작성 주요 특징</h3>
              <ul className="text-[11px] text-gray-500 space-y-2">
-                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ H1 ~ H3 시맨틱 태그 구조화</li>
-                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ 메타 설명 (Description) 포함</li>
-                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ 주요 키워드 자연스러운 반복</li>
-                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ 티스토리 등록 최적화 HTML 호환</li>
+                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ 누구나 3초 만에 이해하는 쉬운 설명</li>
+                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ 친근하고 정중한 생활 밀착형 구어체</li>
+                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ 가독성을 극대화한 모바일 최적화 레이아웃</li>
+                <li className="flex items-center gap-2 px-2 py-1 rounded bg-white/[0.02] border border-white/[0.03]">✓ 구글 SEO 구조화 데이터 & 애드센스 슬롯 자동 탑재</li>
              </ul>
           </div>
         </div>
@@ -393,7 +393,7 @@ function EditorContent() {
                 </div>
                 <div className="flex flex-col items-center gap-2">
                    <p className="text-xl font-bold text-white tracking-tight">AI Drafting in Progress</p>
-                   <p className="text-sm font-medium text-purple-400 animate-pulse uppercase tracking-widest">SEO 최적화 문장 구성 중...</p>
+                   <p className="text-sm font-medium text-purple-400 animate-pulse uppercase tracking-widest">누구나 이해하기 쉬운 친근한 문장 구성 중...</p>
                 </div>
               </div>
             )}
@@ -433,6 +433,9 @@ function EditorContent() {
             </div>
           </div>
         </div>
+      </div>
+      <div className="text-center text-[10px] text-gray-600 mt-4">
+        최종 배포일: 2026.05.24
       </div>
     </div>
   );
