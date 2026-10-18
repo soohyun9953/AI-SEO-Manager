@@ -6,7 +6,9 @@ const nextConfig: NextConfig = {
       return [
         {
           source: '/api/:path*',
-          destination: 'http://127.0.0.1:8002/api/:path*',
+          destination: process.env.LOCAL_BACKEND === 'false'
+            ? 'https://ai-seo-manager-u3w9.vercel.app/api/:path*'
+            : 'http://127.0.0.1:8002/api/:path*',
         },
       ];
     }

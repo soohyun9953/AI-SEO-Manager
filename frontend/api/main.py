@@ -17,6 +17,14 @@ from dotenv import load_dotenv
 import requests
 import markdown
 
+try:
+    import database
+except ImportError:
+    try:
+        from . import database
+    except ImportError:
+        import api.database as database
+
 load_dotenv()
 
 # Vercel 배포 시에는 제목에 배포 환경임을 명시
@@ -65,6 +73,58 @@ class 자동_작성_요청(BaseModel):
 class 심층_분석_요청(BaseModel):
     keyword: str
     topic: str
+
+class ContentCreateRequest(BaseModel):
+    title: str
+    keyword: str
+    related_keywords: Optional[str] = ""
+    category: Optional[str] = "일반"
+    content: str
+    content_html: Optional[str] = ""
+    meta_description: Optional[str] = ""
+    tags: Optional[str] = ""
+    thumbnail_url: Optional[str] = ""
+    body_images: Optional[List[str]] = []
+    reference_urls: Optional[List[str]] = []
+    internal_links: Optional[List[str]] = []
+    ai_model: Optional[str] = "gemini-2.5-flash"
+    status: Optional[str] = "DRAFT"
+    scheduled_at: Optional[str] = ""
+    tistory_url: Optional[str] = ""
+    check_duplicate: Optional[bool] = False
+
+class ContentUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    keyword: Optional[str] = None
+    related_keywords: Optional[str] = None
+    category: Optional[str] = None
+    content: Optional[str] = None
+    content_html: Optional[str] = None
+    meta_description: Optional[str] = None
+    tags: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    body_images: Optional[List[str]] = None
+    reference_urls: Optional[List[str]] = None
+    internal_links: Optional[List[str]] = None
+    status: Optional[str] = None
+    scheduled_at: Optional[str] = None
+    published_at: Optional[str] = None
+    tistory_url: Optional[str] = None
+    queue_order: Optional[int] = None
+    change_summary: Optional[str] = "내용 수정"
+
+class StatusUpdateRequest(BaseModel):
+    status: str
+
+class BatchStatusUpdateRequest(BaseModel):
+    content_ids: List[str]
+    status: str
+
+class PublishRecordRequest(BaseModel):
+    publish_type: str = "TISTORY_MANUAL"
+    status: str = "SUCCESS"
+    post_url: Optional[str] = ""
+    message: Optional[str] = ""
 
 @app.get("/")
 async def root():
@@ -545,4 +605,152 @@ async def publish_tistory(req: PublishRequest, x_gemini_key: Optional[str] = Hea
         })
         return {"success": True, "result": res.json()}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==============================================================================
+# 콘텐츠 관리 및 발행 대기열 API (Vercel Serverless 호환)
+# ==============================================================================
+
+@app.get("/api/contents/stats")
+async def get_contents_stats():
+    """콘텐츠 관리 대시보드 통계 조회"""
+    try:
+        stats = database.get_contents_stats()
+        return stats
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/contents")
+async def get_contents(
+    status: Optional[str] = None,
+    keyword: Optional[str] = None,
+    sort_by: str = "created_at_desc",
+    page: int = 1,
+    limit: int = 20
+):
+    """콘텐츠 목록 조회 (검색, 필터, 정렬, 페이지네이션)"""
+    try:
+        result = database.list_contents(
+            status=status,
+            keyword_query=keyword,
+            sort_by=sort_by,
+            page=page,
+            limit=limit
+        )
+        return result
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/contents")
+async def create_new_content(req: ContentCreateRequest):
+    """신규 콘텐츠 저장 (SEO 라이터 / 자동 글작성에서 직접 저장)"""
+    try:
+        created = database.create_content(req.dict(), check_duplicate=req.check_duplicate)
+        return created
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"콘텐츠 저장 실패: {str(e)}")
+
+@app.get("/api/contents/{content_id}")
+async def get_content(content_id: str):
+    """콘텐츠 상세 조회"""
+    try:
+        content = database.get_content_by_id(content_id)
+        if not content:
+            raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
+        return content
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/contents/{content_id}")
+async def update_content(content_id: str, req: ContentUpdateRequest):
+    """콘텐츠 수정 및 이력 기록"""
+    try:
+        update_data = {k: v for k, v in req.dict().items() if v is not None}
+        change_summary = req.change_summary or "내용 수정"
+        updated = database.update_content(content_id, update_data, change_summary)
+        return updated
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/contents/{content_id}")
+async def delete_content(content_id: str):
+    """콘텐츠 삭제"""
+    try:
+        success = database.delete_content(content_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
+        return {"success": True, "message": "삭제되었습니다."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/contents/{content_id}/status")
+async def update_status(content_id: str, req: StatusUpdateRequest):
+    """단일 콘텐츠 상태 변경"""
+    try:
+        updated = database.update_content_status(content_id, req.status)
+        return updated
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/contents/batch-status")
+async def batch_update_status(req: BatchStatusUpdateRequest):
+    """다중 콘텐츠 상태 일괄 변경 (예: 발행 승인 일괄 처리)"""
+    try:
+        count = database.batch_update_status(req.content_ids, req.status)
+        return {"success": True, "updated_count": count}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/contents/{content_id}/publish-record")
+async def record_publish(content_id: str, req: PublishRecordRequest):
+    """발행 결과 기록 (수동 복사 발행 또는 API 발행 후 결과 확정)"""
+    try:
+        updated = database.record_publish_result(
+            content_id=content_id,
+            publish_type=req.publish_type,
+            status=req.status,
+            post_url=req.post_url or "",
+            message=req.message or ""
+        )
+        return updated
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/contents/{content_id}/history")
+async def get_history(content_id: str):
+    """콘텐츠 수정 이력 목록 조회"""
+    try:
+        return database.get_content_history(content_id)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/publish-history")
+async def get_publish_records(content_id: Optional[str] = None):
+    """발행 이력 목록 조회"""
+    try:
+        return database.get_publish_history(content_id)
+    except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

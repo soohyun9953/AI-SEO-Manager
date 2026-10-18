@@ -17,3 +17,8 @@ frontend/build/
 .cursor/
 .vscode/
 Thumbs.db
+
+# Database & Logs
+*.db
+backend/data/
+backend/backend_log.txt

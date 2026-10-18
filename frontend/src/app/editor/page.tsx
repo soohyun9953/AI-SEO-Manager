@@ -2,7 +2,9 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PenTool, Send, Copy, Eye, FileText, Loader2, CheckCircle, Zap, Layout, Hash, Trash2 } from "lucide-react";
+import { PenTool, Send, Copy, Eye, FileText, Loader2, CheckCircle, Zap, Layout, Hash, Trash2, Save, Download, FolderKanban } from "lucide-react";
+import Link from "next/link";
+import ExportModal, { ContentItem } from "@/components/ExportModal";
 
 function EditorContent() {
   const searchParams = useSearchParams();
@@ -20,6 +22,10 @@ function EditorContent() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"editor" | "preview" | "seo" | "html">("editor");
   const [publishing, setPublishing] = useState(false);
+  
+  const [savingToDB, setSavingToDB] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   useEffect(() => {
     if (!urlTopic) {
@@ -200,6 +206,45 @@ function EditorContent() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const saveToContents = async () => {
+    if (!article || !topic || !keyword) {
+      alert("저장할 원고와 주제, 키워드가 필요합니다. 먼저 원고를 생성해주세요.");
+      return;
+    }
+    setSavingToDB(true);
+    setSaveSuccessMsg(null);
+    try {
+      const res = await fetch("/api/contents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: topic,
+          keyword: keyword,
+          category: "일반",
+          content: article,
+          content_html: htmlArticle,
+          meta_description: article.slice(0, 150).replace(/\n/g, " ").trim() + "...",
+          tags: keyword,
+          status: "DRAFT",
+          check_duplicate: false
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "저장에 실패했습니다.");
+      }
+
+      setSaveSuccessMsg("✅ 콘텐츠 보관함에 안전하게 저장되었습니다!");
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      alert(`저장 실패: ${err.message || "오류가 발생했습니다."}`);
+    } finally {
+      setSavingToDB(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-10 max-w-[1400px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20">
       
@@ -210,7 +255,7 @@ function EditorContent() {
              <PenTool size={14} className="text-purple-500" />
              <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest font-outfit">Content Generation Engine</span>
           </div>
-          <span className="text-xs font-medium text-gray-500 font-outfit">최종 배포일: 2026.05.24</span>
+          <span className="text-xs font-medium text-gray-500 font-outfit">최종 배포일: 2026.10.18 (v2.0.0)</span>
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-white font-outfit">친근한 지식 메이트 <span className="text-purple-400 font-light italic">Story.</span></h1>
         <p className="text-gray-400 text-lg leading-relaxed max-w-2xl">
@@ -299,18 +344,36 @@ function EditorContent() {
 
             <button 
               onClick={generateArticle}
-              disabled={loading || publishing || !topic || !keyword}
-              className="w-full relative group bg-gradient-to-tr from-purple-700 to-purple-500 hover:from-purple-600 hover:to-purple-400 text-white py-5 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 mt-4 shadow-xl shadow-purple-600/20 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+              disabled={loading || publishing || savingToDB || !topic || !keyword}
+              className="w-full relative group bg-gradient-to-tr from-purple-700 to-purple-500 hover:from-purple-600 hover:to-purple-400 text-white py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 mt-4 shadow-xl shadow-purple-600/20 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
             >
               {loading ? <Loader2 className="animate-spin" size={20} /> : <><Zap size={18} className="group-hover:animate-bounce" /> 마스터 원고 쓰기</>}
             </button>
 
             <button 
-              onClick={publishToTistory}
-              disabled={loading || publishing || !topic || !keyword}
-              className="w-full relative group bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white py-5 rounded-2xl font-bold transition-all flex items-center justify-center gap-3 mt-2 shadow-xl shadow-orange-600/20 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+              onClick={saveToContents}
+              disabled={loading || publishing || savingToDB || !article}
+              className="w-full relative group bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-3.5 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 mt-2 shadow-lg shadow-blue-600/20 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
             >
-              {publishing ? <Loader2 className="animate-spin" size={20} /> : <><Send size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /> 티스토리 원스톱 자동 보관</>}
+              {savingToDB ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+              콘텐츠 관리 보관함에 저장하기
+            </button>
+
+            {saveSuccessMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center justify-between">
+                <span>{saveSuccessMsg}</span>
+                <Link href="/contents" className="text-white underline font-bold hover:text-emerald-300">
+                  목록 보기
+                </Link>
+              </div>
+            )}
+
+            <button 
+              onClick={publishToTistory}
+              disabled={loading || publishing || savingToDB || !topic || !keyword}
+              className="w-full relative group bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white py-3.5 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 mt-1 shadow-lg shadow-orange-600/20 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+            >
+              {publishing ? <Loader2 className="animate-spin" size={16} /> : <><Send size={16} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /> 티스토리 원스톱 자동 보관</>}
             </button>
             <div className="absolute -left-20 -top-20 w-80 h-80 bg-purple-600/5 blur-[100px] pointer-events-none" />
           </div>
@@ -365,14 +428,24 @@ function EditorContent() {
               </button>
             </div>
 
-            <button 
-              onClick={copyToClipboard}
-              disabled={!article}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.03] hover:bg-white/[0.08] text-gray-300 rounded-xl text-xs font-bold transition-all border border-white/[0.05] active:scale-95 disabled:opacity-20 translate-x-[-4px]"
-            >
-              {copied ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
-              {activeTab === "seo" ? "구조화 데이터 복사" : activeTab === "html" ? "HTML 최종본 복사" : "티스토리로 최적화 복사"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setIsExportOpen(true)}
+                disabled={!article}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600/10 hover:bg-blue-600/20 text-blue-300 rounded-xl text-xs font-bold transition-all border border-blue-500/30 active:scale-95 disabled:opacity-20"
+              >
+                <Download size={14} /> 내보내기/복사 패키지
+              </button>
+
+              <button 
+                onClick={copyToClipboard}
+                disabled={!article}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/[0.03] hover:bg-white/[0.08] text-gray-300 rounded-xl text-xs font-bold transition-all border border-white/[0.05] active:scale-95 disabled:opacity-20 translate-x-[-4px]"
+              >
+                {copied ? <CheckCircle size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                {activeTab === "seo" ? "구조화 데이터 복사" : activeTab === "html" ? "HTML 최종본 복사" : "티스토리로 최적화 복사"}
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 min-h-[700px] glass-card overflow-hidden relative shadow-inner">
@@ -437,6 +510,24 @@ function EditorContent() {
           </div>
         </div>
       </div>
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        content={article ? {
+          id: "temp-editor-content",
+          title: topic || "제목 없음",
+          keyword: keyword || "",
+          category: "일반",
+          content: article,
+          content_html: htmlArticle,
+          meta_description: article.slice(0, 150).replace(/\n/g, " ").trim(),
+          tags: keyword,
+          status: "DRAFT",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } : null}
+      />
     </div>
   );
 }

@@ -193,6 +193,25 @@ export default function AutoWritePage() {
 
           setGeneratedResult(newArticle);
           saveToStorage([newArticle, ...savedArticles]);
+
+          // 영속적 백엔드 데이터베이스(/api/contents)에도 자동 보관 동기화
+          try {
+            await fetch("/api/contents", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: data.topic,
+                keyword: data.keyword,
+                category: selectedCategory,
+                content: data.article,
+                status: "DRAFT",
+                check_duplicate: false
+              })
+            });
+          } catch (dbErr) {
+            console.error("Auto-write DB sync failed:", dbErr);
+          }
+
           success = true;
           break;
         } catch (err: any) {
@@ -385,10 +404,17 @@ export default function AutoWritePage() {
                     </button>
                     <button 
                       onClick={() => router.push(`/editor?topic=${encodeURIComponent(generatedResult.topic)}&keyword=${encodeURIComponent(generatedResult.keyword)}`)}
-                      className="flex-1 flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-8 py-6 rounded-3xl font-bold transition-all shadow-2xl shadow-blue-600/40 group active:scale-95"
+                      className="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-5 rounded-3xl font-bold transition-all shadow-xl shadow-purple-600/30 group active:scale-95 text-sm"
                     >
                       상세 편집기 열기
-                      <ExternalLink size={20} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                      <ExternalLink size={18} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                    </button>
+                    <button 
+                      onClick={() => router.push('/contents')}
+                      className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-6 py-5 rounded-3xl font-bold transition-all shadow-xl shadow-blue-600/30 group active:scale-95 text-sm"
+                    >
+                      콘텐츠 관리로 이동
+                      <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
 

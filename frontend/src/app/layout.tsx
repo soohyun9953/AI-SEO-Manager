@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
-import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles } from "lucide-react";
+import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal } from "lucide-react";
 import Link from "next/link";
 import ApiKeyHeader from "@/components/ApiKeyHeader";
 
@@ -32,12 +32,16 @@ export default function RootLayout({
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-lg tracking-tight text-white font-outfit">SEO Manager</span>
-                <span className="text-[10px] uppercase tracking-widest text-blue-500 font-bold opacity-80">Enterprise AI</span>
+                <span className="text-[10px] tracking-tight text-blue-400 font-medium">v2.0.0 · 2026.10.18</span>
               </div>
             </Link>
             
             <nav className="flex flex-col gap-1.5">
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] px-4 mb-2">Workspace</p>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] px-4 mb-2">Publishing & Management</p>
+              <NavItem href="/contents" icon={<FolderKanban size={18} />} label="콘텐츠 관리" />
+              <NavItem href="/queue" icon={<SendHorizontal size={18} />} label="발행 대기열" />
+              
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] px-4 mt-4 mb-2">AI Creator Studio</p>
               <NavItem href="/keywords" icon={<Search size={18} />} label="키워드 엔진" />
               <NavItem href="/editor" icon={<PenTool size={18} />} label="SEO 라이터" />
               <NavItem href="/images" icon={<ImageIcon size={18} />} label="이미지 생성기" />
@@ -54,7 +58,7 @@ export default function RootLayout({
                <div className="relative z-10">
                   <p className="text-xs font-bold text-white mb-1 leading-tight">Pro Plan Active</p>
                   <p className="text-[10px] text-gray-400">Gemini 2.5 Flash & Imagen 3 Enabled</p>
-                  <p className="text-[9px] text-gray-500 mt-1">배포일자: 2026.05.24</p>
+                  <p className="text-[9px] text-gray-500 mt-1">배포일자: 2026.10.18 (v2.0.0)</p>
                </div>
                <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-blue-600/20 blur-2xl group-hover:scale-150 transition-all duration-500" />
             </div>
