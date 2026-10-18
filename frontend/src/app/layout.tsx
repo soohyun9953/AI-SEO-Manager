@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
-import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal, UtensilsCrossed } from "lucide-react";
+import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal, UtensilsCrossed, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import ApiKeyHeader from "@/components/ApiKeyHeader";
 
@@ -40,6 +40,7 @@ export default function RootLayout({
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] px-4 mb-2">Publishing & Management</p>
               <NavItem href="/contents" icon={<FolderKanban size={18} />} label="콘텐츠 관리" />
               <NavItem href="/queue" icon={<SendHorizontal size={18} />} label="발행 대기열" />
+              <NavItem href="/analytics" icon={<TrendingUp size={18} />} label="수익·성과 분석" />
               
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] px-4 mt-4 mb-2">AI Creator Studio</p>
               <NavItem href="/keywords" icon={<Search size={18} />} label="키워드 엔진" />

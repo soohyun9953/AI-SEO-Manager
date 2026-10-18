@@ -148,6 +148,20 @@ class AutoRegisterRequest(BaseModel):
     blog_name: Optional[str] = "s-elegant"
     force: Optional[bool] = False
 
+class AnalyticsSettingsRequest(BaseModel):
+    site_url: Optional[str] = "https://s-elegant.tistory.com/"
+    gsc_connected: Optional[bool] = False
+    adsense_connected: Optional[bool] = False
+    adsense_account_id: Optional[str] = ""
+    gsc_auth_type: Optional[str] = "SERVICE_ACCOUNT"
+    service_account_email: Optional[str] = ""
+
+class AnalyticsRecommendRequest(BaseModel):
+    page: dict
+
+class WeeklyReportRequest(BaseModel):
+    days: Optional[int] = 28
+
 
 
 
@@ -1350,6 +1364,94 @@ async def run_auto_register(req: AutoRegisterRequest):
         )
         database.update_content_status(req.content_id, "FAILED")
         raise HTTPException(status_code=500, detail=f"자동 등록 실행 오류: {str(e)}")
+
+# -------------------------------------------------------------------------
+# Google Search Console & AdSense 수익/성과 분석 엔드포인트
+# -------------------------------------------------------------------------
+@app.get("/api/analytics/overview")
+async def get_analytics_overview(days: int = 28):
+    try:
+        import analytics
+        engine = analytics.AnalyticsEngine()
+        connection = engine.get_connection_status()
+        metrics = engine.fetch_metrics(days=days)
+        return {
+            "success": True,
+            "connection": connection,
+            "data": metrics
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"분석 데이터 로드 실패: {str(e)}")
+
+@app.get("/api/analytics/settings")
+async def get_analytics_settings():
+    try:
+        import analytics
+        config = analytics.load_analytics_config()
+        return {
+            "success": True,
+            "config": {
+                "site_url": config.get("site_url", "https://s-elegant.tistory.com/"),
+                "gsc_connected": config.get("gsc_connected", False),
+                "adsense_connected": config.get("adsense_connected", False),
+                "adsense_account_id": config.get("adsense_account_id", ""),
+                "gsc_auth_type": config.get("gsc_auth_type", "SERVICE_ACCOUNT"),
+                "service_account_email": config.get("service_account_email", ""),
+                "last_sync": config.get("last_sync")
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"설정 조회 실패: {str(e)}")
+
+@app.post("/api/analytics/settings")
+async def update_analytics_settings(req: AnalyticsSettingsRequest):
+    try:
+        import analytics
+        config = analytics.load_analytics_config()
+        config["site_url"] = req.site_url or "https://s-elegant.tistory.com/"
+        config["gsc_connected"] = bool(req.gsc_connected)
+        config["adsense_connected"] = bool(req.adsense_connected)
+        config["adsense_account_id"] = req.adsense_account_id or ""
+        config["gsc_auth_type"] = req.gsc_auth_type or "SERVICE_ACCOUNT"
+        if req.service_account_email:
+            config["service_account_email"] = req.service_account_email
+        config["last_sync"] = datetime.now().isoformat()
+        analytics.save_analytics_config(config)
+        return {"success": True, "message": "설정이 성공적으로 저장되었습니다.", "config": config}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"설정 저장 실패: {str(e)}")
+
+@app.post("/api/analytics/recommend")
+async def get_ai_recommendation(req: AnalyticsRecommendRequest, x_gemini_api_key: Optional[str] = Header(None)):
+    api_key = x_gemini_api_key or GEMINI_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Gemini API 키가 설정되지 않았습니다.")
+    try:
+        import analytics
+        engine = analytics.AnalyticsEngine()
+        result = engine.generate_ai_recommendation(req.page, api_key)
+        return result
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"AI 최적화 처방전 생성 실패: {str(e)}")
+
+@app.post("/api/analytics/weekly-report")
+async def get_weekly_report(req: WeeklyReportRequest, x_gemini_api_key: Optional[str] = Header(None)):
+    api_key = x_gemini_api_key or GEMINI_API_KEY
+    try:
+        import analytics
+        engine = analytics.AnalyticsEngine()
+        days_data = engine.fetch_metrics(days=req.days or 28)
+        report = engine.generate_weekly_report(days_data, api_key or "")
+        return {
+            "success": True,
+            "report_markdown": report,
+            "generated_at": datetime.now().isoformat()
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"주간 보고서 생성 실패: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
