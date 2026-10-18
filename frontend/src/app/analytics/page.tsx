@@ -41,6 +41,7 @@ export default function AnalyticsPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [selectedPageForAi, setSelectedPageForAi] = useState<any | null>(null);
+  const [hoveredDay, setHoveredDay] = useState<any | null>(null);
 
   useEffect(() => {
     fetchAnalyticsData(days);
@@ -291,52 +292,84 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* 실시간 일별 상세 인스펙터 바 (마우스 호버 시 값 표시) */}
+        <div className="p-3 bg-[#13131f] border border-white/10 rounded-xl min-h-[46px] flex items-center justify-between text-xs transition-all">
+          {hoveredDay ? (
+            <div className="flex items-center gap-4 flex-wrap w-full animate-in fade-in duration-150">
+              <span className="font-bold text-white bg-white/10 px-2 py-0.5 rounded text-[11px] font-mono">
+                📅 {hoveredDay.date}
+              </span>
+              <div className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <span>검색 클릭: <strong>{hoveredDay.search_clicks?.toLocaleString()}회</strong></span>
+                <span className="text-[10px] text-gray-400 font-normal">
+                  (노출 {hoveredDay.search_impressions?.toLocaleString()}회 · CTR {hoveredDay.search_ctr}%)
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-amber-400 font-semibold ml-auto sm:ml-0">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span>예상 수익: <strong>₩{hoveredDay.estimated_earnings?.toLocaleString()}</strong></span>
+                <span className="text-[10px] text-gray-400 font-normal">
+                  (RPM ₩{hoveredDay.page_rpm?.toLocaleString()})
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-gray-400 text-xs">
+              <span className="text-blue-400">💡</span>
+              <span>그래프 막대 위에 마우스를 올리면 해당 일자의 상세 유입 및 수익 수치가 여기에 표시됩니다.</span>
+            </div>
+          )}
+        </div>
+
         {/* 미니 시계열 바 그래프 (클릭수 & 예상수익 이중 바) */}
-        <div className="h-44 flex items-end gap-2 pt-6 pb-2 px-2 overflow-x-auto border-b border-white/5 scrollbar-thin">
+        <div className="h-40 flex items-end gap-2 pt-4 pb-2 px-2 overflow-x-auto border-b border-white/5 scrollbar-thin">
           {dailyTrends.map((d: any, i: number) => {
             const maxClick = Math.max(...dailyTrends.map((t: any) => t.search_clicks || 1), 1);
             const maxEarning = Math.max(...dailyTrends.map((t: any) => t.estimated_earnings || 1), 1);
             
-            // 85px 높이 기준으로 정밀 계산
-            const clickBarHeight = Math.max(Math.round((d.search_clicks / maxClick) * 85), 6);
-            const earningBarHeight = Math.max(Math.round((d.estimated_earnings / maxEarning) * 85), 6);
+            // 75px 높이 기준으로 정밀 계산
+            const clickBarHeight = Math.max(Math.round((d.search_clicks / maxClick) * 75), 6);
+            const earningBarHeight = Math.max(Math.round((d.estimated_earnings / maxEarning) * 75), 6);
+            const isHovered = hoveredDay?.date === d.date;
 
             return (
-              <div key={i} className="flex-1 min-w-[28px] h-36 flex flex-col justify-end items-center gap-1.5 group relative">
-                {/* 호버 툴팁 */}
-                <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col bg-[#181826] border border-white/10 rounded-xl p-2.5 text-[11px] text-white z-30 pointer-events-none whitespace-nowrap shadow-2xl">
-                  <span className="font-bold text-gray-200 border-b border-white/10 pb-1 mb-1">{d.date}</span>
-                  <div className="flex items-center gap-1.5 text-blue-400">
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
-                    <span>클릭수: <strong>{d.search_clicks?.toLocaleString()}회</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-amber-400">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span>예상수익: <strong>₩{d.estimated_earnings?.toLocaleString()}</strong></span>
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">
-                    노출: {d.search_impressions?.toLocaleString()}회 · CTR: {d.search_ctr}%
-                  </div>
-                </div>
-
+              <div 
+                key={i} 
+                onMouseEnter={() => setHoveredDay(d)}
+                onMouseLeave={() => setHoveredDay(null)}
+                className={`flex-1 min-w-[28px] h-32 flex flex-col justify-end items-center gap-1.5 cursor-pointer transition-all ${
+                  isHovered ? "scale-105" : "hover:scale-105"
+                }`}
+              >
                 {/* 이중 바 그룹 (클릭수: 파랑, 수익: 호박색) */}
-                <div className="w-full flex items-end justify-center gap-1 h-28">
+                <div className="w-full flex items-end justify-center gap-1 h-24">
                   {/* 검색 클릭수 바 */}
                   <div
                     style={{ height: `${clickBarHeight}px` }}
-                    className="w-2 sm:w-2.5 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-sm group-hover:from-blue-500 group-hover:to-cyan-300 transition-all shadow-sm shadow-blue-500/20"
-                    title={`클릭: ${d.search_clicks}회`}
+                    className={`w-2 sm:w-2.5 rounded-t-sm transition-all ${
+                      isHovered
+                        ? "bg-gradient-to-t from-blue-500 to-cyan-300 shadow-lg shadow-blue-500/40 ring-1 ring-blue-400"
+                        : "bg-gradient-to-t from-blue-600 to-blue-400 shadow-sm shadow-blue-500/20"
+                    }`}
+                    title={`${d.date} 클릭: ${d.search_clicks}회`}
                   />
                   {/* 예상 수익 바 */}
                   <div
                     style={{ height: `${earningBarHeight}px` }}
-                    className="w-2 sm:w-2.5 bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-sm group-hover:from-amber-500 group-hover:to-yellow-300 transition-all shadow-sm shadow-amber-500/20"
-                    title={`수익: ₩${d.estimated_earnings}`}
+                    className={`w-2 sm:w-2.5 rounded-t-sm transition-all ${
+                      isHovered
+                        ? "bg-gradient-to-t from-amber-500 to-yellow-300 shadow-lg shadow-amber-500/40 ring-1 ring-amber-400"
+                        : "bg-gradient-to-t from-amber-600 to-amber-400 shadow-sm shadow-amber-500/20"
+                    }`}
+                    title={`${d.date} 수익: ₩${d.estimated_earnings}`}
                   />
                 </div>
 
                 {/* 날짜 표시 */}
-                <span className="text-[10px] font-mono text-gray-400 group-hover:text-white transition-colors">
+                <span className={`text-[10px] font-mono transition-colors ${
+                  isHovered ? "text-white font-bold" : "text-gray-400"
+                }`}>
                   {d.date.slice(8)}
                 </span>
               </div>
