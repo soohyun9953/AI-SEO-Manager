@@ -291,25 +291,52 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* 미니 시계열 바 그래프 */}
-        <div className="h-32 flex items-end gap-1.5 pt-6 pb-2 px-2 overflow-x-auto border-b border-white/5">
+        {/* 미니 시계열 바 그래프 (클릭수 & 예상수익 이중 바) */}
+        <div className="h-44 flex items-end gap-2 pt-6 pb-2 px-2 overflow-x-auto border-b border-white/5 scrollbar-thin">
           {dailyTrends.map((d: any, i: number) => {
-            const maxClick = Math.max(...dailyTrends.map((t: any) => t.search_clicks || 1));
-            const heightPct = Math.round((d.search_clicks / maxClick) * 100);
+            const maxClick = Math.max(...dailyTrends.map((t: any) => t.search_clicks || 1), 1);
+            const maxEarning = Math.max(...dailyTrends.map((t: any) => t.estimated_earnings || 1), 1);
+            
+            // 85px 높이 기준으로 정밀 계산
+            const clickBarHeight = Math.max(Math.round((d.search_clicks / maxClick) * 85), 6);
+            const earningBarHeight = Math.max(Math.round((d.estimated_earnings / maxEarning) * 85), 6);
+
             return (
-              <div key={i} className="flex-1 min-w-[20px] flex flex-col items-center gap-1 group relative">
-                {/* 툴팁 */}
-                <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col bg-[#1a1a28] border border-white/10 rounded-lg p-2 text-[10px] text-white z-20 pointer-events-none whitespace-nowrap shadow-xl">
-                  <span className="font-bold text-blue-300">{d.date}</span>
-                  <span>클릭: {d.search_clicks}회 (노출 {d.search_impressions}회)</span>
-                  <span>수익: ₩{d.estimated_earnings?.toLocaleString()} (RPM ₩{d.page_rpm})</span>
+              <div key={i} className="flex-1 min-w-[28px] h-36 flex flex-col justify-end items-center gap-1.5 group relative">
+                {/* 호버 툴팁 */}
+                <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col bg-[#181826] border border-white/10 rounded-xl p-2.5 text-[11px] text-white z-30 pointer-events-none whitespace-nowrap shadow-2xl">
+                  <span className="font-bold text-gray-200 border-b border-white/10 pb-1 mb-1">{d.date}</span>
+                  <div className="flex items-center gap-1.5 text-blue-400">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span>클릭수: <strong>{d.search_clicks?.toLocaleString()}회</strong></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-amber-400">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>예상수익: <strong>₩{d.estimated_earnings?.toLocaleString()}</strong></span>
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">
+                    노출: {d.search_impressions?.toLocaleString()}회 · CTR: {d.search_ctr}%
+                  </div>
                 </div>
-                {/* 바 */}
-                <div
-                  style={{ height: `${Math.max(heightPct, 8)}%` }}
-                  className="w-full bg-gradient-to-t from-blue-600/40 to-blue-500 rounded-t group-hover:from-blue-500 group-hover:to-cyan-400 transition-all"
-                />
-                <span className="text-[9px] text-gray-500 truncate w-full text-center">
+
+                {/* 이중 바 그룹 (클릭수: 파랑, 수익: 호박색) */}
+                <div className="w-full flex items-end justify-center gap-1 h-28">
+                  {/* 검색 클릭수 바 */}
+                  <div
+                    style={{ height: `${clickBarHeight}px` }}
+                    className="w-2 sm:w-2.5 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-sm group-hover:from-blue-500 group-hover:to-cyan-300 transition-all shadow-sm shadow-blue-500/20"
+                    title={`클릭: ${d.search_clicks}회`}
+                  />
+                  {/* 예상 수익 바 */}
+                  <div
+                    style={{ height: `${earningBarHeight}px` }}
+                    className="w-2 sm:w-2.5 bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-sm group-hover:from-amber-500 group-hover:to-yellow-300 transition-all shadow-sm shadow-amber-500/20"
+                    title={`수익: ₩${d.estimated_earnings}`}
+                  />
+                </div>
+
+                {/* 날짜 표시 */}
+                <span className="text-[10px] font-mono text-gray-400 group-hover:text-white transition-colors">
                   {d.date.slice(8)}
                 </span>
               </div>
