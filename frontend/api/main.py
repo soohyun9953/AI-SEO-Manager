@@ -126,6 +126,24 @@ class PublishRecordRequest(BaseModel):
     post_url: Optional[str] = ""
     message: Optional[str] = ""
 
+class ReviewPhotoItem(BaseModel):
+    data_url: Optional[str] = ""
+    caption: Optional[str] = ""
+    name: Optional[str] = ""
+
+class ReviewArticleRequest(BaseModel):
+    restaurant_name: str
+    location: Optional[str] = ""
+    place_url: Optional[str] = ""
+    menu_info: Optional[str] = ""
+    special_notes: Optional[str] = ""
+    rating: Optional[str] = "5.0"
+    photos: Optional[List[ReviewPhotoItem]] = []
+    adsense_optimize: Optional[bool] = True
+    category: Optional[str] = "맛집/카페"
+    model_name: Optional[str] = None
+
+
 @app.get("/")
 async def root():
     return {"message": "AI SEO Manager (Vercel Engine) is running"}
@@ -774,3 +792,198 @@ async def get_publish_records(content_id: Optional[str] = None):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/generate-review")
+async def generate_review(
+    req: ReviewArticleRequest,
+    x_gemini_key: Optional[str] = Header(None)
+):
+    """
+    맛집/방문 후기 전용 고수익 및 SEO 최적화 블로그 원고 자동 생성 (Vercel 호환)
+    - E-E-A-T 기반의 생생한 내돈내산 방문 후기
+    - 업로드된 1~2장 사진의 적재적소 슬롯 배치
+    - 티스토리 HTML 모드 완벽 호환 카드/캡션 스타일 및 Schema.org 구조화 태그 포함
+    - 태그 자동 추출
+    """
+    api_key = x_gemini_key or GEMINI_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Gemini API Key missing")
+        
+    if not req.restaurant_name or not req.restaurant_name.strip():
+        raise HTTPException(status_code=400, detail="식당 또는 매장 이름을 입력해주세요.")
+
+    try:
+        client = genai.Client(api_key=api_key)
+        photos_info = []
+        for idx, p in enumerate(req.photos[:2]):
+            caption = p.caption.strip() if p.caption else f"방문 사진 {idx+1}"
+            photos_info.append(f"- 사진 {idx+1}: {caption}")
+        photos_desc = "\n".join(photos_info) if photos_info else "첨부된 사진 없음"
+
+        prompt = f"""
+당신은 네이버 블로그 스마트블록 및 다음/구글 검색 상위 노출 전문 '미식·여행 인플루언서'입니다.
+실제 직접 방문하여 맛보고 경험한 생생한 '내돈내산 솔직 방문 후기'를 전문 블로그 포스팅으로 작성해주세요.
+
+[방문 매장 정보]
+- 식당/장소명: {req.restaurant_name}
+- 위치/지역: {req.location or '해당 지역 중심가'}
+- 지도/사이트 링크: {req.place_url or '제공되지 않음'}
+- 대표 메뉴 및 가격: {req.menu_info or '대표 시그니처 메뉴'}
+- 방문 특이사항 및 솔직 메모: {req.special_notes or '친절하고 분위기 좋음, 재방문 의사 있음'}
+- 만족도/별점: {req.rating or '5.0'} / 5.0
+- 등록된 사진 정보:
+{photos_desc}
+
+[필수 작성 지침 및 포맷]
+1. 제목:
+   - 검색 사용자의 클릭률(CTR)을 극대화하는 매력적인 SEO 최적화 제목을 지어주세요.
+   - 예시: [{req.location or '핫플'} 맛집] {req.restaurant_name} 솔직 후기! 대표메뉴 3가지와 웨이팅·주차 꿀팁 총정리
+2. 톤 앤 매너:
+   - 직접 다녀온 경험을 풀어내는 생생한 E-E-A-T 기반의 친근하고 다정한 블로그 어조(~했어요, ~있더라고요, ~추천해요)를 유지하세요.
+   - 뻔하고 기계적인 AI 말투나 과도한 미사여구를 배제하고, 실제 손님의 입장에서 느낀 장단점과 팁을 솔직하게 기술하세요.
+   - 모바일에서 읽기 편하게 2~3줄 단위로 줄바꿈을 적용하세요.
+3. 본문 구성 및 사진 슬롯 마커 배치:
+   - [도입부]: 방문하게 된 계기와 첫인상, 매장 외관
+   - [소제목 1: 위치 & 매장 분위기, 웨이팅/주차 꿀팁]:
+     - 인테리어 분위기, 테이블 간격, 예약/웨이팅 방법, 주차장 정보 등 현실적인 팁.
+     - 본문 중간 적절한 위치에 반드시 다음 마커를 단독 라인으로 삽입하세요:
+       <!-- [PHOTO_1_SLOT] -->
+   - [소제목 2: 대표 메뉴 솔직 맛 평가]:
+     - 주문한 메뉴들의 비주얼, 향, 식감, 양, 가격 대비 만족도(가성비)를 상세히 묘사.
+     - 사진이 2장 등록되어 있다면, 이 단락 중간 적절한 위치에 다음 마커를 단독 라인으로 삽입하세요:
+       <!-- [PHOTO_2_SLOT] -->
+   - [소제목 3: 방문 전 필독! 핵심 요약표]:
+     - 상호명, 위치, 주요 메뉴/가격, 웨이팅 팁, 주차 여부, 총점 등을 깔끔한 마크다운 표(Table)로 정리.
+   - [소제목 4: 위치 안내 및 지도 정보]:
+     - 식당 위치와 지도 링크 안내
+   - [마무리 총평]:
+     - 이런 분들께 추천합니다 (데이트, 가족모임, 친구 모임 등), 최종 한 줄 평.
+4. 검색 태그 (10~15개):
+   - 해당 지역, 식당명, 메뉴명, 추천 대상, 내돈내산 등 유입 키워드를 다각도로 선정.
+
+반드시 아래 JSON 포맷으로만 응답해야 합니다:
+{{
+  "title": "클릭률 높은 블로그 제목",
+  "content_markdown": "작성된 전체 마크다운 본문 (<!-- [PHOTO_1_SLOT] --> 등 포함)",
+  "meta_description": "검색엔진 노출용 120자 내외의 흥미로운 메타 설명",
+  "tags": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5", "키워드6", "키워드7", "키워드8", "키워드9", "키워드10"],
+  "primary_keyword": "{req.restaurant_name}",
+  "related_keywords": "{req.location or ''} {req.restaurant_name}, {req.restaurant_name} 후기"
+}}
+"""
+
+        response = await safe_generate_content_async(client, prompt, is_json=True)
+        result_json = json.loads(response.text)
+
+        title = result_json.get("title", f"{req.restaurant_name} 방문 솔직 후기")
+        raw_markdown = result_json.get("content_markdown", "")
+        meta_desc = result_json.get("meta_description", "")
+        tags_list = result_json.get("tags", [req.restaurant_name, "맛집후기", "내돈내산"])
+        primary_kw = result_json.get("primary_keyword", req.restaurant_name)
+        related_kws = result_json.get("related_keywords", "")
+
+        # 1. 마크다운 내 사진 슬롯 처리
+        markdown_for_editor = raw_markdown
+        for idx in range(2):
+            slot = f"<!-- [PHOTO_{idx+1}_SLOT] -->"
+            if idx < len(req.photos) and req.photos[idx]:
+                cap = req.photos[idx].caption or f"사진 {idx+1}"
+                img_md = f"\n\n> 📸 **[사진 {idx+1}: {cap}]**\n"
+                markdown_for_editor = markdown_for_editor.replace(slot, img_md)
+            else:
+                markdown_for_editor = markdown_for_editor.replace(slot, "")
+
+        # 2. 티스토리 완벽 지원 HTML 렌더링
+        html_body = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
+
+        for idx in range(2):
+            slot = f"<!-- [PHOTO_{idx+1}_SLOT] -->"
+            if idx < len(req.photos) and req.photos[idx]:
+                photo = req.photos[idx]
+                cap = photo.caption or f"{req.restaurant_name} 방문 사진 {idx+1}"
+                img_src = photo.data_url if photo.data_url else "https://via.placeholder.com/800x500?text=Food+Review+Photo"
+                
+                figure_html = f"""
+<figure class="tistory-review-image" style="margin: 28px 0; text-align: center; display: block;">
+  <img src="{img_src}" alt="{cap}" style="max-width: 100%; height: auto; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); margin: 0 auto; display: inline-block;" />
+  <figcaption style="font-size: 13px; color: #71717a; margin-top: 10px; font-weight: 500; text-align: center;">📷 {cap}</figcaption>
+</figure>
+"""
+                html_body = html_body.replace(slot, figure_html)
+            else:
+                html_body = html_body.replace(slot, "")
+
+        if req.place_url:
+            link_box = f"""
+<div style="margin: 30px 0; padding: 18px 22px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; line-height: 1.6; color: #334155;">
+  <strong style="color: #0284c7; font-size: 15px;">📍 {req.restaurant_name} 매장 정보 바로가기</strong><br/>
+  <span style="color: #64748b;">자세한 위치 및 예약 정보는 아래 링크에서 확인하실 수 있습니다:</span><br/>
+  <a href="{req.place_url}" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-weight: 600; word-break: break-all;">👉 {req.place_url}</a>
+</div>
+"""
+            html_body += link_box
+
+        if req.adsense_optimize:
+            # 애드센스 슬롯 자동 삽입
+            lines = html_body.split("\n")
+            new_lines = []
+            h2_count = 0
+            for line in lines:
+                if "<h2" in line.lower():
+                    h2_count += 1
+                    if h2_count in [1, 3]:
+                        new_lines.append('\n<!-- [구글 애드센스 본문 광고 영역 - 수익 극대화] -->')
+                        new_lines.append('<div class="adsense-placeholder" style="margin: 20px 0; text-align: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(168,85,247,0.3); padding: 30px; border-radius: 12px; color: #a855f7; font-size: 13px; font-weight: bold;">💰 여기에 구글 애드센스 광고 코드를 삽입하세요 (수익형 본문 광고)</div>\n')
+                new_lines.append(line)
+            new_lines.append('\n<!-- [구글 애드센스 본문 하단 광고 영역] -->')
+            new_lines.append('<div class="adsense-placeholder" style="margin: 20px 0; text-align: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(168,85,247,0.3); padding: 30px; border-radius: 12px; color: #a855f7; font-size: 13px; font-weight: bold;">💰 여기에 구글 애드센스 광고 코드를 삽입하세요 (수익형 하단 광고)</div>\n')
+            html_body = "\n".join(new_lines)
+
+        json_ld_schema = {
+            "@context": "https://schema.org",
+            "@type": "Restaurant",
+            "name": req.restaurant_name,
+            "address": {
+                "@type": "PostalAddress",
+                "streetAddress": req.location or "대한민국",
+                "addressCountry": "KR"
+            },
+            "url": req.place_url or "",
+            "review": {
+                "@type": "Review",
+                "reviewRating": {
+                    "@type": "Rating",
+                    "ratingValue": req.rating or "5.0",
+                    "bestRating": "5"
+                },
+                "author": {
+                    "@type": "Person",
+                    "name": "내돈내산 솔직 리뷰어"
+                },
+                "reviewBody": meta_desc or f"{req.restaurant_name} 방문 솔직 후기 및 꿀팁 정리"
+            }
+        }
+
+        json_ld_str = f'<script type="application/ld+json">\n{json.dumps(json_ld_schema, ensure_ascii=False, indent=2)}\n</script>\n\n'
+        full_html_package = json_ld_str + html_body
+
+        return {
+            "title": title,
+            "article": markdown_for_editor,
+            "html_article": full_html_package,
+            "tags": tags_list,
+            "tags_string": ", ".join(tags_list),
+            "tags_hash_string": " ".join([f"#{t}" for t in tags_list]),
+            "meta_description": meta_desc,
+            "primary_keyword": primary_kw,
+            "related_keywords": related_kws,
+            "json_ld": json_ld_schema,
+            "restaurant_name": req.restaurant_name,
+            "location": req.location,
+            "category": req.category or "맛집/카페",
+            "photos_count": len(req.photos)
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"맛집 후기 생성 실패: {str(e)}")
+
