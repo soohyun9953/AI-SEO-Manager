@@ -1199,8 +1199,7 @@ async def generate_review(
 """
             html_body += link_box
 
-        if req.adsense_optimize:
-            html_body = 수익성_극대화_관리자.애드센스_광고_삽입(html_body, 활성화=True)
+        # 사용자의 요청에 따라 본문 내 광고 플레이스홀더 영역은 완전히 제거 (삽입하지 않음)
 
         json_ld_schema = {
             "@context": "https://schema.org",
@@ -1227,8 +1226,10 @@ async def generate_review(
             }
         }
 
-        json_ld_str = f'<script type="application/ld+json">\n{json.dumps(json_ld_schema, ensure_ascii=False, indent=2)}\n</script>\n\n'
-        full_html_package = json_ld_str + html_body
+        # 티스토리 에디터 상단에 거추장스러운 회색 SCRIPT 박스가 뜨지 않도록 구조화 데이터는 글 최하단에 배치
+        json_ld_str = f'\n\n<!-- [구글 SEO 검색 최적화 구조화 데이터 - 방문자 화면에는 보이지 않음] -->\n<script type="application/ld+json">\n{json.dumps(json_ld_schema, ensure_ascii=False, indent=2)}\n</script>'
+        full_html_package = html_body + json_ld_str
+
 
         return {
             "title": title,

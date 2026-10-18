@@ -923,21 +923,7 @@ async def generate_review(
 """
             html_body += link_box
 
-        if req.adsense_optimize:
-            # 애드센스 슬롯 자동 삽입
-            lines = html_body.split("\n")
-            new_lines = []
-            h2_count = 0
-            for line in lines:
-                if "<h2" in line.lower():
-                    h2_count += 1
-                    if h2_count in [1, 3]:
-                        new_lines.append('\n<!-- [구글 애드센스 본문 광고 영역 - 수익 극대화] -->')
-                        new_lines.append('<div class="adsense-placeholder" style="margin: 20px 0; text-align: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(168,85,247,0.3); padding: 30px; border-radius: 12px; color: #a855f7; font-size: 13px; font-weight: bold;">💰 여기에 구글 애드센스 광고 코드를 삽입하세요 (수익형 본문 광고)</div>\n')
-                new_lines.append(line)
-            new_lines.append('\n<!-- [구글 애드센스 본문 하단 광고 영역] -->')
-            new_lines.append('<div class="adsense-placeholder" style="margin: 20px 0; text-align: center; background: rgba(255,255,255,0.02); border: 1px dashed rgba(168,85,247,0.3); padding: 30px; border-radius: 12px; color: #a855f7; font-size: 13px; font-weight: bold;">💰 여기에 구글 애드센스 광고 코드를 삽입하세요 (수익형 하단 광고)</div>\n')
-            html_body = "\n".join(new_lines)
+        # 사용자의 요청에 따라 본문 내 광고 플레이스홀더 영역은 완전히 제거 (삽입하지 않음)
 
         json_ld_schema = {
             "@context": "https://schema.org",
@@ -964,8 +950,10 @@ async def generate_review(
             }
         }
 
-        json_ld_str = f'<script type="application/ld+json">\n{json.dumps(json_ld_schema, ensure_ascii=False, indent=2)}\n</script>\n\n'
-        full_html_package = json_ld_str + html_body
+        # 티스토리 에디터 상단에 거추장스러운 회색 SCRIPT 박스가 뜨지 않도록 구조화 데이터는 글 최하단에 배치
+        json_ld_str = f'\n\n<!-- [구글 SEO 검색 최적화 구조화 데이터 - 방문자 화면에는 보이지 않음] -->\n<script type="application/ld+json">\n{json.dumps(json_ld_schema, ensure_ascii=False, indent=2)}\n</script>'
+        full_html_package = html_body + json_ld_str
+
 
         return {
             "title": title,

@@ -44,7 +44,6 @@ export default function ReviewWriterPage() {
   const [menuInfo, setMenuInfo] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
   const [rating, setRating] = useState("5.0");
-  const [adsenseOptimize, setAdsenseOptimize] = useState(true);
 
   // 2. 사진 상태 (최대 2장)
   const [photo1, setPhoto1] = useState<PhotoItem | null>(null);
@@ -61,6 +60,15 @@ export default function ReviewWriterPage() {
   const [tagsString, setTagsString] = useState("");
   const [metaDesc, setMetaDesc] = useState("");
   const [jsonLd, setJsonLd] = useState<any>(null);
+
+  // 광고 플레이스홀더 클린업 헬퍼 함수
+  const removeAdCode = (html: string) => {
+    if (!html) return "";
+    return html
+      .replace(/<!--\s*\[구글 애드센스.*?\]\s*-->/g, "")
+      .replace(/<div class="adsense-placeholder"[^>]*>[\s\S]*?<\/div>/g, "")
+      .trim();
+  };
 
   // 4. UI 탭 및 복사 알림 상태
   const [activeTab, setActiveTab] = useState<"preview" | "html" | "editor" | "seo">("preview");
@@ -93,7 +101,12 @@ export default function ReviewWriterPage() {
     if (savedArticle) setArticle(savedArticle);
 
     const savedHtml = localStorage.getItem("review_writer_result_html");
-    if (savedHtml) setHtmlArticle(savedHtml);
+    if (savedHtml) {
+      // 기존 저장된 HTML에서도 광고 코드를 깔끔히 제거
+      const cleaned = removeAdCode(savedHtml);
+      setHtmlArticle(cleaned);
+      localStorage.setItem("review_writer_result_html", cleaned);
+    }
 
     const savedTags = localStorage.getItem("review_writer_result_tags");
     if (savedTags) {
@@ -235,7 +248,7 @@ export default function ReviewWriterPage() {
           special_notes: specialNotes,
           rating: rating,
           photos: photosPayload,
-          adsense_optimize: adsenseOptimize,
+          adsense_optimize: false,
           category: "맛집/카페",
         }),
       });
@@ -246,13 +259,15 @@ export default function ReviewWriterPage() {
       }
 
       const data = await res.json();
+      const cleanedHtml = removeAdCode(data.html_article || "");
       setGeneratedTitle(data.title || `${restaurantName} 방문 후기`);
       setArticle(data.article || "");
-      setHtmlArticle(data.html_article || "");
+      setHtmlArticle(cleanedHtml);
       setTags(data.tags || []);
       setTagsString(data.tags_string || (data.tags || []).join(", "));
       setMetaDesc(data.meta_description || "");
       setJsonLd(data.json_ld || null);
+
 
       // 로컬 스토리지 보존
       localStorage.setItem("review_writer_name", restaurantName);
@@ -280,19 +295,21 @@ export default function ReviewWriterPage() {
     setTimeout(() => setCopiedType(null), 3000);
   };
 
-  // 1. 티스토리 HTML 복사 (강력 추천)
+  // 1. 티스토리 HTML 복사 (광고 코드 완전 배제)
   const copyTistoryHTML = async () => {
     if (!htmlArticle) {
       alert("생성된 원고가 없습니다.");
       return;
     }
     try {
-      await navigator.clipboard.writeText(htmlArticle);
+      const cleanHtml = removeAdCode(htmlArticle);
+      await navigator.clipboard.writeText(cleanHtml);
       showCopiedToast("html");
     } catch (e) {
       alert("클립보드 복사 권한이 거부되었습니다.");
     }
   };
+
 
   // 2. 본문 마크다운 복사
   const copyMarkdown = async () => {
@@ -720,20 +737,6 @@ export default function ReviewWriterPage() {
                   </label>
                 </div>
               )}
-            </div>
-
-            {/* 애드센스 옵션 */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-purple-500/5 border border-purple-500/20 mt-1">
-              <div className="flex flex-col">
-                <span className="text-xs font-semibold text-purple-300">구글 애드센스 수익형 광고 영역</span>
-                <span className="text-[10px] text-gray-400">소제목 사이 및 글 하단에 광고 코드 슬롯 자동 포함</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={adsenseOptimize}
-                onChange={(e) => setAdsenseOptimize(e.target.checked)}
-                className="w-4 h-4 rounded text-purple-600 bg-white/[0.05] border-white/[0.2] focus:ring-0 cursor-pointer"
-              />
             </div>
 
             {/* AI 생성 실행 버튼 */}
