@@ -23,11 +23,13 @@ import {
   Eye,
   Calendar,
   Sparkles,
-  PenTool
+  PenTool,
+  Bot
 } from "lucide-react";
 import Link from "next/link";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
 import ContentEditModal from "@/components/ContentEditModal";
+import AutoRegisterModal from "@/components/AutoRegisterModal";
 
 export default function ContentsManagementPage() {
   const [stats, setStats] = useState({
@@ -55,6 +57,8 @@ export default function ContentsManagementPage() {
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [autoRegisterContent, setAutoRegisterContent] = useState<ContentItem | null>(null);
+
 
   const fetchStats = useCallback(async () => {
     try {
@@ -478,6 +482,15 @@ export default function ContentsManagementPage() {
                           <Download size={14} />
                         </button>
 
+                        {/* 티스토리 브라우저 자동 등록 (Playwright 봇) */}
+                        <button
+                          onClick={() => setAutoRegisterContent(item)}
+                          className="p-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 transition-all"
+                          title="티스토리 브라우저 자동 등록 (Playwright 봇)"
+                        >
+                          <Bot size={14} />
+                        </button>
+
                         {/* 발행 승인 (대기열 추가) */}
                         {item.status !== "APPROVED" && item.status !== "PUBLISHED" && (
                           <button
@@ -488,6 +501,7 @@ export default function ContentsManagementPage() {
                             <SendHorizontal size={14} />
                           </button>
                         )}
+
 
                         {/* 삭제 */}
                         <button
@@ -552,6 +566,18 @@ export default function ContentsManagementPage() {
         }}
       />
 
+      <AutoRegisterModal
+        isOpen={!!autoRegisterContent}
+        onClose={() => setAutoRegisterContent(null)}
+        contentId={autoRegisterContent?.id || ""}
+        title={autoRegisterContent?.title || ""}
+        category={autoRegisterContent?.category || "맛집/카페"}
+        onSuccess={() => {
+          fetchStats();
+          fetchContents();
+        }}
+      />
     </div>
+
   );
 }

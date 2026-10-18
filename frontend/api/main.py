@@ -143,6 +143,13 @@ class ReviewArticleRequest(BaseModel):
     category: Optional[str] = "맛집/카페"
     model_name: Optional[str] = None
 
+class AutoRegisterRequest(BaseModel):
+    content_id: str
+    publish_action: Optional[str] = "TEMP_SAVE"  # TEMP_SAVE, CONFIRM_BEFORE_PUBLISH, PUBLISH
+    blog_name: Optional[str] = "s-elegant"
+    force: Optional[bool] = False
+
+
 
 @app.get("/")
 async def root():
@@ -974,4 +981,50 @@ async def generate_review(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"맛집 후기 생성 실패: {str(e)}")
+
+@app.post("/api/publish/auto-register")
+async def run_auto_register(req: AutoRegisterRequest):
+    """
+    티스토리 브라우저 자동 등록 엔드포인트
+    - 로컬 PC 환경에서는 Playwright 봇이 실제 크롬을 띄워 작동
+    - Vercel 클라우드 환경에서는 보안 및 아키텍처 원칙에 따라 로컬 실행 안내 반환
+    """
+    content = database.get_content(req.content_id)
+    if not content:
+        raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
+
+    # 중복 발행 검사
+    if content.get("status") == "PUBLISHED" and not req.force:
+        raise HTTPException(
+            status_code=400,
+            detail=f"이미 발행 완료된 콘텐츠입니다. (티스토리 URL: {content.get('tistory_url', '')})"
+        )
+
+    # 로컬에 tistory_bot 모듈이 있으면 직접 실행 시도
+    try:
+        import tistory_bot
+        automator = tistory_bot.TistoryAutomator(blog_name=req.blog_name or "s-elegant", headless=False)
+        title = content.get("title", "")
+        content_html = content.get("content_html") or content.get("content", "")
+        tags_raw = content.get("tags", "")
+        tags = [t.strip() for t in tags_raw.replace("#", "").split(",") if t.strip()] if tags_raw else []
+        category = content.get("category", "맛집/카페")
+        
+        bot_result = automator.post_content(
+            title=title,
+            content_html=content_html,
+            tags=tags,
+            category=category,
+            action=req.publish_action or "TEMP_SAVE"
+        )
+        return bot_result
+    except ImportError:
+        # Vercel 클라우드 환경인 경우
+        raise HTTPException(
+            status_code=400, 
+            detail="티스토리 브라우저 자동 등록은 사용자의 로컬 PC에서 실행되는 보안 기능입니다. 로컬 서버(localhost:8002)를 실행하거나 로컬 터미널에서 `python tistory_bot.py`를 실행해주세요."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"자동 등록 오류: {str(e)}")
+
 

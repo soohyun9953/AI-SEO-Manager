@@ -142,6 +142,13 @@ class ReviewArticleRequest(BaseModel):
     category: Optional[str] = "맛집/카페"
     model_name: Optional[str] = None
 
+class AutoRegisterRequest(BaseModel):
+    content_id: str
+    publish_action: Optional[str] = "TEMP_SAVE"  # TEMP_SAVE, CONFIRM_BEFORE_PUBLISH, PUBLISH
+    blog_name: Optional[str] = "s-elegant"
+    force: Optional[bool] = False
+
+
 
 
 
@@ -1251,7 +1258,101 @@ async def generate_review(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"맛집 후기 생성 실패: {str(e)}")
 
+@app.post("/api/publish/auto-register")
+async def run_auto_register(req: AutoRegisterRequest):
+    """
+    티스토리 브라우저 자동 등록 실행 (Playwright 기반 로컬 봇 연동)
+    - 승인된 콘텐츠를 티스토리 에디터에 자동 입력
+    - 임시저장(TEMP_SAVE), 최종검토(CONFIRM_BEFORE_PUBLISH), 공개발행(PUBLISH) 지원
+    - 결과 및 이력 DB 자동 기록
+    """
+    content = database.get_content(req.content_id)
+    if not content:
+        raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
+
+    # 중복 발행 검사
+    if content.get("status") == "PUBLISHED" and not req.force:
+        raise HTTPException(
+            status_code=400,
+            detail=f"이미 발행 완료된 콘텐츠입니다. (티스토리 URL: {content.get('tistory_url', '')}) 재발행하려면 '강제 재시도'를 선택하세요."
+        )
+
+    title = content.get("title", "")
+    content_html = content.get("content_html") or content.get("content", "")
+    tags_raw = content.get("tags", "")
+    tags = [t.strip() for t in tags_raw.replace("#", "").split(",") if t.strip()] if tags_raw else []
+    category = content.get("category", "맛집/카페")
+    blog_name = req.blog_name or os.getenv("TISTORY_BLOG_NAME", "s-elegant")
+
+    try:
+        # 상태를 PUBLISHING으로 업데이트
+        database.update_content_status(req.content_id, "PUBLISHING")
+
+        # 티스토리 봇 실행
+        import tistory_bot
+        automator = tistory_bot.TistoryAutomator(blog_name=blog_name, headless=False)
+        bot_result = automator.post_content(
+            title=title,
+            content_html=content_html,
+            tags=tags,
+            category=category,
+            action=req.publish_action or "TEMP_SAVE"
+        )
+
+        success = bot_result.get("success", False)
+        post_url = bot_result.get("post_url", "")
+        message = bot_result.get("message", "")
+        error_msg = bot_result.get("error", "")
+
+        final_status = "PUBLISHED" if (success and req.publish_action == "PUBLISH") else ("APPROVED" if success else "FAILED")
+
+        # DB 발행 결과 기록
+        database.record_publish_result(
+            content_id=req.content_id,
+            publish_type=f"PLAYWRIGHT_{req.publish_action}",
+            status="SUCCESS" if success else "FAILED",
+            post_url=post_url or "",
+            message=message or error_msg
+        )
+
+        # 콘텐츠 최종 상태 업데이트
+        database.update_content(
+            req.content_id,
+            {
+                "status": final_status,
+                "tistory_url": post_url or content.get("tistory_url", ""),
+                "published_at": datetime.now().isoformat() if final_status == "PUBLISHED" else content.get("published_at")
+            },
+            change_summary=f"티스토리 자동 등록 ({req.publish_action}): {'성공' if success else '실패'}"
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail=f"자동 등록 실패: {error_msg or message}")
+
+        return {
+            "success": True,
+            "content_id": req.content_id,
+            "action": req.publish_action,
+            "status": final_status,
+            "post_url": post_url,
+            "message": message
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        database.record_publish_result(
+            content_id=req.content_id,
+            publish_type=f"PLAYWRIGHT_{req.publish_action}",
+            status="FAILED",
+            post_url="",
+            message=str(e)
+        )
+        database.update_content_status(req.content_id, "FAILED")
+        raise HTTPException(status_code=500, detail=f"자동 등록 실행 오류: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002)
+
 

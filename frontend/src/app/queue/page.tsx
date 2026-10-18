@@ -23,11 +23,13 @@ import {
   RefreshCw,
   Hash,
   Download,
-  AlertTriangle
+  AlertTriangle,
+  Bot
 } from "lucide-react";
 import Link from "next/link";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
 import ContentEditModal from "@/components/ContentEditModal";
+import AutoRegisterModal from "@/components/AutoRegisterModal";
 
 export default function PublishQueuePage() {
   const [queueItems, setQueueItems] = useState<ContentItem[]>([]);
@@ -38,11 +40,13 @@ export default function PublishQueuePage() {
   const [activeItem, setActiveItem] = useState<ContentItem | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [autoRegisterItem, setAutoRegisterItem] = useState<ContentItem | null>(null);
   
   // 실제 발행 완료 기록 모달
   const [recordModalItem, setRecordModalItem] = useState<ContentItem | null>(null);
   const [publishedUrlInput, setPublishedUrlInput] = useState("");
   const [recordSaving, setRecordSaving] = useState(false);
+
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -357,17 +361,28 @@ export default function PublishQueuePage() {
                       복사/내보내기
                     </button>
 
-                    {/* 실제 발행 완료 기록 버튼 */}
+                    {/* 티스토리 브라우저 자동 등록 (Playwright 봇) */}
+                    <button
+                      onClick={() => setAutoRegisterItem(item)}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-600/20 transition-all hover:scale-105 active:scale-95"
+                      title="Playwright 브라우저 자동 등록 실행"
+                    >
+                      <Bot size={14} />
+                      🤖 자동 등록 (봇)
+                    </button>
+
+                    {/* 실제 발행 완료 수동 기록 버튼 */}
                     <button
                       onClick={() => {
                         setRecordModalItem(item);
                         setPublishedUrlInput(item.tistory_url || "");
                       }}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-600/20 transition-all hover:scale-105 active:scale-95"
+                      className="px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 text-xs font-semibold flex items-center gap-1.5 border border-white/[0.08] transition-all"
                     >
-                      <CheckCircle2 size={14} />
-                      발행 결과 기록
+                      <CheckCircle2 size={13} />
+                      결과 기록
                     </button>
+
 
                   </div>
                 </div>
@@ -476,6 +491,18 @@ export default function PublishQueuePage() {
         content={activeItem}
         onSaved={fetchQueue}
       />
+
+      <AutoRegisterModal
+        isOpen={!!autoRegisterItem}
+        onClose={() => setAutoRegisterItem(null)}
+        contentId={autoRegisterItem?.id || ""}
+        title={autoRegisterItem?.title || ""}
+        category={autoRegisterItem?.category || "맛집/카페"}
+        onSuccess={() => {
+          fetchQueue();
+        }}
+      />
+
 
     </div>
   );

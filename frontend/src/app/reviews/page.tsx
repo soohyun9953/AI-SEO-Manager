@@ -23,12 +23,15 @@ import {
   RefreshCw, 
   AlertCircle,
   Share2,
-  FolderKanban
+  FolderKanban,
+  Bot
 } from "lucide-react";
 import Link from "next/link";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
+import AutoRegisterModal from "@/components/AutoRegisterModal";
 
 interface PhotoItem {
+
   id: string;
   dataUrl: string;
   caption: string;
@@ -76,6 +79,10 @@ export default function ReviewWriterPage() {
   const [savingToDB, setSavingToDB] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [savedContentId, setSavedContentId] = useState<string | null>(null);
+  const [isAutoRegisterOpen, setIsAutoRegisterOpen] = useState(false);
+  const [autoRegisterLoading, setAutoRegisterLoading] = useState(false);
+
 
   // 로컬 스토리지 복원
   useEffect(() => {
@@ -352,10 +359,10 @@ export default function ReviewWriterPage() {
   };
 
   // 6. 콘텐츠 보관함(DB)에 영구 저장
-  const saveToContentDB = async () => {
+  const saveToContentDB = async (): Promise<string | null> => {
     if (!generatedTitle || !article) {
       alert("저장할 콘텐츠가 없습니다. 먼저 원고를 생성해주세요.");
-      return;
+      return null;
     }
 
     setSavingToDB(true);
@@ -392,15 +399,39 @@ export default function ReviewWriterPage() {
         throw new Error(err.detail || "콘텐츠 보관함 저장에 실패했습니다.");
       }
 
+      const data = await res.json();
+      setSavedContentId(data.id);
       setSaveSuccessMsg("✅ 콘텐츠 보관함에 성공적으로 저장되었습니다!");
       setTimeout(() => setSaveSuccessMsg(null), 4000);
+      return data.id;
     } catch (err: any) {
       console.error(err);
       alert(`저장 실패: ${err.message}`);
+      return null;
     } finally {
       setSavingToDB(false);
     }
   };
+
+  // 7. 티스토리 브라우저 자동 등록 봇 트리거
+  const handleAutoRegisterClick = async () => {
+    if (!generatedTitle || !article) {
+      alert("먼저 AI 맛집 후기 원고를 생성해주세요.");
+      return;
+    }
+
+    let targetId = savedContentId;
+    if (!targetId) {
+      setAutoRegisterLoading(true);
+      targetId = await saveToContentDB();
+      setAutoRegisterLoading(false);
+    }
+
+    if (targetId) {
+      setIsAutoRegisterOpen(true);
+    }
+  };
+
 
   // 내보내기 모달용 아이템 객체 생성
   const exportItem: ContentItem = {
@@ -785,7 +816,7 @@ export default function ReviewWriterPage() {
                 type="button"
                 onClick={copyTistoryHTML}
                 disabled={!htmlArticle}
-                className={`col-span-2 py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg ${
+                className={`py-3 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg ${
                   copiedType === "html"
                     ? "bg-emerald-600 text-white shadow-emerald-600/30"
                     : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-600/20 active:scale-[0.98]"
@@ -793,18 +824,34 @@ export default function ReviewWriterPage() {
               >
                 {copiedType === "html" ? (
                   <>
-                    <CheckCircle size={15} />
-                    <span>티스토리 HTML 복사 완료!</span>
+                    <CheckCircle size={14} />
+                    <span>복사 완료!</span>
                   </>
                 ) : (
                   <>
-                    <Code size={15} />
-                    <span>🔥 [티스토리 HTML 복사] (추천)</span>
+                    <Code size={14} />
+                    <span>HTML 복사</span>
                   </>
                 )}
               </button>
 
-              {/* 2. 태그 복사 */}
+              {/* 2. 티스토리 브라우저 자동 등록 (신규 봇) */}
+              <button
+                type="button"
+                onClick={handleAutoRegisterClick}
+                disabled={!article || autoRegisterLoading}
+                className="py-3 px-3 rounded-xl font-bold text-xs bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-lg shadow-orange-600/20 flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Playwright 브라우저 자동 등록 실행"
+              >
+                {autoRegisterLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Bot size={14} />
+                )}
+                <span>🤖 자동 등록 (봇)</span>
+              </button>
+
+              {/* 3. 태그 복사 */}
               <button
                 type="button"
                 onClick={copyTags}
@@ -819,17 +866,18 @@ export default function ReviewWriterPage() {
                 <span>태그 복사</span>
               </button>
 
-              {/* 3. 티스토리 열기 */}
+              {/* 4. 티스토리 열기 */}
               <button
                 type="button"
                 onClick={openTistoryEditor}
-                className="py-3 px-3 rounded-xl font-semibold text-xs bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 flex items-center justify-center gap-1.5 transition-all"
+                className="py-3 px-3 rounded-xl font-semibold text-xs bg-white/[0.04] hover:bg-white/[0.08] text-gray-300 border border-white/[0.08] flex items-center justify-center gap-1.5 transition-all"
                 title="티스토리 글쓰기 새 창으로 열기"
               >
                 <ExternalLink size={13} />
                 <span>티스토리 열기</span>
               </button>
             </div>
+
 
             {/* 2차 액션: 본문 마크다운 복사, 보관함 저장, 내보내기 */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/[0.04] text-xs">
@@ -1131,6 +1179,20 @@ export default function ReviewWriterPage() {
         onClose={() => setIsExportOpen(false)}
         content={exportItem}
       />
+
+      {/* 티스토리 브라우저 자동 등록 모달 */}
+      <AutoRegisterModal
+        isOpen={isAutoRegisterOpen}
+        onClose={() => setIsAutoRegisterOpen(false)}
+        contentId={savedContentId || ""}
+        title={generatedTitle || `${restaurantName} 방문 후기`}
+        category="맛집/카페"
+        onSuccess={(res) => {
+          setSaveSuccessMsg(`🎉 티스토리 자동 등록 완료! (${res.action})`);
+          setTimeout(() => setSaveSuccessMsg(null), 5000);
+        }}
+      />
     </div>
   );
 }
+
