@@ -13,18 +13,27 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import requests
 
-# 기본 설정 디렉토리
+# 기본 설정 디렉토리 (Vercel Serverless의 Read-Only 파일시스템 대응: /tmp 사용)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, "analytics_config.json")
+if os.environ.get("VERCEL") or not os.access(BASE_DIR, os.W_OK):
+    CONFIG_FILE = "/tmp/analytics_config.json"
+else:
+    CONFIG_FILE = os.path.join(BASE_DIR, "analytics_config.json")
 
 def load_analytics_config() -> Dict[str, Any]:
-    """저장된 GSC 및 AdSense 연동 설정 로드 (외부 노출 방지)"""
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+    """저장된 GSC 및 AdSense 연동 설정 로드 (Vercel Read-Only 완벽 대응)"""
+    candidate_paths = [
+        CONFIG_FILE,
+        "/tmp/analytics_config.json",
+        os.path.join(BASE_DIR, "analytics_config.json")
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
     return {
         "gsc_connected": False,
         "adsense_connected": False,
@@ -35,9 +44,23 @@ def load_analytics_config() -> Dict[str, Any]:
     }
 
 def save_analytics_config(config: Dict[str, Any]):
-    """연동 설정 저장"""
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    """연동 설정 저장 (Vercel Read-Only 파일 시스템 완벽 대응)"""
+    global CONFIG_FILE
+    paths_to_try = [CONFIG_FILE, "/tmp/analytics_config.json"]
+    saved = False
+    last_err = None
+    for target in paths_to_try:
+        try:
+            with open(target, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            CONFIG_FILE = target
+            saved = True
+            break
+        except Exception as e:
+            last_err = e
+            continue
+    if not saved and last_err:
+        raise last_err
 
 class AnalyticsEngine:
     def __init__(self, site_url: str = "https://s-elegant.tistory.com/"):

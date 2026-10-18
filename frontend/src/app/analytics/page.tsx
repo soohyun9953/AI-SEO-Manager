@@ -52,7 +52,23 @@ export default function AnalyticsPage() {
       const res = await fetch(`/api/analytics/overview?days=${targetDays}`);
       if (res.ok) {
         const json = await res.json();
-        setConnection(json.connection || {});
+        const conn = json.connection || {};
+
+        // Vercel 인스턴스 무상태 대응: 브라우저 로컬 캐시 확인 및 결합
+        try {
+          const cached = localStorage.getItem("gsc_analytics_config");
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed.gsc_connected || parsed.adsense_connected) {
+              conn.mode = "LIVE";
+              conn.gsc_connected = Boolean(parsed.gsc_connected);
+              conn.adsense_connected = Boolean(parsed.adsense_connected);
+              if (parsed.site_url) conn.site_url = parsed.site_url;
+            }
+          }
+        } catch (e) {}
+
+        setConnection(conn);
         setData(json.data || null);
       }
     } catch (err) {

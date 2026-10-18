@@ -26,16 +26,30 @@ export default function AnalyticsSettingsModal({ isOpen, onClose, onSaved }: Ana
 
   const loadSettings = async () => {
     setLoading(true);
+    // 1. 로컬스토리지 캐시 우선 복원
+    try {
+      const cached = localStorage.getItem("gsc_analytics_config");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.site_url) setSiteUrl(parsed.site_url);
+        if (parsed.adsense_account_id) setAdsenseAccountId(parsed.adsense_account_id);
+        if (parsed.service_account_email) setServiceAccountEmail(parsed.service_account_email);
+        if (parsed.gsc_connected !== undefined) setGscConnected(Boolean(parsed.gsc_connected));
+        if (parsed.adsense_connected !== undefined) setAdsenseConnected(Boolean(parsed.adsense_connected));
+      }
+    } catch (e) {}
+
+    // 2. 서버 설정 조회
     try {
       const res = await fetch("/api/analytics/settings");
       if (res.ok) {
         const data = await res.json();
         if (data.config) {
-          setSiteUrl(data.config.site_url || "https://s-elegant.tistory.com/");
-          setAdsenseAccountId(data.config.adsense_account_id || "");
-          setServiceAccountEmail(data.config.service_account_email || "");
-          setGscConnected(Boolean(data.config.gsc_connected));
-          setAdsenseConnected(Boolean(data.config.adsense_connected));
+          if (data.config.site_url) setSiteUrl(data.config.site_url);
+          if (data.config.adsense_account_id) setAdsenseAccountId(data.config.adsense_account_id);
+          if (data.config.service_account_email) setServiceAccountEmail(data.config.service_account_email);
+          if (data.config.gsc_connected !== undefined) setGscConnected(Boolean(data.config.gsc_connected));
+          if (data.config.adsense_connected !== undefined) setAdsenseConnected(Boolean(data.config.adsense_connected));
         }
       }
     } catch (err) {
@@ -47,18 +61,25 @@ export default function AnalyticsSettingsModal({ isOpen, onClose, onSaved }: Ana
 
   const handleSave = async () => {
     setSaving(true);
+    const configData = {
+      site_url: siteUrl,
+      adsense_account_id: adsenseAccountId,
+      service_account_email: serviceAccountEmail,
+      gsc_connected: gscConnected,
+      adsense_connected: adsenseConnected,
+      gsc_auth_type: "SERVICE_ACCOUNT"
+    };
+
+    // 로컬스토리지에 즉시 안전 저장
+    try {
+      localStorage.setItem("gsc_analytics_config", JSON.stringify(configData));
+    } catch (e) {}
+
     try {
       const res = await fetch("/api/analytics/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          site_url: siteUrl,
-          adsense_account_id: adsenseAccountId,
-          service_account_email: serviceAccountEmail,
-          gsc_connected: gscConnected,
-          adsense_connected: adsenseConnected,
-          gsc_auth_type: "SERVICE_ACCOUNT"
-        })
+        body: JSON.stringify(configData)
       });
       if (res.ok) {
         alert("Google 연동 설정이 성공적으로 저장되었습니다.");
