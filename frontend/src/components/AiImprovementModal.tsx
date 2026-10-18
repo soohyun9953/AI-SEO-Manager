@@ -28,7 +28,7 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
     setLoading(true);
     setError(null);
     try {
-      const apiKey = localStorage.getItem("gemini_api_key") || "";
+      const apiKey = localStorage.getItem("GEMINI_API_KEY") || localStorage.getItem("gemini_api_key") || "";
       const res = await fetch("/api/analytics/recommend", {
         method: "POST",
         headers: {

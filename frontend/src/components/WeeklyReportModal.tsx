@@ -25,7 +25,7 @@ export default function WeeklyReportModal({ isOpen, onClose, days = 28 }: Weekly
     setLoading(true);
     setError(null);
     try {
-      const apiKey = localStorage.getItem("gemini_api_key") || "";
+      const apiKey = localStorage.getItem("GEMINI_API_KEY") || localStorage.getItem("gemini_api_key") || "";
       const res = await fetch("/api/analytics/weekly-report", {
         method: "POST",
         headers: {

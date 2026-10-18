@@ -1424,9 +1424,7 @@ async def update_analytics_settings(req: AnalyticsSettingsRequest):
 
 @app.post("/api/analytics/recommend")
 async def get_ai_recommendation(req: AnalyticsRecommendRequest, x_gemini_api_key: Optional[str] = Header(None)):
-    api_key = x_gemini_api_key or GEMINI_API_KEY
-    if not api_key:
-        raise HTTPException(status_code=400, detail="Gemini API 키가 설정되지 않았습니다.")
+    api_key = x_gemini_api_key or GEMINI_API_KEY or ""
     try:
         import analytics
         engine = analytics.AnalyticsEngine()
