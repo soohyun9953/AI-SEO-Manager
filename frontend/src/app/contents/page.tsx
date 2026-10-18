@@ -81,9 +81,34 @@ export default function ContentsManagementPage() {
       const res = await fetch(`/api/contents?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        setContents(data.items || []);
+        const items = data.items || [];
+        setContents(items);
         setTotalPages(data.total_pages || 1);
-        setTotalCount(data.total || 0);
+        const count = data.total || items.length;
+        setTotalCount(count);
+
+        // 통계 보정: 서버 stats가 0이더라도 가져온 목록 기반으로 통계 즉시 갱신
+        if (items.length > 0) {
+          setStats(prev => {
+            const draftCnt = items.filter((i: any) => i.status === "DRAFT").length;
+            const reviewCnt = items.filter((i: any) => i.status === "REVIEW").length;
+            const approvedCnt = items.filter((i: any) => i.status === "APPROVED").length;
+            const scheduledCnt = items.filter((i: any) => i.status === "SCHEDULED").length;
+            const publishedCnt = items.filter((i: any) => i.status === "PUBLISHED").length;
+            const failedCnt = items.filter((i: any) => i.status === "FAILED").length;
+            return {
+              total: Math.max(prev.total, count, items.length),
+              DRAFT: Math.max(prev.DRAFT, draftCnt),
+              REVIEW: Math.max(prev.REVIEW, reviewCnt),
+              APPROVED: Math.max(prev.APPROVED, approvedCnt),
+              SCHEDULED: Math.max(prev.SCHEDULED, scheduledCnt),
+              PUBLISHING: prev.PUBLISHING,
+              PUBLISHED: Math.max(prev.PUBLISHED, publishedCnt),
+              FAILED: Math.max(prev.FAILED, failedCnt),
+              queue_ready: Math.max(prev.queue_ready, approvedCnt + scheduledCnt)
+            };
+          });
+        }
       }
     } catch (e) {
       console.error("콘텐츠 목록 조회 실패", e);
@@ -338,13 +363,13 @@ export default function ContentsManagementPage() {
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-white/[0.05] bg-white/[0.01] text-gray-400 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-4 px-5">콘텐츠 제목</th>
-                <th className="py-4 px-4">핵심 키워드</th>
-                <th className="py-4 px-4">카테고리</th>
-                <th className="py-4 px-4">상태</th>
-                <th className="py-4 px-4">작성일 / 수정일</th>
-                <th className="py-4 px-4">발행 정보</th>
-                <th className="py-4 px-5 text-right">관리 작업</th>
+                <th className="py-4 px-5 whitespace-nowrap min-w-[220px]">콘텐츠 제목</th>
+                <th className="py-4 px-4 whitespace-nowrap min-w-[140px] max-w-[220px]">핵심 키워드</th>
+                <th className="py-4 px-4 whitespace-nowrap">카테고리</th>
+                <th className="py-4 px-4 whitespace-nowrap">상태</th>
+                <th className="py-4 px-4 whitespace-nowrap">작성일 / 수정일</th>
+                <th className="py-4 px-4 whitespace-nowrap">발행 정보</th>
+                <th className="py-4 px-5 text-right whitespace-nowrap">관리 작업</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -366,11 +391,12 @@ export default function ContentsManagementPage() {
                   <tr key={item.id} className="hover:bg-white/[0.02] transition-colors group">
                     
                     {/* 제목 */}
-                    <td className="py-4 px-5 max-w-xs">
+                    <td className="py-4 px-5 min-w-[220px] max-w-sm">
                       <div className="flex flex-col gap-1">
                         <span 
                           onClick={() => { setSelectedContent(item); setIsEditOpen(true); }}
                           className="font-bold text-white hover:text-purple-400 cursor-pointer line-clamp-1 transition-colors"
+                          title={item.title}
                         >
                           {item.title}
                         </span>
@@ -380,9 +406,12 @@ export default function ContentsManagementPage() {
                       </div>
                     </td>
 
-                    {/* 키워드 */}
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-300 font-medium text-[11px] border border-purple-500/20">
+                    {/* 키워드 (긴 키워드 truncate 처리) */}
+                    <td className="py-4 px-4 max-w-[220px]">
+                      <span 
+                        title={item.keyword}
+                        className="inline-block max-w-full truncate px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-300 font-medium text-[11px] border border-purple-500/20"
+                      >
                         {item.keyword}
                       </span>
                     </td>

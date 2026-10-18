@@ -282,9 +282,29 @@ class 자동_작성_관리자:
         return json.loads(res.text)
 
     async def 키워드_추출(self, topic: str):
-        prompt = f"[현재 시점: {datetime.now().strftime('%Y년 %m월 %d일')}] '{topic}' 주제 고단가 키워드 1개 전송"
+        import re
+        prompt = f"당신은 SEO 키워드 전문가입니다. '{topic}' 주제에 대해 최신 트렌드 기준 CPC가 높은 핵심 롱테일 키워드 딱 1개만 단답형 단어로 알려주세요. 설명이나 마크다운(#, *) 기호, 문장 일절 없이 오직 '키워드 명칭'만 텍스트로 출력하세요. (예: 클라우드 비용 최적화)"
         res = await safe_generate_content_async(self.client, prompt)
-        return res.text.strip()
+        raw_text = res.text.strip()
+
+        bold_match = re.findall(r'\*\*(.*?)\*\*', raw_text)
+        if bold_match:
+            for b in bold_match:
+                b_clean = b.strip()
+                if 0 < len(b_clean) <= 30 and "설명" not in b_clean and "키워드" not in b_clean:
+                    return b_clean
+
+        lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+        for line in lines:
+            if ":" in line:
+                candidate = line.split(":")[-1].replace("*", "").strip()
+                if 0 < len(candidate) <= 30 and "설명" not in candidate:
+                    return candidate
+
+        clean_first = re.sub(r'[#*`"\'\[\]]', '', lines[0]).strip() if lines else topic
+        if ":" in clean_first:
+            clean_first = clean_first.split(":")[-1].strip()
+        return clean_first[:30] if clean_first else topic[:20]
 
     async def 원고_생성(self, topic: str, keyword: str):
         prompt = f"""

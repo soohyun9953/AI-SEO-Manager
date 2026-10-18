@@ -329,7 +329,7 @@ export default function PublishQueuePage() {
                       </h2>
                       
                       <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5 flex-wrap">
-                        <span>핵심 키워드: <strong className="text-purple-300">{item.keyword}</strong></span>
+                        <span className="flex items-center gap-1">핵심 키워드: <strong className="text-purple-300 max-w-[200px] inline-block truncate align-bottom" title={item.keyword}>{item.keyword}</strong></span>
                         <span>태그: <strong className="text-gray-300">{item.tags || item.keyword}</strong></span>
                         <span>글자수: <strong className="text-white">{item.content.length.toLocaleString()}자</strong></span>
                       </div>
