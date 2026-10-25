@@ -1,4 +1,11 @@
 import os
+import sys
+
+# Windows 콘솔 cp949 인코딩 문제 방지
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 import base64
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Header
@@ -1578,13 +1585,13 @@ def generate_claude_review(req: ClaudeReviewRequest):
             "updated_at": datetime.now().isoformat()
         }
         database.create_content(content_dict)
-        print(f"✅ [API] 데이터베이스 콘텐츠 저장 완료 (ID: {content_id})")
+        print(f"[OK] [API] 데이터베이스 콘텐츠 저장 완료 (ID: {content_id})")
 
         # 4. (옵션) 원스톱 티스토리 임시저장 실행
         tistory_saved = False
         tistory_msg = ""
         if req.auto_tistory_save:
-            print("\n🚀 [API] 옵션 활성화: 티스토리 자동 임시저장 실행...")
+            print("\n[START] [API] 옵션 활성화: 티스토리 자동 임시저장 실행...")
             blog_name = req.tistory_blog or os.getenv("TISTORY_BLOG_NAME", "s-elegant")
             tistory_auto = tistory_bot.TistoryAutomator(blog_name=blog_name, headless=False)
             bot_res = tistory_auto.post_content(

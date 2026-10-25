@@ -19,6 +19,23 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from playwright.sync_api import sync_playwright, BrowserContext, Page
 
+# Windows 콘솔 cp949 인코딩 문제 방지
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
+def log(msg: str):
+    """안전한 로그 출력 (인코딩 에러 방지)"""
+    try:
+        print(msg)
+    except Exception:
+        try:
+            clean = msg.encode('cp949', errors='replace').decode('cp949')
+            print(clean)
+        except Exception:
+            pass
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLAUDE_PROFILE_DIR = os.path.join(BASE_DIR, "claude_browser_profile")
 CLAUDE_NEW_URL = "https://claude.ai/new"
@@ -32,23 +49,21 @@ class ClaudeWebAutomator:
 
     def _wait_for_user_login(self, page: Page) -> bool:
         """사용자가 Claude.ai 로그인을 완료할 때까지 대기"""
-        print("\n🔑 [Claude Bot] Claude.ai 로그인이 필요합니다. 브라우저 창에서 로그인을 진행해주세요...")
+        log("\n[LOGIN] [Claude Bot] Claude.ai 로그인이 필요합니다. 브라우저 창에서 로그인을 진행해주세요...")
         start_time = time.time()
         while time.time() - start_time < self.timeout_login:
             curr_url = page.url
-            # 로그인 완료 후 new 채팅 페이지나 대화방 페이지로 진입했는지 확인
             if "claude.ai" in curr_url and "login" not in curr_url and "signup" not in curr_url:
-                # 입력창 또는 환영 문구가 있는지 확인
                 try:
                     input_box = page.locator("div[contenteditable='true'], div.ProseMirror, textarea").first
                     if input_box.is_visible(timeout=2000):
-                        print("✅ [Claude Bot] 로그인 확인 완료! Claude 채팅 화면에 진입했습니다.")
+                        log("[OK] [Claude Bot] 로그인 확인 완료! Claude 채팅 화면에 진입했습니다.")
                         time.sleep(2)
                         return True
                 except Exception:
                     pass
             time.sleep(2)
-        print("❌ [Claude Bot] 로그인 대기 시간(3분)이 초과되었습니다.")
+        log("[ERROR] [Claude Bot] 로그인 대기 시간(3분)이 초과되었습니다.")
         return False
 
     def generate_review_article(
@@ -125,7 +140,7 @@ class ClaudeWebAutomator:
         )
 
         with sync_playwright() as p:
-            print(f"\n🚀 [Claude Bot] 크롬 브라우저를 시작합니다... (프로필: {self.profile_dir})")
+            log(f"\n[START] [Claude Bot] 크롬 브라우저를 시작합니다... (프로필: {self.profile_dir})")
             context: BrowserContext = p.chromium.launch_persistent_context(
                 user_data_dir=self.profile_dir,
                 headless=self.headless,
@@ -141,7 +156,7 @@ class ClaudeWebAutomator:
             page.on("dialog", lambda dialog: dialog.accept())
 
             try:
-                print(f"🌐 [Claude Bot] Claude 새 대화 페이지로 이동: {CLAUDE_NEW_URL}")
+                log(f"[NAVIGATE] [Claude Bot] Claude 새 대화 페이지로 이동: {CLAUDE_NEW_URL}")
                 page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
                 time.sleep(3)
 
@@ -157,7 +172,7 @@ class ClaudeWebAutomator:
                     page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
                     time.sleep(3)
 
-                # 안내 팝업이나 모달(Acknowledge, Got it, 닫기 등)이 떠있을 경우 닫기 처리
+                # 안내 팝업이나 모달 닫기
                 try:
                     dismiss_buttons = page.locator("button:has-text('Got it'), button:has-text('확인'), button:has-text('Dismiss'), button:has-text('Continue'), button[aria-label='Close']").all()
                     for d_btn in dismiss_buttons:
@@ -171,18 +186,17 @@ class ClaudeWebAutomator:
                 if photo_paths and len(photo_paths) > 0:
                     valid_files = [f for f in photo_paths if os.path.exists(f)]
                     if valid_files:
-                        print(f"📷 [Claude Bot] 이미지 파일 {len(valid_files)}장 첨부 중...")
+                        log(f"[PHOTO] [Claude Bot] 이미지 파일 {len(valid_files)}장 첨부 중...")
                         file_input = page.locator("input[type='file']").first
                         try:
-                            # 숨겨진 파일 인풋에 직접 전달
                             file_input.set_input_files(valid_files, timeout=10000)
-                            print(f"✅ [Claude Bot] 이미지 파일 첨부 완료, 업로드 대기 중...")
-                            time.sleep(3 + len(valid_files) * 2) # 파일 업로드 썸네일 대기
+                            log("[OK] [Claude Bot] 이미지 파일 첨부 완료, 업로드 대기 중...")
+                            time.sleep(3 + len(valid_files) * 2)
                         except Exception as file_e:
-                            print(f"⚠️ [Claude Bot] 파일 첨부 중 에러 (계속 진행): {file_e}")
+                            log(f"[WARN] [Claude Bot] 파일 첨부 중 에러 (계속 진행): {file_e}")
 
                 # 3. 텍스트 입력창 찾기
-                print("✍️ [Claude Bot] 메시지 입력창 탐색 중...")
+                log("[EDIT] [Claude Bot] 메시지 입력창 탐색 중...")
                 input_selector = None
                 for sel in [
                     "div[contenteditable='true'].ProseMirror",
@@ -203,8 +217,7 @@ class ClaudeWebAutomator:
                 input_element.click()
                 time.sleep(0.5)
 
-                # 텍스트 주입 (클립보드 방식 및 DOM 조작을 통한 안전한 대량 텍스트 삽입)
-                print("📝 [Claude Bot] 프롬프트 텍스트 주입 중...")
+                log("[EDIT] [Claude Bot] 프롬프트 텍스트 주입 중...")
                 page.evaluate("""
                     ([selector, text]) => {
                         const el = document.querySelector(selector);
@@ -214,7 +227,6 @@ class ClaudeWebAutomator:
                             el.dispatchEvent(new Event('input', { bubbles: true }));
                         } else {
                             el.focus();
-                            // ProseMirror 및 ContentEditable 환경을 위한 처리
                             document.execCommand('selectAll', false, null);
                             document.execCommand('insertText', false, text);
                         }
@@ -222,16 +234,15 @@ class ClaudeWebAutomator:
                 """, [input_selector, prompt])
                 time.sleep(1.5)
 
-                # 내용이 제대로 채워졌는지 검증, 누락 시 keyboard 방식 보완
                 inserted_text = input_element.inner_text()
                 if not inserted_text or len(inserted_text.strip()) < 10:
-                    print("⚠️ 텍스트 직접 입력 보완 실행...")
+                    log("[WARN] 텍스트 직접 입력 보완 실행...")
                     input_element.click()
                     page.keyboard.insert_text(prompt)
                     time.sleep(1)
 
                 # 4. 전송 버튼 클릭
-                print("🚀 [Claude Bot] 전송 버튼 클릭...")
+                log("[SEND] [Claude Bot] 전송 버튼 클릭...")
                 send_clicked = False
                 send_selectors = [
                     "button[aria-label*='Send']",
@@ -247,18 +258,17 @@ class ClaudeWebAutomator:
                         if btn.is_visible(timeout=1500) and btn.is_enabled():
                             btn.click()
                             send_clicked = True
-                            print(f"✅ 전송 버튼 클릭 완료 ({s_sel})")
+                            log(f"[OK] 전송 버튼 클릭 완료 ({s_sel})")
                             break
                     except Exception:
                         continue
 
                 if not send_clicked:
-                    # 대체: Enter 키 전송
-                    print("⚠️ 전송 버튼 클릭 실패, Enter 키 전송 시도...")
+                    log("[WARN] 전송 버튼 클릭 실패, Enter 키 전송 시도...")
                     input_element.press("Enter")
 
-                # 5. 답변 생성 대기 (스트리밍 완료 감지)
-                print("⏳ [Claude Bot] 답변 생성 중... 생성이 완료될 때까지 대기합니다...")
+                # 5. 답변 생성 대기
+                log("[WAIT] [Claude Bot] 답변 생성 중... 생성이 완료될 때까지 대기합니다...")
                 time.sleep(5)
 
                 max_wait_seconds = 180
@@ -271,7 +281,6 @@ class ClaudeWebAutomator:
                     time.sleep(poll_interval)
                     elapsed += poll_interval
 
-                    # 중지 버튼(Stop) 확인
                     stop_btn = page.locator("button[aria-label*='Stop'], button:has-text('Stop')").first
                     is_streaming = False
                     try:
@@ -279,7 +288,6 @@ class ClaudeWebAutomator:
                     except Exception:
                         is_streaming = False
 
-                    # 마지막 어시스턴트 메시지 길이 체크
                     msg_text = self._get_latest_assistant_message(page)
                     curr_len = len(msg_text.strip())
 
@@ -290,13 +298,12 @@ class ClaudeWebAutomator:
                             unchanged_count = 0
                             last_content_len = curr_len
 
-                    # 중지 버튼이 없고, 텍스트 길이가 200자 이상이며 2회(4초) 이상 변경이 없으면 완료로 판정
                     if not is_streaming and curr_len > 200 and unchanged_count >= 2:
-                        print("🎉 [Claude Bot] 답변 생성 완료 감지!")
+                        log("[DONE] [Claude Bot] 답변 생성 완료 감지!")
                         break
 
                     if elapsed % 10 == 0:
-                        print(f"   생성 진행 중... ({elapsed}초 경과, 현재 글자 수: {curr_len}자)")
+                        log(f"   생성 진행 중... ({elapsed}초 경과, 현재 글자 수: {curr_len}자)")
 
                 # 6. 최종 텍스트 추출 및 파싱
                 full_raw_text = self._get_latest_assistant_message(page)
@@ -307,10 +314,10 @@ class ClaudeWebAutomator:
                 result.update(parsed)
                 result["success"] = True
                 result["end_time"] = datetime.now().isoformat()
-                print("✅ [Claude Bot] 원고 추출 및 구조화 성공!")
+                log("[OK] [Claude Bot] 원고 추출 및 구조화 성공!")
 
             except Exception as e:
-                print(f"❌ [Claude Bot] 에러 발생: {e}")
+                log(f"[ERROR] [Claude Bot] 에러 발생: {e}")
                 result["error"] = str(e)
             finally:
                 context.close()
@@ -320,7 +327,6 @@ class ClaudeWebAutomator:
     def _get_latest_assistant_message(self, page: Page) -> str:
         """가장 마지막 어시스턴트(Claude) 메시지 텍스트 추출"""
         try:
-            # 다양한 Claude DOM 버전에 대응
             selectors = [
                 "[data-is-streaming] .font-claude-message",
                 ".font-claude-message",
@@ -333,12 +339,11 @@ class ClaudeWebAutomator:
                 if elements:
                     return elements[-1].inner_text()
             
-            # fallback: 마지막 markdown 컨테이너
             all_prose = page.locator("div.prose, div[class*='font-user-message'] ~ div").all()
             if all_prose:
                 return all_prose[-1].inner_text()
         except Exception as e:
-            print(f"텍스트 추출 중 경미한 에러: {e}")
+            log(f"텍스트 추출 중 경미한 에러: {e}")
         return ""
 
     def _build_prompt(
@@ -414,33 +419,27 @@ class ClaudeWebAutomator:
         tags = []
         article = text
 
-        # 1. 제목 추출
         title_match = re.search(r'\[제목\]\s*(.*?)(?=\n\n|\[메타설명\]|\[본문\]|$)', text, re.DOTALL)
         if title_match:
             title = title_match.group(1).strip().replace("#", "").strip()
 
-        # 2. 메타설명 추출
         meta_match = re.search(r'\[메타설명\]\s*(.*?)(?=\n\n|\[본문\]|$)', text, re.DOTALL)
         if meta_match:
             meta_desc = meta_match.group(1).strip()
 
-        # 3. 태그 추출
         tags_match = re.search(r'\[태그\]\s*(.*?)$', text, re.DOTALL)
         if tags_match:
             raw_tags = tags_match.group(1).strip()
-            # 쉼표나 공백, # 기준으로 태그 분리
             t_list = re.findall(r'#?([가-힣a-zA-Z0-9_\-]+)', raw_tags)
             tags = [t for t in t_list if t and t.lower() not in ["태그", "tag"]]
 
         if not tags:
             tags = [place_name, category, "방문후기", "내돈내산", "솔직후기"]
 
-        # 4. 본문 분리
         body_match = re.search(r'\[본문\]\s*(.*?)(?=\n\n\[태그\]|\[태그\]|$)', text, re.DOTALL)
         if body_match:
             article = body_match.group(1).strip()
         else:
-            # 라벨이 없는 경우 제목 부분 등을 제거한 전체 텍스트
             cleaned = text
             if title_match:
                 cleaned = cleaned.replace(title_match.group(0), "")
@@ -448,7 +447,6 @@ class ClaudeWebAutomator:
                 cleaned = cleaned.replace(tags_match.group(0), "")
             article = cleaned.strip()
 
-        # 5. HTML 변환
         html_article = self._markdown_to_tistory_html(article, place_name, photos=photos)
 
         return {
@@ -465,7 +463,6 @@ class ClaudeWebAutomator:
         import markdown
         html = markdown.markdown(md_content, extensions=['tables', 'fenced_code', 'nl2br'])
 
-        # 카드 뷰 및 스타일 입히기
         html = html.replace('<h2>', '<h2 style="font-size: 20px; font-weight: bold; border-left: 4px solid #3b82f6; padding-left: 12px; margin-top: 35px; margin-bottom: 15px; color: #1e293b;">')
         html = html.replace('<h3>', '<h3 style="font-size: 17px; font-weight: bold; margin-top: 25px; margin-bottom: 10px; color: #334155;">')
         html = html.replace('<table>', '<table style="width: 100%; border-collapse: collapse; margin: 25px 0; font-size: 14px; text-align: left; background-color: #f8fafc; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0;">')
@@ -473,7 +470,6 @@ class ClaudeWebAutomator:
         html = html.replace('<td>', '<td style="padding: 12px; border-bottom: 1px solid #e2e8f0; color: #475569;">')
         html = html.replace('<p>', '<p style="line-height: 1.85; margin-bottom: 16px; color: #334155; font-size: 15px;">')
 
-        # 사진 슬롯 치환
         if photos and len(photos) > 0:
             for idx, p in enumerate(photos):
                 slot_marker = f"<!-- [PHOTO_{idx+1}_SLOT] -->"
@@ -490,12 +486,9 @@ class ClaudeWebAutomator:
                     if slot_marker in html:
                         html = html.replace(slot_marker, img_card)
                     else:
-                        # 슬롯 마커가 없으면 적절한 위치(소제목 뒤)에 보완 삽입
                         html += img_card
                 else:
                     html = html.replace(slot_marker, "")
         
-        # 잔여 마커 제거
         html = re.sub(r'<!--\s*\[PHOTO_\d+_SLOT\]\s*-->', '', html)
-
         return html

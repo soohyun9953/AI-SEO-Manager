@@ -14,6 +14,23 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from playwright.sync_api import sync_playwright, BrowserContext, Page
 
+# Windows 콘솔 cp949 인코딩 문제 방지
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
+def log(msg: str):
+    """안전한 로그 출력 (인코딩 에러 방지)"""
+    try:
+        print(msg)
+    except Exception:
+        try:
+            clean = msg.encode('cp949', errors='replace').decode('cp949')
+            print(clean)
+        except Exception:
+            pass
+
 # 기본 설정
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROFILE_DIR = os.path.join(BASE_DIR, "tistory_browser_profile")
@@ -29,18 +46,18 @@ class TistoryAutomator:
 
     def _wait_for_user_login(self, page: Page, timeout_seconds: int = 180) -> bool:
         """사용자가 카카오 로그인을 완료할 때까지 대기"""
-        print("\n🔑 카카오 로그인이 필요합니다. 열린 브라우저 창에서 로그인을 진행해주세요...")
+        log("\n[LOGIN] 카카오 로그인이 필요합니다. 열린 브라우저 창에서 로그인을 진행해주세요...")
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
             curr_url = page.url
             # 티스토리 관리자 또는 글쓰기 페이지에 도달했는지 확인
             if "/manage/post" in curr_url or f"{self.blog_name}.tistory.com" in curr_url:
                 if "login" not in curr_url and "accounts.kakao.com" not in curr_url:
-                    print("✅ 로그인 확인 완료! 글쓰기 편집기로 진입합니다.")
+                    log("[OK] 로그인 확인 완료! 글쓰기 편집기로 진입합니다.")
                     time.sleep(2)
                     return True
             time.sleep(2)
-        print("❌ 로그인 대기 시간(3분)이 초과되었습니다.")
+        log("[ERROR] 로그인 대기 시간(3분)이 초과되었습니다.")
         return False
 
     def post_content(
@@ -79,7 +96,7 @@ class TistoryAutomator:
         }
 
         with sync_playwright() as p:
-            print(f"\n🚀 [Tistory Bot] 크롬 브라우저를 시작합니다... (프로필: {self.profile_dir})")
+            log(f"\n[START] [Tistory Bot] 크롬 브라우저를 시작합니다... (프로필: {self.profile_dir})")
             
             # 사용자 로그인 세션을 유지하는 Persistent Context 실행
             context: BrowserContext = p.chromium.launch_persistent_context(
