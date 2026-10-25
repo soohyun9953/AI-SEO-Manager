@@ -6,3 +6,5 @@ google-genai
 openai
 python-dotenv
 pydantic
+playwright
+markdown

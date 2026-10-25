@@ -22,3 +22,9 @@ Thumbs.db
 *.db
 backend/data/
 backend/backend_log.txt
+
+# Browser Profiles & Playwright Cache
+backend/*_profile/
+backend/claude_browser_profile/
+backend/tistory_browser_profile/
+.playwright/

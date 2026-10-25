@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
-import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal, UtensilsCrossed, TrendingUp } from "lucide-react";
+import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal, UtensilsCrossed, TrendingUp, Compass } from "lucide-react";
 import Link from "next/link";
 import ApiKeyHeader from "@/components/ApiKeyHeader";
 
@@ -46,6 +46,7 @@ export default function RootLayout({
               <NavItem href="/keywords" icon={<Search size={18} />} label="키워드 엔진" />
               <NavItem href="/editor" icon={<PenTool size={18} />} label="SEO 라이터" />
               <NavItem href="/reviews" icon={<UtensilsCrossed size={18} />} label="맛집·방문 후기" />
+              <NavItem href="/experience-reviews" icon={<Compass size={18} />} label="체험·방문 후기 (Claude)" />
               <NavItem href="/images" icon={<ImageIcon size={18} />} label="이미지 생성기" />
               <NavItem href="/auto-write" icon={<Sparkles size={18} />} label="자동 글작성" />
             </nav>
