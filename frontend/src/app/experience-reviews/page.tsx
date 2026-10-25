@@ -212,9 +212,11 @@ export default function ExperienceReviewWriterPage() {
     setLaunchingClaude(true);
     try {
       const res = await fetch("/api/claude/launch-browser", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Claude 브라우저 실행 실패");
-      alert("크롬 브라우저가 열렸습니다. Claude.ai에 로그인해 두시면 이후 글 생성이 자동으로 진행됩니다!");
+      const rawText = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(rawText); } catch (e) {}
+      if (!res.ok) throw new Error(data.detail || rawText || "Claude 브라우저 실행 실패");
+      alert("크롬 브라우저가 열렸습니다. 열린 창에서 Claude.ai 로그인을 진행해 주세요! (로그인 완료 시 세션이 영구 보존됩니다)");
     } catch (err: any) {
       alert(`오류: ${err.message}`);
     } finally {
@@ -262,12 +264,19 @@ export default function ExperienceReviewWriterPage() {
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "원고 생성에 실패했습니다.");
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch (parseErr) {
+        if (!res.ok) {
+          throw new Error(`서버 처리 오류 (${res.status}): ${rawText.slice(0, 200)}`);
+        }
       }
 
-      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || `원고 생성 실패 (${res.status}): ${rawText.slice(0, 200)}`);
+      }
       setGeneratedTitle(data.title || `${placeName} 솔직 방문 후기`);
       setArticle(data.article || "");
       setHtmlArticle(data.html_article || "");

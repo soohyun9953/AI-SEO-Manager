@@ -315,8 +315,11 @@ class TistoryAutomator:
             finally:
                 result["end_time"] = datetime.now().isoformat()
                 if action != "CONFIRM_BEFORE_PUBLISH":
-                    context.close()
-                    print("🔒 브라우저 세션이 안전하게 닫혔습니다.")
+                    try:
+                        context.close()
+                    except Exception:
+                        pass
+                    log("[OK] 브라우저 세션이 안전하게 닫혔습니다.")
 
         return result
 

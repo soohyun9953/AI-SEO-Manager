@@ -1465,6 +1465,7 @@ def launch_claude_browser():
     """
     def _open():
         import claude_bot
+        claude_bot._cleanup_stale_chrome(claude_bot.CLAUDE_PROFILE_DIR)
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             context = p.chromium.launch_persistent_context(

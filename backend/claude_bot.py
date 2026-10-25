@@ -36,6 +36,26 @@ def log(msg: str):
         except Exception:
             pass
 
+def _cleanup_stale_chrome(profile_dir: str):
+    """이전 실행 후 남아있는 좀비 크롬 프로세스 및 락 파일 정리"""
+    try:
+        import subprocess
+        if sys.platform == "win32":
+            dir_name = os.path.basename(profile_dir)
+            cmd = f'powershell -Command "Get-CimInstance Win32_Process -Filter \\"Name = \'chrome.exe\'\\" | Where-Object {{ $_.CommandLine -like \'*{dir_name}*\' }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"'
+            subprocess.run(cmd, shell=True, timeout=5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1)
+
+        for lock_file in ["SingletonLock", "SingletonCookie", "SingletonSocket", "lockfile"]:
+            f_path = os.path.join(profile_dir, lock_file)
+            if os.path.exists(f_path):
+                try:
+                    os.remove(f_path)
+                except Exception:
+                    pass
+    except Exception as e:
+        log(f"[CLEANUP_WARN] 프로필 정리 알림: {e}")
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLAUDE_PROFILE_DIR = os.path.join(BASE_DIR, "claude_browser_profile")
 CLAUDE_NEW_URL = "https://claude.ai/new"
@@ -178,6 +198,7 @@ class ClaudeWebAutomator:
 
         with sync_playwright() as p:
             log(f"\n[START] [Claude Bot] 크롬 브라우저를 시작합니다... (프로필: {self.profile_dir})")
+            _cleanup_stale_chrome(self.profile_dir)
             context: BrowserContext = p.chromium.launch_persistent_context(
                 user_data_dir=self.profile_dir,
                 headless=self.headless,
@@ -322,7 +343,10 @@ class ClaudeWebAutomator:
                 log(f"[ERROR] [Claude Bot] 에러 발생: {e}")
                 result["error"] = str(e)
             finally:
-                context.close()
+                try:
+                    context.close()
+                except Exception:
+                    pass
 
         return result
 
