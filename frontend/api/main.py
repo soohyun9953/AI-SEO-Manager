@@ -997,7 +997,7 @@ async def generate_review(
         raise HTTPException(status_code=500, detail=f"맛집 후기 생성 실패: {str(e)}")
 
 @app.post("/api/publish/auto-register")
-async def run_auto_register(req: AutoRegisterRequest):
+def run_auto_register(req: AutoRegisterRequest):
     """
     티스토리 브라우저 자동 등록 엔드포인트
     - 로컬 PC 환경에서는 Playwright 봇이 실제 크롬을 띄워 작동
@@ -1140,7 +1140,7 @@ class ClaudeReviewRequest(BaseModel):
     tistory_blog: Optional[str] = "s-elegant"
 
 @app.post("/api/claude/launch-browser")
-async def launch_claude_browser():
+def launch_claude_browser():
     """
     Claude.ai 웹 브라우저 창 띄우기 (로컬 브라우저 세션 지원)
     """
@@ -1169,7 +1169,7 @@ async def launch_claude_browser():
         raise HTTPException(status_code=500, detail=f"브라우저 실행 실패: {str(e)}")
 
 @app.post("/api/claude/generate-review")
-async def generate_claude_review(req: ClaudeReviewRequest):
+def generate_claude_review(req: ClaudeReviewRequest):
     """
     Claude.ai 웹(Playwright) 방문 후기 원고 자동 생성 엔드포인트
     - 로컬 PC 환경: Playwright를 통한 실제 크롬 자동화 및 티스토리 연동

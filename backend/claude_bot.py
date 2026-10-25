@@ -65,8 +65,38 @@ class ClaudeWebAutomator:
         photos_data: Optional[List[Dict[str, str]]] = None
     ) -> Dict[str, Any]:
         """
-        Claude.ai 웹에 접속하여 사진 첨부 및 프롬프트를 전송하고 생성된 원고를 추출
+        Claude.ai 웹에 접속하여 사진 첨부 및 프롬프트를 전송하고 생성된 원고를 추출 (독립 스레드 보장)
         """
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                self._run_generate_review,
+                place_name,
+                category,
+                location,
+                place_url,
+                key_info,
+                special_notes,
+                rating,
+                photo_paths,
+                photo_captions,
+                photos_data
+            )
+            return future.result()
+
+    def _run_generate_review(
+        self,
+        place_name: str,
+        category: str,
+        location: str,
+        place_url: str = "",
+        key_info: str = "",
+        special_notes: str = "",
+        rating: str = "5.0",
+        photo_paths: Optional[List[str]] = None,
+        photo_captions: Optional[List[str]] = None,
+        photos_data: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
         start_time = datetime.now().isoformat()
         result = {
             "success": False,

@@ -1273,7 +1273,7 @@ async def generate_review(
         raise HTTPException(status_code=500, detail=f"맛집 후기 생성 실패: {str(e)}")
 
 @app.post("/api/publish/auto-register")
-async def run_auto_register(req: AutoRegisterRequest):
+def run_auto_register(req: AutoRegisterRequest):
     """
     티스토리 브라우저 자동 등록 실행 (Playwright 기반 로컬 봇 연동)
     - 승인된 콘텐츠를 티스토리 에디터에 자동 입력
@@ -1452,11 +1452,11 @@ class ClaudeReviewRequest(BaseModel):
     tistory_blog: Optional[str] = "s-elegant"
 
 @app.post("/api/claude/launch-browser")
-async def launch_claude_browser():
+def launch_claude_browser():
     """
     Claude.ai 웹 브라우저 창을 띄워 사용자가 미리 로그인할 수 있도록 지원
     """
-    try:
+    def _open():
         import claude_bot
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
@@ -1469,13 +1469,18 @@ async def launch_claude_browser():
             page = context.pages[0] if context.pages else context.new_page()
             page.goto(claude_bot.CLAUDE_NEW_URL)
             time.sleep(3)
+
+    try:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            executor.submit(_open).result()
         return {"success": True, "message": "Claude 브라우저가 실행되었습니다. 로그인을 완료해주세요."}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"브라우저 실행 실패: {str(e)}")
 
 @app.post("/api/claude/generate-review")
-async def generate_claude_review(req: ClaudeReviewRequest):
+def generate_claude_review(req: ClaudeReviewRequest):
     """
     Claude.ai 웹(Playwright)을 통해 고품질 방문/체험 후기 원고 자동 생성
     - 옵션 활성화 시 티스토리(Playwright)에 원스톱 자동 임시저장까지 연계

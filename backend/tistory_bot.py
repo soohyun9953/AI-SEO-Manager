@@ -49,11 +49,24 @@ class TistoryAutomator:
         content_html: str,
         tags: Optional[List[str]] = None,
         category: Optional[str] = None,
-        action: str = "TEMP_SAVE"  # 'TEMP_SAVE' (임시저장), 'CONFIRM_BEFORE_PUBLISH' (사용자 확인 대기), 'PUBLISH' (즉시발행)
+        action: str = "TEMP_SAVE"
     ) -> Dict[str, Any]:
         """
-        티스토리 에디터에 콘텐츠 등록 실행
+        티스토리 에디터에 콘텐츠 등록 실행 (독립 스레드 보장)
         """
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(self._run_post_content, title, content_html, tags, category, action)
+            return future.result()
+
+    def _run_post_content(
+        self,
+        title: str,
+        content_html: str,
+        tags: Optional[List[str]] = None,
+        category: Optional[str] = None,
+        action: str = "TEMP_SAVE"
+    ) -> Dict[str, Any]:
         start_time = datetime.now().isoformat()
         result = {
             "success": False,
