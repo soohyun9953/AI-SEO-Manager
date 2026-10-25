@@ -331,17 +331,19 @@ export default function ExperienceReviewWriterPage() {
               </h4>
               <p className="text-xs text-amber-200/80 mt-1 leading-relaxed">
                 Claude 웹 브라우저 및 티스토리 자동화(Playwright)는 <strong>사용자 PC의 크롬 창을 직접 띄워 작업하는 로컬 보안 기능</strong>입니다.
-                클라우드 서버에서는 사용자 PC의 브라우저를 띄울 수 없으므로, 자동 실행을 위해 <strong>내 컴퓨터 로컬 주소(http://localhost:3000)</strong>에서 실행해 주세요.
+                클라우드 서버에서는 사용자 PC의 브라우저를 띄울 수 없으므로, 자동 실행을 위해 <strong>내 컴퓨터 로컬 주소(http://localhost:3001)</strong>에서 실행해 주세요.
               </p>
             </div>
           </div>
-          <a
-            href="http://localhost:3000/experience-reviews"
-            className="flex-shrink-0 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all shadow-md flex items-center gap-1.5"
-          >
-            <span>내 PC 로컬 서버 열기</span>
-            <ExternalLink size={14} />
-          </a>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href="http://localhost:3001/experience-reviews"
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all shadow-md flex items-center gap-1.5"
+            >
+              <span>로컬 서버 열기 (3001)</span>
+              <ExternalLink size={14} />
+            </a>
+          </div>
         </div>
       )}
 
