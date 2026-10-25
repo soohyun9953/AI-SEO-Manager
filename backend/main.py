@@ -1475,7 +1475,18 @@ def launch_claude_browser():
             )
             page = context.pages[0] if context.pages else context.new_page()
             page.goto(claude_bot.CLAUDE_NEW_URL)
-            time.sleep(3)
+            
+            # 사용자가 로그인할 수 있도록 최대 180초 동안 대기 (입력창이 나타나면 조기 완료)
+            start_t = time.time()
+            while time.time() - start_t < 180:
+                try:
+                    for sel in ["div[contenteditable='true']", "textarea"]:
+                        if page.locator(sel).first.is_visible(timeout=1000):
+                            time.sleep(2)
+                            return
+                except Exception:
+                    pass
+                time.sleep(2)
 
     try:
         import concurrent.futures

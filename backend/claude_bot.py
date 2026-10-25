@@ -47,24 +47,61 @@ class ClaudeWebAutomator:
         self.timeout_login = timeout_login
         os.makedirs(self.profile_dir, exist_ok=True)
 
-    def _wait_for_user_login(self, page: Page) -> bool:
-        """사용자가 Claude.ai 로그인을 완료할 때까지 대기"""
-        log("\n[LOGIN] [Claude Bot] Claude.ai 로그인이 필요합니다. 브라우저 창에서 로그인을 진행해주세요...")
+    def _ensure_ready_for_chat(self, page: Page) -> str:
+        """
+        Claude.ai에 로그인되어 있고 새 채팅 입력창이 준비될 때까지 대기 후 셀렉터 반환
+        """
+        log("[CHECK] [Claude Bot] Claude.ai 로그인 및 채팅 에디터 로딩 상태 확인 중...")
         start_time = time.time()
+        
         while time.time() - start_time < self.timeout_login:
             curr_url = page.url
-            if "claude.ai" in curr_url and "login" not in curr_url and "signup" not in curr_url:
+            
+            # 1. 로그인 페이지인 경우 사용자가 브라우저 창에서 직접 로그인할 때까지 대기
+            if "login" in curr_url or "signup" in curr_url or "accounts.google.com" in curr_url:
+                log("[LOGIN_WAIT] 크롬 브라우저 창이 열렸습니다. Claude.ai 로그인을 진행해주세요... (로그인 대기 중)")
+                time.sleep(3)
+                continue
+                
+            # 2. 팝업, 안내 모달(Got it, Continue, Dismiss 등) 자동 닫기 시도
+            try:
+                dismiss_buttons = page.locator("button:has-text('Got it'), button:has-text('확인'), button:has-text('Dismiss'), button:has-text('Continue'), button:has-text('Accept'), button[aria-label='Close']").all()
+                for d_btn in dismiss_buttons:
+                    if d_btn.is_visible(timeout=500):
+                        d_btn.click()
+                        time.sleep(0.5)
+            except Exception:
+                pass
+                
+            # 3. /new 또는 /chat 페이지가 아닌 메인일 경우 /new로 이동 시도
+            if "/new" not in page.url and "/chat/" not in page.url and "claude.ai" in page.url:
                 try:
-                    input_box = page.locator("div[contenteditable='true'], div.ProseMirror, textarea").first
-                    if input_box.is_visible(timeout=2000):
-                        log("[OK] [Claude Bot] 로그인 확인 완료! Claude 채팅 화면에 진입했습니다.")
-                        time.sleep(2)
-                        return True
+                    page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=20000)
+                    time.sleep(2)
                 except Exception:
                     pass
+
+            # 4. 입력창 셀렉터 탐색
+            for sel in [
+                "div[contenteditable='true'].ProseMirror",
+                "div[contenteditable='true']",
+                "div.ProseMirror",
+                "textarea[placeholder*='Reply']",
+                "textarea[placeholder*='How can Claude help']",
+                "textarea[placeholder*='메시지']",
+                "textarea"
+            ]:
+                try:
+                    el = page.locator(sel).first
+                    if el.is_visible(timeout=1000):
+                        log(f"[OK] [Claude Bot] Claude 메시지 입력창 준비 완료! ({sel})")
+                        return sel
+                except Exception:
+                    continue
+
             time.sleep(2)
-        log("[ERROR] [Claude Bot] 로그인 대기 시간(3분)이 초과되었습니다.")
-        return False
+
+        raise Exception("Claude.ai 로그인 대기 시간(3분)이 초과되었거나 입력창을 찾지 못했습니다. 열린 브라우저 창에서 로그인을 완료해주세요.")
 
     def generate_review_article(
         self,
@@ -160,59 +197,24 @@ class ClaudeWebAutomator:
                 page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
                 time.sleep(3)
 
-                # 1. 로그인 여부 확인
-                current_url = page.url
-                if "login" in current_url or "signup" in current_url:
-                    logged_in = self._wait_for_user_login(page)
-                    if not logged_in:
-                        raise Exception("Claude.ai 로그인이 완료되지 않아 작업을 중단합니다.")
-                
-                # 새 대화 화면이 아닐 경우 이동
-                if "/new" not in page.url and "/chat/" not in page.url:
-                    page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
-                    time.sleep(3)
+                # 1. 로그인 확인 및 입력창 준비 대기 (로그인이 안 된 경우 사용자가 로그인할 때까지 대기)
+                input_selector = self._ensure_ready_for_chat(page)
 
-                # 안내 팝업이나 모달 닫기
-                try:
-                    dismiss_buttons = page.locator("button:has-text('Got it'), button:has-text('확인'), button:has-text('Dismiss'), button:has-text('Continue'), button[aria-label='Close']").all()
-                    for d_btn in dismiss_buttons:
-                        if d_btn.is_visible(timeout=1000):
-                            d_btn.click()
-                            time.sleep(0.5)
-                except Exception:
-                    pass
-
-                # 2. 사진 파일 첨부 (있는 경우)
+                # 2. 사진 파일 첨부 (입력창이 준비된 후 첨부)
                 if photo_paths and len(photo_paths) > 0:
                     valid_files = [f for f in photo_paths if os.path.exists(f)]
                     if valid_files:
                         log(f"[PHOTO] [Claude Bot] 이미지 파일 {len(valid_files)}장 첨부 중...")
-                        file_input = page.locator("input[type='file']").first
                         try:
-                            file_input.set_input_files(valid_files, timeout=10000)
-                            log("[OK] [Claude Bot] 이미지 파일 첨부 완료, 업로드 대기 중...")
+                            # file input 탐색 및 파일 설정
+                            file_input = page.locator("input[type='file']").first
+                            file_input.set_input_files(valid_files, timeout=15000)
+                            log("[OK] [Claude Bot] 이미지 파일 첨부 완료, 업로드 완료 대기 중...")
                             time.sleep(3 + len(valid_files) * 2)
                         except Exception as file_e:
                             log(f"[WARN] [Claude Bot] 파일 첨부 중 에러 (계속 진행): {file_e}")
 
-                # 3. 텍스트 입력창 찾기
-                log("[EDIT] [Claude Bot] 메시지 입력창 탐색 중...")
-                input_selector = None
-                for sel in [
-                    "div[contenteditable='true'].ProseMirror",
-                    "div[contenteditable='true']",
-                    "div.ProseMirror",
-                    "textarea[placeholder*='Reply']",
-                    "textarea[placeholder*='How can Claude help']",
-                    "textarea"
-                ]:
-                    if page.locator(sel).first.is_visible(timeout=3000):
-                        input_selector = sel
-                        break
-
-                if not input_selector:
-                    raise Exception("Claude 입력창을 찾을 수 없습니다. UI가 변경되었거나 로딩 중입니다.")
-
+                # 3. 텍스트 입력창 조작
                 input_element = page.locator(input_selector).first
                 input_element.click()
                 time.sleep(0.5)
