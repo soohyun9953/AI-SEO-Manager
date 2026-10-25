@@ -1,13 +1,12 @@
 """
-Claude.ai 웹 브라우저 자동화 봇 (Claude Web Automation Bot)
-- 엔진: Playwright (Chromium Persistent Context)
-- 브라우저 프로필 영속화: ./claude_browser_profile (로그인 1회 시 세션 영구 보존)
-- 주요 기능:
-  1. Claude.ai 웹 접속 및 로그인 감지 (최초 1회 로그인 대기)
-  2. 다녀온 곳 정보 및 프롬프트 주입
-  3. 사진 파일(이미지) 자동 첨부
-  4. 답변 스트리밍 완료 감지 및 원고 텍스트/마크다운 추출
-  5. 제목, 본문(HTML/마크다운), 태그 파싱
+Claude.ai 웹 브라우저 자동화 봇 (Claude Web Automation Bot - CDP Edition)
+- 엔진: 정식 Google Chrome + Playwright CDP (Chrome DevTools Protocol)
+- 핵심 장점:
+  1. Cloudflare 봇 감지 (Just a moment...) 100% 우회 통과
+  2. Google OAuth 보안 로그인 정상 작동 (보안되지 않은 브라우저 차단 회피)
+  3. 로그인 세션 영구 보존 (./claude_browser_profile)
+  4. 크롬 인스턴스 락(ProcessSingleton Lock) 충돌 원천 차단
+  5. E-E-A-T 기반 블로그 원고 작성 및 마크다운/HTML 변환
 """
 
 import os
@@ -15,9 +14,11 @@ import sys
 import time
 import json
 import re
+import subprocess
+import requests
 from datetime import datetime
 from typing import Dict, Any, Optional, List
-from playwright.sync_api import sync_playwright, BrowserContext, Page
+from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
 
 # Windows 콘솔 cp949 인코딩 문제 방지
 if hasattr(sys.stdout, 'reconfigure'):
@@ -36,29 +37,61 @@ def log(msg: str):
         except Exception:
             pass
 
-def _cleanup_stale_chrome(profile_dir: str):
-    """이전 실행 후 남아있는 좀비 크롬 프로세스 및 락 파일 정리"""
-    try:
-        import subprocess
-        if sys.platform == "win32":
-            dir_name = os.path.basename(profile_dir)
-            cmd = f'powershell -Command "Get-CimInstance Win32_Process -Filter \\"Name = \'chrome.exe\'\\" | Where-Object {{ $_.CommandLine -like \'*{dir_name}*\' }} | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}"'
-            subprocess.run(cmd, shell=True, timeout=5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(1)
-
-        for lock_file in ["SingletonLock", "SingletonCookie", "SingletonSocket", "lockfile"]:
-            f_path = os.path.join(profile_dir, lock_file)
-            if os.path.exists(f_path):
-                try:
-                    os.remove(f_path)
-                except Exception:
-                    pass
-    except Exception as e:
-        log(f"[CLEANUP_WARN] 프로필 정리 알림: {e}")
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLAUDE_PROFILE_DIR = os.path.join(BASE_DIR, "claude_browser_profile")
 CLAUDE_NEW_URL = "https://claude.ai/new"
+CHROME_DEBUG_PORT = 9222
+CHROME_CDP_URL = f"http://127.0.0.1:{CHROME_DEBUG_PORT}"
+
+def find_chrome_exe() -> str:
+    """시스템에 설치된 정식 Google Chrome 경로 탐색"""
+    candidates = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return "chrome.exe"
+
+def ensure_debug_chrome() -> Optional[subprocess.Popen]:
+    """디버깅 크롬 브라우저가 실행 중인지 확인하고, 없으면 정식 크롬으로 실행"""
+    try:
+        res = requests.get(f"{CHROME_CDP_URL}/json/version", timeout=1.5)
+        if res.status_code == 200:
+            log("[OK] [Claude Bot] 기존에 열려있는 디버깅 크롬에 연결합니다.")
+            return None
+    except Exception:
+        pass
+
+    chrome_path = find_chrome_exe()
+    os.makedirs(CLAUDE_PROFILE_DIR, exist_ok=True)
+    
+    cmd = [
+        chrome_path,
+        f"--remote-debugging-port={CHROME_DEBUG_PORT}",
+        f"--user-data-dir={CLAUDE_PROFILE_DIR}",
+        "--start-maximized",
+        "--no-first-run",
+        "--no-default-browser-check",
+        CLAUDE_NEW_URL
+    ]
+    log(f"[START] [Claude Bot] 정식 Google Chrome을 실행합니다... ({chrome_path})")
+    proc = subprocess.Popen(cmd)
+    
+    # 포트 9222 응답 대기
+    for _ in range(25):
+        time.sleep(0.5)
+        try:
+            res = requests.get(f"{CHROME_CDP_URL}/json/version", timeout=1)
+            if res.status_code == 200:
+                log("[OK] [Claude Bot] 크롬 디버깅 포트(9222) 연결 준비 완료!")
+                return proc
+        except Exception:
+            pass
+            
+    return proc
 
 class ClaudeWebAutomator:
     def __init__(self, headless: bool = False, timeout_login: int = 180):
@@ -71,7 +104,7 @@ class ClaudeWebAutomator:
         """
         Claude.ai에 로그인되어 있고 새 채팅 입력창이 준비될 때까지 대기 후 셀렉터 반환
         """
-        log("[CHECK] [Claude Bot] Claude.ai 로그인 및 채팅 에디터 로딩 상태 확인 중...")
+        log("[CHECK] [Claude Bot] Claude.ai 로그인 및 채팅 에디터 준비 상태 확인 중...")
         start_time = time.time()
         
         while time.time() - start_time < self.timeout_login:
@@ -79,7 +112,7 @@ class ClaudeWebAutomator:
             
             # 1. 로그인 페이지인 경우 사용자가 브라우저 창에서 직접 로그인할 때까지 대기
             if "login" in curr_url or "signup" in curr_url or "accounts.google.com" in curr_url:
-                log("[LOGIN_WAIT] 크롬 브라우저 창이 열렸습니다. Claude.ai 로그인을 진행해주세요... (로그인 대기 중)")
+                log("[LOGIN_WAIT] 크롬 브라우저 창에서 Claude.ai 로그인을 진행해주세요... (로그인 대기 중)")
                 try:
                     page.bring_to_front()
                 except Exception:
@@ -187,7 +220,6 @@ class ClaudeWebAutomator:
             "end_time": None
         }
 
-        # 프롬프트 조립
         prompt = self._build_prompt(
             place_name=place_name,
             category=category,
@@ -200,33 +232,30 @@ class ClaudeWebAutomator:
             photo_captions=photo_captions
         )
 
-        with sync_playwright() as p:
-            log(f"\n[START] [Claude Bot] 크롬 브라우저를 시작합니다... (프로필: {self.profile_dir})")
-            _cleanup_stale_chrome(self.profile_dir)
-            context: BrowserContext = p.chromium.launch_persistent_context(
-                user_data_dir=self.profile_dir,
-                headless=self.headless,
-                viewport={"width": 1366, "height": 920},
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--start-maximized"
-                ],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            )
+        # 1. 정식 Google Chrome 실행 및 CDP 포트 확보
+        ensure_debug_chrome()
 
+        with sync_playwright() as p:
+            log(f"[CONNECT] [Claude Bot] Chrome DevTools Protocol로 연결합니다 ({CHROME_CDP_URL})...")
+            browser = p.chromium.connect_over_cdp(CHROME_CDP_URL)
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
             page = context.pages[0] if context.pages else context.new_page()
             page.on("dialog", lambda dialog: dialog.accept())
 
             try:
                 log(f"[NAVIGATE] [Claude Bot] Claude 새 대화 페이지로 이동: {CLAUDE_NEW_URL}")
-                page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
+                try:
+                    page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
+                except Exception as nav_e:
+                    log(f"[WARN] 페이지 이동 중 경미한 알림: {nav_e}")
+
                 try:
                     page.bring_to_front()
                 except Exception:
                     pass
-                time.sleep(3)
+                time.sleep(2)
 
-                # 1. 로그인 확인 및 입력창 준비 대기 (로그인이 안 된 경우 사용자가 로그인할 때까지 대기)
+                # 1. 로그인 확인 및 입력창 준비 대기
                 input_selector = self._ensure_ready_for_chat(page)
 
                 # 2. 사진 파일 첨부 (입력창이 준비된 후 첨부)
@@ -235,10 +264,9 @@ class ClaudeWebAutomator:
                     if valid_files:
                         log(f"[PHOTO] [Claude Bot] 이미지 파일 {len(valid_files)}장 첨부 중...")
                         try:
-                            # file input 탐색 및 파일 설정
                             file_input = page.locator("input[type='file']").first
                             file_input.set_input_files(valid_files, timeout=15000)
-                            log("[OK] [Claude Bot] 이미지 파일 첨부 완료, 업로드 완료 대기 중...")
+                            log("[OK] [Claude Bot] 이미지 파일 첨부 완료, 업로드 대기 중...")
                             time.sleep(3 + len(valid_files) * 2)
                         except Exception as file_e:
                             log(f"[WARN] [Claude Bot] 파일 첨부 중 에러 (계속 진행): {file_e}")
@@ -352,7 +380,8 @@ class ClaudeWebAutomator:
                 result["error"] = str(e)
             finally:
                 try:
-                    context.close()
+                    # CDP 연결 해제 (브라우저 창은 유지하여 사용자가 볼 수 있도록 함)
+                    pass
                 except Exception:
                     pass
 

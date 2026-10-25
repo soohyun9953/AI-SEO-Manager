@@ -1461,39 +1461,12 @@ class ClaudeReviewRequest(BaseModel):
 @app.post("/api/claude/launch-browser")
 def launch_claude_browser():
     """
-    Claude.ai 웹 브라우저 창을 띄워 사용자가 미리 로그인할 수 있도록 지원
+    Claude.ai 웹 브라우저 창을 띄워 사용자가 미리 로그인할 수 있도록 지원 (CDP 모드)
     """
-    def _open():
-        import claude_bot
-        claude_bot._cleanup_stale_chrome(claude_bot.CLAUDE_PROFILE_DIR)
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            context = p.chromium.launch_persistent_context(
-                user_data_dir=claude_bot.CLAUDE_PROFILE_DIR,
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled", "--start-maximized"],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            )
-            page = context.pages[0] if context.pages else context.new_page()
-            page.goto(claude_bot.CLAUDE_NEW_URL)
-            
-            # 사용자가 로그인할 수 있도록 최대 180초 동안 대기 (입력창이 나타나면 조기 완료)
-            start_t = time.time()
-            while time.time() - start_t < 180:
-                try:
-                    for sel in ["div[contenteditable='true']", "textarea"]:
-                        if page.locator(sel).first.is_visible(timeout=1000):
-                            time.sleep(2)
-                            return
-                except Exception:
-                    pass
-                time.sleep(2)
-
     try:
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            executor.submit(_open).result()
-        return {"success": True, "message": "Claude 브라우저가 실행되었습니다. 로그인을 완료해주세요."}
+        import claude_bot
+        claude_bot.ensure_debug_chrome()
+        return {"success": True, "message": "Google Chrome 브라우저가 실행되었습니다. 열린 창에서 Claude.ai 로그인을 완료해주세요."}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"브라우저 실행 실패: {str(e)}")
