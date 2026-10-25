@@ -1122,6 +1122,198 @@ async def get_ai_recommendation(req: AnalyticsRecommendRequest, x_gemini_api_key
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"AI 최적화 처방전 생성 실패: {str(e)}")
 
+class ClaudePhotoItem(BaseModel):
+    data_url: Optional[str] = None
+    caption: Optional[str] = ""
+    name: Optional[str] = ""
+
+class ClaudeReviewRequest(BaseModel):
+    place_name: str
+    category: Optional[str] = "맛집/카페"
+    location: Optional[str] = ""
+    place_url: Optional[str] = ""
+    key_info: Optional[str] = ""
+    special_notes: Optional[str] = ""
+    rating: Optional[str] = "5.0"
+    photos: Optional[List[ClaudePhotoItem]] = []
+    auto_tistory_save: Optional[bool] = False
+    tistory_blog: Optional[str] = "s-elegant"
+
+@app.post("/api/claude/launch-browser")
+async def launch_claude_browser():
+    """
+    Claude.ai 웹 브라우저 창 띄우기 (로컬 브라우저 세션 지원)
+    """
+    try:
+        import claude_bot
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=claude_bot.CLAUDE_PROFILE_DIR,
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled", "--start-maximized"],
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            )
+            page = context.pages[0] if context.pages else context.new_page()
+            page.goto(claude_bot.CLAUDE_NEW_URL)
+            import time
+            time.sleep(3)
+        return {"success": True, "message": "Claude 브라우저가 실행되었습니다. 로그인을 완료해주세요."}
+    except ImportError:
+        raise HTTPException(
+            status_code=400,
+            detail="Claude 웹 브라우저 자동화는 사용자의 로컬 PC에서 실행되는 기능입니다. 내 컴퓨터에서 로컬 서버(http://localhost:3000)로 접속하여 실행해주세요."
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"브라우저 실행 실패: {str(e)}")
+
+@app.post("/api/claude/generate-review")
+async def generate_claude_review(req: ClaudeReviewRequest):
+    """
+    Claude.ai 웹(Playwright) 방문 후기 원고 자동 생성 엔드포인트
+    - 로컬 PC 환경: Playwright를 통한 실제 크롬 자동화 및 티스토리 연동
+    - Vercel 클라우드 환경: 로컬 접속 안내 반환
+    """
+    try:
+        import claude_bot
+    except ImportError:
+        raise HTTPException(
+            status_code=400,
+            detail="Claude.ai 웹 브라우저 자동화는 사용자의 로컬 PC(크롬 브라우저)에서 직접 실행되는 기능입니다. Vercel 클라우드에서는 브라우저 창을 띄울 수 없으므로, 로컬 주소(http://localhost:3000/experience-reviews)로 접속하여 실행해주세요!"
+        )
+
+    if not req.place_name or not req.place_name.strip():
+        raise HTTPException(status_code=400, detail="방문 장소 또는 상호명을 입력해주세요.")
+
+    import tempfile
+    import uuid
+    import time
+
+    temp_dir = os.path.join(tempfile.gettempdir(), f"claude_review_{uuid.uuid4().hex[:8]}")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_photo_paths = []
+    photo_captions = []
+    photos_data_list = []
+
+    try:
+        if req.photos:
+            for idx, p in enumerate(req.photos):
+                caption = p.caption.strip() if p.caption else f"{req.place_name} 사진 {idx+1}"
+                photo_captions.append(caption)
+                photos_data_list.append({
+                    "data_url": p.data_url,
+                    "caption": caption,
+                    "name": p.name or f"photo_{idx+1}.jpg"
+                })
+
+                if p.data_url and "base64," in p.data_url:
+                    try:
+                        header, b64_data = p.data_url.split("base64,", 1)
+                        ext = "jpg"
+                        if "image/png" in header:
+                            ext = "png"
+                        elif "image/webp" in header:
+                            ext = "webp"
+
+                        file_path = os.path.join(temp_dir, f"photo_{idx+1}.{ext}")
+                        with open(file_path, "wb") as f_img:
+                            f_img.write(base64.b64decode(b64_data))
+                        temp_photo_paths.append(file_path)
+                    except Exception as b64_err:
+                        print(f"사진 파일 변환 실패 ({idx}): {b64_err}")
+
+        claude_automator = claude_bot.ClaudeWebAutomator(headless=False)
+        claude_result = claude_automator.generate_review_article(
+            place_name=req.place_name,
+            category=req.category or "맛집/카페",
+            location=req.location or "",
+            place_url=req.place_url or "",
+            key_info=req.key_info or "",
+            special_notes=req.special_notes or "",
+            rating=req.rating or "5.0",
+            photo_paths=temp_photo_paths,
+            photo_captions=photo_captions,
+            photos_data=photos_data_list
+        )
+
+        if not claude_result.get("success"):
+            err_msg = claude_result.get("error") or "Claude 웹에서 원고 생성에 실패했습니다."
+            raise Exception(err_msg)
+
+        title = claude_result.get("title") or f"{req.place_name} 방문 솔직 후기"
+        article = claude_result.get("article", "")
+        html_article = claude_result.get("html_article", "")
+        tags = claude_result.get("tags", [])
+        tags_string = claude_result.get("tags_string", ", ".join(tags))
+        meta_description = claude_result.get("meta_description", "")
+
+        content_id = f"cont_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        content_dict = {
+            "id": content_id,
+            "title": title,
+            "keyword": req.place_name,
+            "related_keywords": tags_string,
+            "category": req.category or "맛집/카페",
+            "content": article,
+            "content_html": html_article,
+            "meta_description": meta_description,
+            "tags": tags_string,
+            "thumbnail_url": req.photos[0].data_url if req.photos else "",
+            "body_images": [p.data_url for p in req.photos if p.data_url],
+            "reference_urls": [req.place_url] if req.place_url else [],
+            "internal_links": [],
+            "ai_model": "Claude-Web-Browser (Playwright)",
+            "status": "DRAFT",
+            "scheduled_at": "",
+            "tistory_url": "",
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }
+        database.create_content(content_dict)
+
+        tistory_saved = False
+        tistory_msg = ""
+        if req.auto_tistory_save:
+            try:
+                import tistory_bot
+                blog_name = req.tistory_blog or os.getenv("TISTORY_BLOG_NAME", "s-elegant")
+                tistory_auto = tistory_bot.TistoryAutomator(blog_name=blog_name, headless=False)
+                bot_res = tistory_auto.post_content(
+                    title=title,
+                    content_html=html_article,
+                    tags=tags,
+                    category=req.category,
+                    action="TEMP_SAVE"
+                )
+                tistory_saved = bot_res.get("success", False)
+                tistory_msg = bot_res.get("message", "")
+            except Exception as tis_err:
+                tistory_msg = f"티스토리 저장 오류: {tis_err}"
+
+        return {
+            "success": True,
+            "content_id": content_id,
+            "title": title,
+            "article": article,
+            "html_article": html_article,
+            "tags": tags,
+            "tags_string": tags_string,
+            "meta_description": meta_description,
+            "tistory_saved": tistory_saved,
+            "tistory_message": tistory_msg
+        }
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Claude 방문 후기 처리 실패: {str(e)}")
+    finally:
+        try:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
 @app.post("/api/analytics/weekly-report")
 async def get_weekly_report(req: WeeklyReportRequest, x_gemini_api_key: Optional[str] = Header(None)):
     api_key = x_gemini_api_key or GEMINI_API_KEY

@@ -84,9 +84,13 @@ export default function ExperienceReviewWriterPage() {
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const [isAutoRegisterOpen, setIsAutoRegisterOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isVercelEnv, setIsVercelEnv] = useState(false);
 
-  // 로컬 스토리지 복원
+  // 로컬 스토리지 복원 및 환경 감지
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsVercelEnv(window.location.hostname.includes("vercel.app"));
+    }
     const savedBlog = localStorage.getItem("tistory_blog");
     if (savedBlog) setTistoryBlog(savedBlog);
 
@@ -316,6 +320,31 @@ export default function ExperienceReviewWriterPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-fadeIn pb-16">
+      {/* Vercel 환경 안내 배너 */}
+      {isVercelEnv && (
+        <div className="p-5 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={22} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-bold text-amber-300">
+                안내: 현재 Vercel 클라우드(웹)로 접속 중입니다.
+              </h4>
+              <p className="text-xs text-amber-200/80 mt-1 leading-relaxed">
+                Claude 웹 브라우저 및 티스토리 자동화(Playwright)는 <strong>사용자 PC의 크롬 창을 직접 띄워 작업하는 로컬 보안 기능</strong>입니다.
+                클라우드 서버에서는 사용자 PC의 브라우저를 띄울 수 없으므로, 자동 실행을 위해 <strong>내 컴퓨터 로컬 주소(http://localhost:3000)</strong>에서 실행해 주세요.
+              </p>
+            </div>
+          </div>
+          <a
+            href="http://localhost:3000/experience-reviews"
+            className="flex-shrink-0 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-all shadow-md flex items-center gap-1.5"
+          >
+            <span>내 PC 로컬 서버 열기</span>
+            <ExternalLink size={14} />
+          </a>
+        </div>
+      )}
+
       {/* 상단 타이틀 배너 */}
       <div className="relative rounded-3xl overflow-hidden p-8 border border-white/[0.08] bg-gradient-to-r from-blue-950/40 via-purple-950/30 to-indigo-950/40 backdrop-blur-xl">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
