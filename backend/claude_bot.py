@@ -80,6 +80,10 @@ class ClaudeWebAutomator:
             # 1. 로그인 페이지인 경우 사용자가 브라우저 창에서 직접 로그인할 때까지 대기
             if "login" in curr_url or "signup" in curr_url or "accounts.google.com" in curr_url:
                 log("[LOGIN_WAIT] 크롬 브라우저 창이 열렸습니다. Claude.ai 로그인을 진행해주세요... (로그인 대기 중)")
+                try:
+                    page.bring_to_front()
+                except Exception:
+                    pass
                 time.sleep(3)
                 continue
                 
@@ -216,6 +220,10 @@ class ClaudeWebAutomator:
             try:
                 log(f"[NAVIGATE] [Claude Bot] Claude 새 대화 페이지로 이동: {CLAUDE_NEW_URL}")
                 page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
+                try:
+                    page.bring_to_front()
+                except Exception:
+                    pass
                 time.sleep(3)
 
                 # 1. 로그인 확인 및 입력창 준비 대기 (로그인이 안 된 경우 사용자가 로그인할 때까지 대기)

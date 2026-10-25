@@ -207,11 +207,19 @@ export default function ExperienceReviewWriterPage() {
     }
   };
 
+  // API 엔드포인트 URL 해석 (로컬 개발 환경에서는 Next.js 프록시 타임아웃/소켓끊김 방지를 위해 백엔드 8002 직접 호출)
+  const getApiUrl = (endpoint: string) => {
+    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+      return `http://localhost:8002${endpoint}`;
+    }
+    return endpoint;
+  };
+
   // Claude.ai 로그인용 브라우저 실행
   const handleLaunchClaude = async () => {
     setLaunchingClaude(true);
     try {
-      const res = await fetch("/api/claude/launch-browser", { method: "POST" });
+      const res = await fetch(getApiUrl("/api/claude/launch-browser"), { method: "POST" });
       const rawText = await res.text();
       let data: any = {};
       try { data = JSON.parse(rawText); } catch (e) {}
@@ -247,7 +255,7 @@ export default function ExperienceReviewWriterPage() {
         setProgressStep("📝 프롬프트 전송 및 원고 생성 대기 중...");
       }
 
-      const res = await fetch("/api/claude/generate-review", {
+      const res = await fetch(getApiUrl("/api/claude/generate-review"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -751,7 +759,18 @@ export default function ExperienceReviewWriterPage() {
                   <div>
                     <h3 className="text-base font-bold text-white mb-1">Claude 브라우저에서 작업 중입니다</h3>
                     <p className="text-xs text-blue-400 font-medium">{progressStep}</p>
-                    <p className="text-[11px] text-slate-500 mt-2">브라우저 창을 닫지 마시고 잠시만 기다려주세요.</p>
+                  </div>
+                  <div className="max-w-md p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-left space-y-2 mt-2">
+                    <div className="font-bold flex items-center gap-1.5 text-amber-200">
+                      <AlertCircle size={15} />
+                      열린 크롬 브라우저 창에서 로그인을 진행해 주세요!
+                    </div>
+                    <p className="text-[11px] text-amber-300/80 leading-relaxed">
+                      화면에 새로 열린 크롬 브라우저 창에서 <strong>Claude.ai 로그인(Google 또는 이메일)</strong>을 완료해 주시면, 봇이 즉시 감지하여 <strong>사진 첨부 ➔ 원고 작성 ➔ 티스토리 임시저장</strong>을 자동으로 진행합니다.
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      (최초 1회 로그인 완료 시 세션이 영구 보존되어 다음부터는 자동으로 진행됩니다.)
+                    </p>
                   </div>
                 </div>
               ) : (
