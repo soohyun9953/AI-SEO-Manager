@@ -28,3 +28,4 @@ backend/*_profile/
 backend/claude_browser_profile/
 backend/tistory_browser_profile/
 .playwright/
+backend/tistory_cookies.json

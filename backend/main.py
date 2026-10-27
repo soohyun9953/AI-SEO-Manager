@@ -155,6 +155,14 @@ class AutoRegisterRequest(BaseModel):
     blog_name: Optional[str] = "s-elegant"
     force: Optional[bool] = False
 
+class TistoryDirectRegisterRequest(BaseModel):
+    title: str
+    content_html: str
+    tags: List[str] = []
+    category: Optional[str] = "맛집/카페"
+    blog_name: Optional[str] = "s-elegant"
+    action: Optional[str] = "TEMP_SAVE"
+
 class AnalyticsSettingsRequest(BaseModel):
     site_url: Optional[str] = "https://s-elegant.tistory.com/"
     gsc_connected: Optional[bool] = False
@@ -1278,6 +1286,29 @@ async def generate_review(
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"맛집 후기 생성 실패: {str(e)}")
+
+@app.post("/api/tistory/auto-register")
+def run_tistory_direct_register(req: TistoryDirectRegisterRequest):
+    """생성된 원고(제목/HTML/태그)를 DB 조회 없이 바로 티스토리 에디터에 임시저장 (Gemini 고속 모드용)"""
+    import tistory_bot
+    blog_name = req.blog_name or os.getenv("TISTORY_BLOG_NAME", "s-elegant")
+    try:
+        automator = tistory_bot.TistoryAutomator(blog_name=blog_name, headless=False)
+        bot_result = automator.post_content(
+            title=req.title,
+            content_html=req.content_html,
+            tags=req.tags,
+            category=req.category,
+            action="TEMP_SAVE"
+        )
+        return {
+            "success": bot_result.get("success", False),
+            "message": bot_result.get("message", ""),
+            "error": bot_result.get("error", "")
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"티스토리 임시저장 실패: {str(e)}")
 
 @app.post("/api/publish/auto-register")
 def run_auto_register(req: AutoRegisterRequest):

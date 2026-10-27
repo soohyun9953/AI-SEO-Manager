@@ -34,6 +34,7 @@ def log(msg: str):
 # 기본 설정
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROFILE_DIR = os.path.join(BASE_DIR, "tistory_browser_profile")
+COOKIE_FILE = os.path.join(BASE_DIR, "tistory_cookies.json")  # 세션 쿠키는 브라우저 종료 시 사라지므로 별도 보관
 DEFAULT_BLOG = "s-elegant"
 
 class TistoryAutomator:
@@ -44,20 +45,30 @@ class TistoryAutomator:
         self.profile_dir = PROFILE_DIR
         os.makedirs(self.profile_dir, exist_ok=True)
 
-    def _wait_for_user_login(self, page: Page, timeout_seconds: int = 180) -> bool:
-        """사용자가 카카오 로그인을 완료할 때까지 대기"""
-        log("\n[LOGIN] 카카오 로그인이 필요합니다. 열린 브라우저 창에서 로그인을 진행해주세요...")
+    def _is_login_url(self, url: str) -> bool:
+        return "accounts.kakao.com" in url or "/auth/login" in url or "login" in url.split("?")[0]
+
+    def _wait_for_user_login(self, page: Page, timeout_seconds: int = 300) -> bool:
+        """사용자가 카카오 로그인을 완료할 때까지 대기 (로그인 화면을 벗어나면 글쓰기 화면으로 재진입해 확인)"""
+        log("[LOGIN] 카카오 로그인이 필요합니다. 열린 브라우저 창에서 로그인을 진행해주세요...")
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
-            curr_url = page.url
-            # 티스토리 관리자 또는 글쓰기 페이지에 도달했는지 확인
-            if "/manage/post" in curr_url or f"{self.blog_name}.tistory.com" in curr_url:
-                if "login" not in curr_url and "accounts.kakao.com" not in curr_url:
-                    log("[OK] 로그인 확인 완료! 글쓰기 편집기로 진입합니다.")
-                    time.sleep(2)
-                    return True
             time.sleep(2)
-        log("[ERROR] 로그인 대기 시간(3분)이 초과되었습니다.")
+            try:
+                curr_url = page.url
+                log(f"[LOGIN] 현재 주소 확인: {curr_url}")
+                if self._is_login_url(curr_url):
+                    continue
+                # 블로그 도메인(관리/에디터 화면)에 도달했다면 로그인 완료
+                if f"{self.blog_name}.tistory.com/manage" in curr_url:
+                    log("[OK] 로그인 확인 완료! 글쓰기 편집기로 진입합니다.")
+                    return True
+                # 그 외 주소(티스토리 메인 등)라면 글쓰기 화면으로 이동해 다시 확인
+                page.goto(self.write_url, wait_until="domcontentloaded", timeout=60000)
+                time.sleep(2)
+            except Exception as e:
+                log(f"[LOGIN] 확인 중 일시 오류(무시): {e}")
+        log("[ERROR] 로그인 대기 시간(5분)이 초과되었습니다.")
         return False
 
     def post_content(
@@ -110,10 +121,24 @@ class TistoryAutomator:
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
             )
 
+            # 이전에 저장해 둔 로그인 쿠키 복원
+            try:
+                if os.path.exists(COOKIE_FILE):
+                    with open(COOKIE_FILE, "r", encoding="utf-8") as f:
+                        context.add_cookies(json.load(f))
+                    log("[OK] 저장된 로그인 세션을 복원했습니다.")
+            except Exception as ck_err:
+                log(f"[WARN] 로그인 세션 복원 실패(무시): {ck_err}")
+
             page = context.pages[0] if context.pages else context.new_page()
 
             # 다이얼로그(alert, confirm) 자동 수락 설정 (모드 변경 시 확인창 등)
-            page.on("dialog", lambda dialog: dialog.accept())
+            def _accept_dialog(dialog):
+                try:
+                    dialog.accept()
+                except Exception:
+                    pass
+            page.on("dialog", _accept_dialog)
 
             try:
                 print(f"🌐 글쓰기 화면으로 이동: {self.write_url}")
@@ -125,10 +150,10 @@ class TistoryAutomator:
                 if "accounts.kakao.com" in current_url or "login" in current_url:
                     logged_in = self._wait_for_user_login(page)
                     if not logged_in:
-                        raise Exception("로그인이 완료되지 않아 작업을 중단합니다.")
-                    if "/manage/post" not in page.url:
-                        page.goto(self.write_url, wait_until="networkidle", timeout=60000)
-                        time.sleep(3)
+                        raise Exception("로그인이 완료되지 않아 작업을 중단합니다. (5분 내 카카오 로그인을 완료해 주세요)")
+                    if "/manage/" not in page.url:
+                        page.goto(self.write_url, wait_until="domcontentloaded", timeout=60000)
+                    time.sleep(3)
 
                 # 2. 에디터 로딩 대기
                 print("📝 티스토리 에디터 로딩 확인 중...")
@@ -171,11 +196,29 @@ class TistoryAutomator:
                 # 5. 본문 입력 (HTML 모드 전환 주입)
                 print("📄 본문 내용 주입 준비 (HTML 모드 전환)...")
                 
+                # 0순위: TinyMCE API로 본문 HTML 직접 주입 (티스토리 기본 에디터)
+                content_injected = False
+                try:
+                    page.wait_for_function("() => window.tinymce && tinymce.activeEditor", timeout=15000)
+                    content_injected = bool(page.evaluate(
+                        """(content) => {
+                            const ed = tinymce.activeEditor;
+                            if (!ed) return false;
+                            ed.setContent(content);
+                            ed.save();
+                            ed.fire('change');
+                            return ed.getContent().length > 0;
+                        }""", content_html))
+                    if content_injected:
+                        print("✅ 본문 HTML 주입 성공 (TinyMCE)")
+                except Exception as mce_err:
+                    print(f"⚠️ TinyMCE 주입 실패, 대체 방식 시도: {mce_err}")
+
                 # 에디터 모드 전환 버튼 찾기 (기본모드 -> HTML)
                 html_mode_switched = False
                 mode_btn = page.locator("#editor-mode-select, button.btn_mode, #editor-mode, button:has-text('기본모드')").first
                 
-                if mode_btn.is_visible(timeout=4000):
+                if not content_injected and mode_btn.is_visible(timeout=4000):
                     mode_btn.click()
                     time.sleep(1)
                     html_option = page.locator("button:has-text('HTML'), li:has-text('HTML'), span:has-text('HTML')").first
@@ -220,7 +263,7 @@ class TistoryAutomator:
                                 print("✅ 기본모드로 재전환하여 서식 및 이미지 렌더링 확인 완료")
                     except Exception as html_err:
                         print(f"⚠️ CodeMirror 직접 주입 실패, 대체 클립보드 주입 시도: {html_err}")
-                else:
+                elif not content_injected:
                     # HTML 모드 버튼이 보이지 않을 경우 본문 영역 직접 주입
                     print("⚠️ 기본 WYSIWYG 본문 영역 직접 삽입")
                     content_area = page.locator("#editor-root, #mceu_0, div[contenteditable='true'], .mce-content-body").first
@@ -260,7 +303,7 @@ class TistoryAutomator:
                 # 7. 정책에 따른 발행/임시저장 실행
                 if action == "TEMP_SAVE":
                     print("💾 [정책: 임시저장] 안전 모드로 임시저장을 수행합니다...")
-                    temp_btn = page.locator("#temp-save-btn, button:has-text('임시저장'), button.btn_temp").first
+                    temp_btn = page.locator("a.action:has-text('임시저장'), #temp-save-btn, button:has-text('임시저장'), button.btn_temp").first
                     if temp_btn.is_visible(timeout=4000):
                         temp_btn.click()
                         time.sleep(2)
@@ -314,6 +357,13 @@ class TistoryAutomator:
                 print(f"❌ 오류 발생: {e}")
             finally:
                 result["end_time"] = datetime.now().isoformat()
+                # 로그인 상태라면 쿠키를 저장 (다음 실행에서 재로그인 방지)
+                try:
+                    if "login" not in page.url and "accounts.kakao.com" not in page.url:
+                        with open(COOKIE_FILE, "w", encoding="utf-8") as f:
+                            json.dump(context.cookies(), f, ensure_ascii=False)
+                except Exception:
+                    pass
                 if action != "CONFIRM_BEFORE_PUBLISH":
                     try:
                         context.close()

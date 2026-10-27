@@ -446,6 +446,7 @@ export default function ExperienceReviewWriterPage() {
 
         // 티스토리 자동 임시저장 연계 (옵션 활성화 시)
         let tistoryOk = false;
+        let tistoryErr = "";
         if (autoTistorySave) {
           set_current_step(4);
           setProgressStep("📝 티스토리 에디터 자동 임시저장 진행 중...");
@@ -463,10 +464,12 @@ export default function ExperienceReviewWriterPage() {
                 action: "TEMP_SAVE"
               })
             });
-            const autoData = await autoRes.json();
-            tistoryOk = autoData.success;
+            const autoData = await autoRes.json().catch(() => ({}));
+            tistoryOk = !!autoData.success;
+            if (!tistoryOk) tistoryErr = autoData.error || autoData.detail || autoData.message || `HTTP ${autoRes.status}`;
           } catch (tErr) {
             console.warn("티스토리 임시저장 연계 알림:", tErr);
+            tistoryErr = "로컬 백엔드(8002)에 연결할 수 없습니다. 로컬 서버를 실행해 주세요.";
           }
         }
 
@@ -492,6 +495,11 @@ export default function ExperienceReviewWriterPage() {
 
         if (tistoryOk) {
           alert(`🎉 Gemini 고속 원고 생성 및 티스토리 임시저장이 모두 성공적으로 완료되었습니다!\n\n블로그: ${tistoryBlog}\n제목: ${contentTitle}`);
+        } else if (autoTistorySave) {
+          alert(`✨ Gemini 원고는 완성되었으나 티스토리 임시저장에 실패했습니다.
+사유: ${tistoryErr}
+
+우측 [티스토리 임시저장] 버튼으로 다시 시도할 수 있습니다.`);
         } else {
           alert("✨ Gemini 2.5 Flash 고속 원고가 성공적으로 완성되었습니다! 아래 결과를 확인해보세요.");
         }
