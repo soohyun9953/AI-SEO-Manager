@@ -34,8 +34,8 @@ import AutoRegisterModal from "@/components/AutoRegisterModal";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
 import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
 
-// 진행 단계 정의 목록 (스네이크 케이스 및 한글 설명 준수)
-const 체험_후기_단계_목록: 단계_정보[] = [
+// 진행 단계 정의 목록 - Claude 모드 (스네이크 케이스 및 한글 설명 준수)
+const 클로드_단계_목록: 단계_정보[] = [
   {
     id: 1,
     title: "현장 사진 및 방문 정보 데이터 전처리",
@@ -44,11 +44,11 @@ const 체험_후기_단계_목록: 단계_정보[] = [
   {
     id: 2,
     title: "Chrome 브라우저 구동 및 Claude.ai 연결",
-    description: "사용자 PC의 크롬 브라우저 자동 실행 및 Claude.ai 세션 연결 확인",
+    description: "사용자 PC 크롬 브라우저 자동 실행 및 Claude.ai 세션 연결 확인",
   },
   {
     id: 3,
-    title: "Claude 3.7 Sonnet 사진 분석 및 내돈내산 원고 집필",
+    title: "Claude 3.7 Sonnet 사진 분석 & 내돈내산 원고 집필",
     description: "사진 속 공간 분위기와 메뉴를 정밀 분석하여 사실적이고 생생한 방문 후기 본문 작성",
   },
   {
@@ -60,6 +60,35 @@ const 체험_후기_단계_목록: 단계_정보[] = [
     id: 5,
     title: "최종 원고 완성 및 SEO 메타데이터 검증",
     description: "포털 검색 상위 노출을 위한 제목, 메타 설명, 추천 검색 태그 완성 및 보관",
+  },
+];
+
+// 진행 단계 정의 목록 - Gemini 고속 모드 (로그인 불필요)
+const 제미나이_단계_목록: 단계_정보[] = [
+  {
+    id: 1,
+    title: "현장 사진 및 방문 정보 스마트 최적화",
+    description: "업로드된 사진 스마트 압축 최적화(1280px) 및 시각적 캡션 매핑 완료",
+  },
+  {
+    id: 2,
+    title: "네이버 지도 및 방문 경험 데이터 분석",
+    description: "상호명, 위치, 주요 정보 및 고객 방문 메모를 바탕으로 최적 프롬프트 구성",
+  },
+  {
+    id: 3,
+    title: "Gemini 2.5 Flash 고품질 솔직 후기 원고 집필",
+    description: "맛, 인테리어 분위기, 가성비, 주차 꿀팁이 담긴 신뢰도 높은 내돈내산 원고 생성",
+  },
+  {
+    id: 4,
+    title: "티스토리 에디터 자동 접속 및 임시저장 연동",
+    description: "서식과 사진이 온전히 반영된 고품질 포스팅으로 티스토리 블로그 임시저장함에 등록",
+  },
+  {
+    id: 5,
+    title: "최종 원고 완성 및 SEO 메타데이터 검증",
+    description: "검색 상위 노출을 위한 최적 제목, 메타 설명, 추천 검색 태그 완성 및 보관",
   },
 ];
 import { compress_image_file } from "@/utils/imageCompressor";
@@ -100,6 +129,9 @@ export default function ExperienceReviewWriterPage() {
   const [autoTistorySave, setAutoTistorySave] = useState(true);
   const [tistoryBlog, setTistoryBlog] = useState("s-elegant");
   const [launchingClaude, setLaunchingClaude] = useState(false);
+
+  // AI 생성 엔진 선택 상태 ("gemini" 고속 생성 또는 "claude" 브라우저 자동화)
+  const [ai_engine, set_ai_engine] = useState<"gemini" | "claude">("gemini");
 
   // 4. 생성 결과 상태
   const [loading, setLoading] = useState(false);
@@ -316,7 +348,7 @@ export default function ExperienceReviewWriterPage() {
     }
   };
 
-  // Claude 웹 자동 생성 실행
+  // AI 원고 생성 실행 (Gemini 2.5 고속 엔진 또는 Claude 브라우저 자동화 엔진 듀얼 지원)
   const handleGenerate = async () => {
     if (!placeName.trim()) {
       alert("다녀온 곳의 장소명 또는 상호명을 입력해주세요.");
@@ -334,16 +366,28 @@ export default function ExperienceReviewWriterPage() {
       timer_seconds += 1;
       set_elapsed_seconds(timer_seconds);
 
-      // 시간 경과에 따라 진행 단계를 자연스럽게 전환
-      if (timer_seconds === 2) {
-        set_current_step(2);
-        setProgressStep("🚀 사용자 PC 크롬 브라우저 구동 및 Claude.ai 세션 연결 중...");
-      } else if (timer_seconds === 6) {
-        set_current_step(3);
-        setProgressStep("🧠 Claude 3.7 Sonnet 사진 정밀 분석 및 내돈내산 원고 집필 중...");
-      } else if (timer_seconds === 22 && autoTistorySave) {
-        set_current_step(4);
-        setProgressStep("📝 티스토리 에디터 자동 접속 및 원스톱 임시저장 진행 중...");
+      if (ai_engine === "gemini") {
+        if (timer_seconds === 2) {
+          set_current_step(2);
+          setProgressStep("🗺️ 네이버 플레이스 및 방문 경험 데이터 분석 중...");
+        } else if (timer_seconds === 4) {
+          set_current_step(3);
+          setProgressStep("🤖 Gemini 2.5 Flash 고품질 방문 후기 원고 집필 중...");
+        } else if (timer_seconds === 7 && autoTistorySave) {
+          set_current_step(4);
+          setProgressStep("📝 티스토리 에디터 자동 접속 및 원스톱 임시저장 진행 중...");
+        }
+      } else {
+        if (timer_seconds === 2) {
+          set_current_step(2);
+          setProgressStep("🚀 크롬 브라우저 구동 및 Claude.ai 세션 연결 확인 중...");
+        } else if (timer_seconds === 6) {
+          set_current_step(3);
+          setProgressStep("🧠 Claude 3.7 Sonnet 사진 정밀 분석 및 내돈내산 원고 집필 중...");
+        } else if (timer_seconds === 22 && autoTistorySave) {
+          set_current_step(4);
+          setProgressStep("📝 티스토리 에디터 자동 접속 및 원스톱 임시저장 진행 중...");
+        }
       }
     }, 1000);
 
@@ -354,81 +398,183 @@ export default function ExperienceReviewWriterPage() {
     }));
 
     try {
-      if (photos.length > 0) {
-        setProgressStep(`📷 현장 사진 ${photos.length}장 주입 및 프롬프트 전송 중...`);
-      } else {
-        setProgressStep("📝 프롬프트 전송 및 원고 생성 대기 중...");
-      }
+      if (ai_engine === "gemini") {
+        // [모드 1] Gemini 2.5 Flash 고속 생성 (로그인 불필요, 5~10초 완성)
+        setProgressStep("⚡ Gemini 2.5 Flash 고속 분석 및 원고 생성 중...");
+        const geminiKey = typeof window !== "undefined" ? (localStorage.getItem("GEMINI_API_KEY") || "") : "";
 
-      const res = await fetch(getApiUrl("/api/claude/generate-review"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          place_name: placeName,
-          category: category,
-          location: location,
-          place_url: placeUrl,
-          key_info: keyInfo,
-          special_notes: specialNotes,
-          rating: rating,
-          photos: photosPayload,
-          auto_tistory_save: autoTistorySave,
-          tistory_blog: tistoryBlog
-        }),
-      });
+        const res = await fetch("/api/generate-review", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Gemini-Key": geminiKey
+          },
+          body: JSON.stringify({
+            restaurant_name: placeName,
+            location: location,
+            place_url: placeUrl,
+            menu_info: keyInfo,
+            special_notes: specialNotes,
+            rating: rating,
+            photos: photosPayload.slice(0, 2),
+            adsense_optimize: false,
+            category: category || "맛집/카페"
+          })
+        });
 
-      const rawText = await res.text();
-      let data: any = {};
-      try {
-        data = JSON.parse(rawText);
-      } catch (parseErr) {
         if (!res.ok) {
-          throw new Error(`서버 처리 오류 (${res.status}): ${rawText.slice(0, 200)}`);
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `Gemini 후기 생성 실패 (${res.status})`);
         }
-      }
 
-      if (!res.ok) {
-        throw new Error(data.detail || `원고 생성 실패 (${res.status}): ${rawText.slice(0, 200)}`);
-      }
-      clearInterval(timer_interval);
-      set_current_step(5);
-      set_is_step_completed(true);
-      setProgressStep("🎉 원고 작성 및 최적화가 성공적으로 완료되었습니다!");
+        const data = await res.json();
+        const contentTitle = data.title || `${placeName} 솔직 방문 후기`;
+        const contentArticle = data.article || "";
+        const contentHtml = data.html_article || "";
+        const contentTags = data.tags || [];
 
-      setGeneratedTitle(data.title || `${placeName} 솔직 방문 후기`);
-      setArticle(data.article || "");
-      setHtmlArticle(data.html_article || "");
-      setTags(data.tags || []);
-      setTagsString(data.tags_string || (data.tags || []).join(", "));
-      setMetaDesc(data.meta_description || "");
-      setSavedContentId(data.content_id || null);
+        setGeneratedTitle(contentTitle);
+        setArticle(contentArticle);
+        setHtmlArticle(contentHtml);
+        setTags(contentTags);
+        setTagsString(data.tags_string || contentTags.join(", "));
+        setMetaDesc(data.meta_description || "");
+        setSavedContentId(data.content_id || null);
 
-      // 로컬 스토리지 저장
-      localStorage.setItem("exp_review_place", placeName);
-      localStorage.setItem("exp_review_category", category);
-      localStorage.setItem("exp_review_loc", location);
-      localStorage.setItem("exp_review_url", placeUrl);
-      localStorage.setItem("exp_review_keyinfo", keyInfo);
-      localStorage.setItem("exp_review_notes", specialNotes);
-      localStorage.setItem("exp_review_res_title", data.title || "");
-      localStorage.setItem("exp_review_res_article", data.article || "");
-      localStorage.setItem("exp_review_res_html", data.html_article || "");
-      localStorage.setItem("exp_review_res_tags", JSON.stringify(data.tags || []));
-      localStorage.setItem("tistory_blog", tistoryBlog);
+        // 티스토리 자동 임시저장 연계 (옵션 활성화 시)
+        let tistoryOk = false;
+        if (autoTistorySave) {
+          set_current_step(4);
+          setProgressStep("📝 티스토리 에디터 자동 임시저장 진행 중...");
+          try {
+            const blogTarget = tistoryBlog || "s-elegant";
+            const autoRes = await fetch(getApiUrl("/api/tistory/auto-register"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: contentTitle,
+                content_html: contentHtml,
+                tags: contentTags,
+                category: category || "맛집/카페",
+                blog_name: blogTarget,
+                action: "TEMP_SAVE"
+              })
+            });
+            const autoData = await autoRes.json();
+            tistoryOk = autoData.success;
+          } catch (tErr) {
+            console.warn("티스토리 임시저장 연계 알림:", tErr);
+          }
+        }
 
-      setActiveTab("preview");
+        clearInterval(timer_interval);
+        set_current_step(5);
+        set_is_step_completed(true);
+        setProgressStep("🎉 Gemini 2.5 Flash 고속 원고 작성이 성공적으로 완료되었습니다!");
 
-      if (data.tistory_saved) {
-        alert(`🎉 원고 생성 및 티스토리 임시저장이 모두 성공적으로 완료되었습니다!\n\n블로그: ${tistoryBlog}\n제목: ${data.title}`);
-      } else if (autoTistorySave && !data.tistory_saved) {
-        alert(`⚠️ Claude 원고 생성은 완료되었으나, 티스토리 저장 중 알림이 있습니다:\n${data.tistory_message || '임시저장을 수동으로 실행해주세요.'}`);
+        // 로컬 스토리지 저장
+        localStorage.setItem("exp_review_place", placeName);
+        localStorage.setItem("exp_review_category", category);
+        localStorage.setItem("exp_review_loc", location);
+        localStorage.setItem("exp_review_url", placeUrl);
+        localStorage.setItem("exp_review_keyinfo", keyInfo);
+        localStorage.setItem("exp_review_notes", specialNotes);
+        localStorage.setItem("exp_review_res_title", contentTitle);
+        localStorage.setItem("exp_review_res_article", contentArticle);
+        localStorage.setItem("exp_review_res_html", contentHtml);
+        localStorage.setItem("exp_review_res_tags", JSON.stringify(contentTags));
+        localStorage.setItem("tistory_blog", tistoryBlog);
+
+        setActiveTab("preview");
+
+        if (tistoryOk) {
+          alert(`🎉 Gemini 고속 원고 생성 및 티스토리 임시저장이 모두 성공적으로 완료되었습니다!\n\n블로그: ${tistoryBlog}\n제목: ${contentTitle}`);
+        } else {
+          alert("✨ Gemini 2.5 Flash 고속 원고가 성공적으로 완성되었습니다! 아래 결과를 확인해보세요.");
+        }
+
       } else {
-        alert("✨ Claude 웹에서 고품질 방문 후기 원고가 성공적으로 완성되었습니다! 아래 결과를 확인해보세요.");
+        // [모드 2] Claude 3.7 브라우저 자동화 (Chrome 1회 로그인 필요)
+        if (photos.length > 0) {
+          setProgressStep(`📷 현장 사진 ${photos.length}장 주입 및 프롬프트 전송 중...`);
+        } else {
+          setProgressStep("📝 프롬프트 전송 및 원고 생성 대기 중...");
+        }
+
+        const res = await fetch(getApiUrl("/api/claude/generate-review"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            place_name: placeName,
+            category: category,
+            location: location,
+            place_url: placeUrl,
+            key_info: keyInfo,
+            special_notes: specialNotes,
+            rating: rating,
+            photos: photosPayload,
+            auto_tistory_save: autoTistorySave,
+            tistory_blog: tistoryBlog
+          }),
+        });
+
+        const rawText = await res.text();
+        let data: any = {};
+        try {
+          data = JSON.parse(rawText);
+        } catch (parseErr) {
+          if (!res.ok) {
+            throw new Error(`서버 처리 오류 (${res.status}): ${rawText.slice(0, 200)}`);
+          }
+        }
+
+        if (!res.ok) {
+          throw new Error(data.detail || `원고 생성 실패 (${res.status}): ${rawText.slice(0, 200)}`);
+        }
+        clearInterval(timer_interval);
+        set_current_step(5);
+        set_is_step_completed(true);
+        setProgressStep("🎉 원고 작성 및 최적화가 성공적으로 완료되었습니다!");
+
+        setGeneratedTitle(data.title || `${placeName} 솔직 방문 후기`);
+        setArticle(data.article || "");
+        setHtmlArticle(data.html_article || "");
+        setTags(data.tags || []);
+        setTagsString(data.tags_string || (data.tags || []).join(", "));
+        setMetaDesc(data.meta_description || "");
+        setSavedContentId(data.content_id || null);
+
+        // 로컬 스토리지 저장
+        localStorage.setItem("exp_review_place", placeName);
+        localStorage.setItem("exp_review_category", category);
+        localStorage.setItem("exp_review_loc", location);
+        localStorage.setItem("exp_review_url", placeUrl);
+        localStorage.setItem("exp_review_keyinfo", keyInfo);
+        localStorage.setItem("exp_review_notes", specialNotes);
+        localStorage.setItem("exp_review_res_title", data.title || "");
+        localStorage.setItem("exp_review_res_article", data.article || "");
+        localStorage.setItem("exp_review_res_html", data.html_article || "");
+        localStorage.setItem("exp_review_res_tags", JSON.stringify(data.tags || []));
+        localStorage.setItem("tistory_blog", tistoryBlog);
+
+        setActiveTab("preview");
+
+        if (data.tistory_saved) {
+          alert(`🎉 Claude 원고 생성 및 티스토리 임시저장이 모두 성공적으로 완료되었습니다!\n\n블로그: ${tistoryBlog}\n제목: ${data.title}`);
+        } else if (autoTistorySave && !data.tistory_saved) {
+          alert(`⚠️ Claude 원고 생성은 완료되었으나, 티스토리 저장 중 알림이 있습니다:\n${data.tistory_message || '임시저장을 수동으로 실행해주세요.'}`);
+        } else {
+          alert("✨ Claude 웹에서 고품질 방문 후기 원고가 성공적으로 완성되었습니다! 아래 결과를 확인해보세요.");
+        }
       }
 
     } catch (err: any) {
       console.error(err);
-      alert(`오류: ${err.message || "원고 생성 중 문제가 발생했습니다."}`);
+      let errMsg = err.message || "원고 생성 중 문제가 발생했습니다.";
+      if (errMsg.includes("로그인 대기 시간") || errMsg.includes("Claude.ai")) {
+        errMsg += "\n\n💡 팁: 별도 로그인 없이 즉시 원고를 생성하시려면 상단의 [⚡ Gemini 2.5 Flash 고속 생성]을 선택해 보세요!";
+      }
+      alert(`오류: ${errMsg}`);
     } finally {
       clearInterval(timer_interval);
       setLoading(false);
@@ -760,11 +906,72 @@ export default function ExperienceReviewWriterPage() {
             )}
           </div>
 
+          {/* AI 생성 엔진 선택 카드 (Gemini 고속 / Claude 브라우저) */}
+          <div className="bg-[#0b0c14] border border-white/[0.08] rounded-3xl p-6 shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Sparkles size={18} className="text-blue-400" />
+                3. AI 원고 생성 엔진 선택
+              </h2>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {ai_engine === "gemini" ? "⚡ 로그인 불필요 (추천)" : "🧠 브라우저 연동"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Gemini 2.5 Flash 옵션 */}
+              <button
+                type="button"
+                onClick={() => set_ai_engine("gemini")}
+                className={`p-3.5 rounded-2xl border text-left transition-all ${
+                  ai_engine === "gemini"
+                    ? "bg-blue-600/20 border-blue-500/60 shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/40 text-white"
+                    : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200 hover:border-white/[0.12]"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                    ⚡ Gemini 2.5 Flash
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-500/30 text-[10px] text-blue-200 font-bold border border-blue-400/30">
+                    추천·로그인불필요
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  브라우저 로그인 없이 <strong>5~10초 만에 즉시</strong> 사진 분석 및 고품질 내돈내산 원고 완성
+                </p>
+              </button>
+
+              {/* Claude 3.7 Sonnet 옵션 */}
+              <button
+                type="button"
+                onClick={() => set_ai_engine("claude")}
+                className={`p-3.5 rounded-2xl border text-left transition-all ${
+                  ai_engine === "claude"
+                    ? "bg-purple-600/20 border-purple-500/60 shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/40 text-white"
+                    : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200 hover:border-white/[0.12]"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    🧠 Claude 3.7 Sonnet
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-[10px] text-purple-200 font-medium border border-purple-400/20">
+                    Chrome 자동화
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  내 PC 크롬 브라우저를 직접 띄워 Claude 웹에서 고품질 작성 (최초 1회 로그인 필요)
+                </p>
+              </button>
+            </div>
+          </div>
+
           {/* 원스톱 자동화 및 티스토리 연동 옵션 */}
           <div className="bg-[#0b0c14] border border-white/[0.08] rounded-3xl p-6 shadow-xl space-y-4">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Bot size={18} className="text-orange-400" />
-              3. 티스토리 브라우저 연동 설정
+              4. 티스토리 자동 임시저장 연동 설정
             </h2>
 
             <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-3">
@@ -819,7 +1026,11 @@ export default function ExperienceReviewWriterPage() {
               ) : (
                 <>
                   <Sparkles size={18} />
-                  <span>Claude로 작성하고 티스토리 임시저장하기</span>
+                  <span>
+                    {ai_engine === "gemini" 
+                      ? "⚡ Gemini 2.5 Flash로 즉시 작성하기 (추천)" 
+                      : "🧠 Claude 3.7로 작성하고 티스토리 임시저장하기"}
+                  </span>
                 </>
               )}
             </button>
@@ -913,16 +1124,18 @@ export default function ExperienceReviewWriterPage() {
               ) : loading ? (
                 <div className="h-full flex flex-col items-center justify-center py-6 px-4">
                   <StepProgressIndicator
-                    steps={체험_후기_단계_목록}
+                    steps={ai_engine === "gemini" ? 제미나이_단계_목록 : 클로드_단계_목록}
                     current_step={current_step}
                     is_completed={is_step_completed}
                     elapsed_seconds={elapsed_seconds}
                     sub_message={progressStep}
                     tip_message={
-                      current_step === 2
-                        ? "새로 열린 크롬 브라우저 창에서 Claude.ai 로그인을 완료해 주시면 봇이 감지하여 바로 다음 단계로 진행합니다."
+                      ai_engine === "gemini"
+                        ? "Gemini 2.5 Flash AI가 현장 사진과 네이버 지도 정보를 토대로 실시간으로 고품질 내돈내산 원고를 집필 중입니다."
+                        : current_step === 2
+                        ? "새로 열린 크롬 창에서 Claude.ai 로그인을 완료해 주시면 봇이 감지하여 즉시 다음 단계로 자동 진행합니다."
                         : current_step === 4
-                        ? "티스토리 에디터에 접속하여 제목, 본문, 서식 및 사진을 안전하게 임시저장하고 있습니다."
+                        ? "티스토리 블로그 임시저장함에 본문 및 서식 코드를 안전하게 주입하고 있습니다."
                         : ""
                     }
                   />
