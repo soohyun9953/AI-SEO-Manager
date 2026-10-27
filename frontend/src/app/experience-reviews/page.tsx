@@ -8,12 +8,9 @@ import {
   Camera, 
   Upload, 
   Trash2, 
-  Download, 
   Copy, 
-  CheckCircle, 
   Sparkles, 
   Loader2, 
-  Save, 
   FileText, 
   Eye, 
   Code, 
@@ -23,15 +20,9 @@ import {
   AlertCircle,
   Bot,
   Globe,
-  Sliders,
-  Send,
-  Info,
-  Check,
-  ChevronRight
+  Check
 } from "lucide-react";
-import Link from "next/link";
 import AutoRegisterModal from "@/components/AutoRegisterModal";
-import ExportModal, { ContentItem } from "@/components/ExportModal";
 import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
 
 // 진행 단계 정의 목록 - Claude 모드 (스네이크 케이스 및 한글 설명 준수)
@@ -93,6 +84,19 @@ const 제미나이_단계_목록: 단계_정보[] = [
 ];
 import { compress_image_file } from "@/utils/imageCompressor";
 import { 기본_상호명, 기본_위치, 기본_지도링크, 기본_주요정보, 기본_카테고리, 기본_샘플_사진 } from "@/utils/sampleData";
+
+interface ReviewResponse {
+  detail?: string;
+  title?: string;
+  article?: string;
+  html_article?: string;
+  tags?: string[];
+  tags_string?: string;
+  meta_description?: string;
+  content_id?: string;
+  tistory_saved?: boolean;
+  tistory_message?: string;
+}
 
 interface PhotoItem {
   id: string;
@@ -170,8 +174,7 @@ export default function ExperienceReviewWriterPage() {
   const [activeTab, setActiveTab] = useState<"preview" | "html" | "editor" | "seo">("preview");
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const [isAutoRegisterOpen, setIsAutoRegisterOpen] = useState(false);
-  const [isExportOpen, setIsExportOpen] = useState(false);
-  const [isVercelEnv, setIsVercelEnv] = useState(false);
+    const [isVercelEnv, setIsVercelEnv] = useState(false);
 
   // 로컬 스토리지 복원 및 환경 감지
   useEffect(() => {
@@ -218,7 +221,7 @@ export default function ExperienceReviewWriterPage() {
         const parsed = JSON.parse(savedTags);
         setTags(parsed);
         setTagsString(parsed.join(", "));
-      } catch (e) {}
+      } catch {}
     }
   }, []);
 
@@ -249,7 +252,7 @@ export default function ExperienceReviewWriterPage() {
           fileSize: file_size_str,
         };
         setPhotos(prev => [...prev, newPhoto]);
-      } catch (err: any) {
+      } catch (err) {
         console.error("Image compression error:", err);
       }
     }
@@ -337,12 +340,12 @@ export default function ExperienceReviewWriterPage() {
     try {
       const res = await fetch(getApiUrl("/api/claude/launch-browser"), { method: "POST" });
       const rawText = await res.text();
-      let data: any = {};
-      try { data = JSON.parse(rawText); } catch (e) {}
+      let data: { detail?: string } = {};
+      try { data = JSON.parse(rawText); } catch {}
       if (!res.ok) throw new Error(data.detail || rawText || "Claude 브라우저 실행 실패");
       alert("크롬 브라우저가 열렸습니다. 열린 창에서 Claude.ai 로그인을 진행해 주세요! (로그인 완료 시 세션이 영구 보존됩니다)");
-    } catch (err: any) {
-      alert(`오류: ${err.message}`);
+    } catch (err) {
+      alert(`오류: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setLaunchingClaude(false);
     }
@@ -519,10 +522,10 @@ export default function ExperienceReviewWriterPage() {
         });
 
         const rawText = await res.text();
-        let data: any = {};
+        let data: ReviewResponse = {};
         try {
           data = JSON.parse(rawText);
-        } catch (parseErr) {
+        } catch {
           if (!res.ok) {
             throw new Error(`서버 처리 오류 (${res.status}): ${rawText.slice(0, 200)}`);
           }
@@ -568,9 +571,9 @@ export default function ExperienceReviewWriterPage() {
         }
       }
 
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      let errMsg = err.message || "원고 생성 중 문제가 발생했습니다.";
+      let errMsg = (err instanceof Error && err.message) || "원고 생성 중 문제가 발생했습니다.";
       if (errMsg.includes("로그인 대기 시간") || errMsg.includes("Claude.ai")) {
         errMsg += "\n\n💡 팁: 별도 로그인 없이 즉시 원고를 생성하시려면 상단의 [⚡ Gemini 2.5 Flash 고속 생성]을 선택해 보세요!";
       }
@@ -848,7 +851,7 @@ export default function ExperienceReviewWriterPage() {
                   {isDragging ? "여기에 사진을 놓으세요! (드래그 앤 드롭)" : "사진을 드래그하여 여기에 놓거나 클릭하여 업로드 (최대 5장)"}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-1.5">
-                  JPG, PNG, WEBP 지원 · 외관, 시그니처 메뉴, 인테리어 등 (Claude에 첨부되어 분석됩니다)
+                  JPG, PNG, WEBP 지원 · 외관, 시그니처 메뉴, 인테리어 등 (AI가 사진을 분석합니다)
                 </p>
               </div>
             ) : (
@@ -1118,7 +1121,7 @@ export default function ExperienceReviewWriterPage() {
                   </div>
                   <h3 className="text-base font-bold text-slate-300 mb-1">방문 후기 원고가 생성되지 않았습니다</h3>
                   <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
-                    좌측에서 다녀온 곳의 정보와 사진을 입력하고 <strong>[Claude로 작성하고 티스토리 임시저장하기]</strong>를 클릭하세요.
+                    좌측에서 다녀온 곳의 정보와 사진을 입력하고 <strong>AI 엔진을 선택</strong>한 뒤 작성 버튼을 클릭하세요.
                   </p>
                 </div>
               ) : loading ? (
