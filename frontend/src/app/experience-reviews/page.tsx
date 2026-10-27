@@ -82,6 +82,23 @@ export default function ExperienceReviewWriterPage() {
   const [metaDesc, setMetaDesc] = useState("");
   const [savedContentId, setSavedContentId] = useState<string | null>(null);
 
+  // 임시 테스트 데이터(도미닉커피로스터즈) 자동 입력 함수
+  const loadSampleData = () => {
+    setPlaceName(기본_상호명);
+    setCategory(기본_카테고리);
+    setLocation(기본_위치);
+    setPlaceUrl(기본_지도링크);
+    setKeyInfo(기본_주요정보);
+    setSpecialNotes("매장에서 직접 로스팅하는 스페셜티 커피 전문점. 광교 호수공원 인근 여유로운 분위기.");
+    setPhotos([기본_샘플_사진]);
+
+    localStorage.setItem("exp_review_place", 기본_상호명);
+    localStorage.setItem("exp_review_category", 기본_카테고리);
+    localStorage.setItem("exp_review_loc", 기본_위치);
+    localStorage.setItem("exp_review_url", 기본_지도링크);
+    localStorage.setItem("exp_review_keyinfo", 기본_주요정보);
+  };
+
   // 5. UI 탭 및 모달
   const [activeTab, setActiveTab] = useState<"preview" | "html" | "editor" | "seo">("preview");
   const [copiedType, setCopiedType] = useState<string | null>(null);
@@ -98,7 +115,11 @@ export default function ExperienceReviewWriterPage() {
     if (savedBlog) setTistoryBlog(savedBlog);
 
     const savedPlace = localStorage.getItem("exp_review_place");
-    if (savedPlace) setPlaceName(savedPlace);
+    if (savedPlace && savedPlace.trim()) {
+      setPlaceName(savedPlace);
+    } else {
+      loadSampleData();
+    }
 
     const savedCat = localStorage.getItem("exp_review_category");
     if (savedCat) setCategory(savedCat);
@@ -433,10 +454,21 @@ export default function ExperienceReviewWriterPage() {
         {/* 좌측: 입력 폼 섹션 (5열) */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-[#0b0c14] border border-white/[0.08] rounded-3xl p-6 shadow-xl space-y-5">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Compass size={18} className="text-blue-400" />
-              1. 방문 장소 정보 입력
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Compass size={18} className="text-blue-400" />
+                1. 방문 장소 정보 입력
+              </h2>
+              <button
+                type="button"
+                onClick={loadSampleData}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition-all hover:scale-105 shadow-sm"
+                title="도미닉커피로스터즈 테스트 데이터 자동 채우기"
+              >
+                <Sparkles size={13} className="text-blue-400 animate-pulse" />
+                테스트 데이터 자동 입력
+              </button>
+            </div>
 
             {/* 카테고리 선택 */}
             <div>
