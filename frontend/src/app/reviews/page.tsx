@@ -51,6 +51,8 @@ export default function ReviewWriterPage() {
   // 2. 사진 상태 (최대 2장)
   const [photo1, setPhoto1] = useState<PhotoItem | null>(null);
   const [photo2, setPhoto2] = useState<PhotoItem | null>(null);
+  const [isDragging1, setIsDragging1] = useState(false);
+  const [isDragging2, setIsDragging2] = useState(false);
   const fileInputRef1 = useRef<HTMLInputElement>(null);
   const fileInputRef2 = useRef<HTMLInputElement>(null);
 
@@ -125,17 +127,13 @@ export default function ReviewWriterPage() {
     }
   }, []);
 
-  // 사진 업로드 핸들러 (base64 변환)
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // 단일 사진 파일 처리 (파일 선택 & 드래그 앤 드롭 공용)
+  const processSingleFile = (file: File, slot: 1 | 2) => {
     if (!file.type.startsWith("image/")) {
       alert("이미지 파일(JPG, PNG, WEBP 등)만 업로드할 수 있습니다.");
       return;
     }
 
-    // 용량 제한 검사 (약 10MB)
     if (file.size > 10 * 1024 * 1024) {
       alert("이미지 크기는 10MB 이하여야 합니다.");
       return;
@@ -160,6 +158,23 @@ export default function ReviewWriterPage() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {
+    const file = e.target.files?.[0];
+    if (file) processSingleFile(file, slot);
+    if (slot === 1 && fileInputRef1.current) fileInputRef1.current.value = "";
+    if (slot === 2 && fileInputRef2.current) fileInputRef2.current.value = "";
+  };
+
+  const handleSlotDrop = (e: React.DragEvent, slot: 1 | 2) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (slot === 1) setIsDragging1(false);
+    else setIsDragging2(false);
+
+    const file = e.dataTransfer?.files?.[0];
+    if (file) processSingleFile(file, slot);
   };
 
   // 사진 삭제
@@ -679,11 +694,18 @@ export default function ReviewWriterPage() {
                   />
                   <label
                     htmlFor="photo_upload_1"
-                    className="flex flex-col items-center justify-center p-5 rounded-xl border border-dashed border-white/[0.15] hover:border-orange-500/50 hover:bg-white/[0.02] cursor-pointer transition-all text-center gap-2 group"
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging1(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging1(false); }}
+                    onDrop={(e) => handleSlotDrop(e, 1)}
+                    className={`flex flex-col items-center justify-center p-5 rounded-xl border-2 border-dashed cursor-pointer transition-all text-center gap-2 group ${
+                      isDragging1
+                        ? "border-orange-500 bg-orange-500/10 scale-[1.01]"
+                        : "border-white/[0.15] hover:border-orange-500/50 hover:bg-white/[0.02]"
+                    }`}
                   >
-                    <Upload size={20} className="text-gray-500 group-hover:text-orange-400 transition-colors" />
+                    <Upload size={20} className={`transition-colors ${isDragging1 ? "text-orange-400 animate-bounce" : "text-gray-500 group-hover:text-orange-400"}`} />
                     <span className="text-xs font-medium text-gray-300 group-hover:text-white">
-                      사진 1 업로드 클릭
+                      {isDragging1 ? "여기에 사진을 놓으세요!" : "사진 1을 드래그하여 놓거나 클릭하여 업로드"}
                     </span>
                     <span className="text-[10px] text-gray-500">
                       JPG, PNG, WEBP (외관, 인테리어 또는 메인 요리)
@@ -756,11 +778,18 @@ export default function ReviewWriterPage() {
                   />
                   <label
                     htmlFor="photo_upload_2"
-                    className="flex flex-col items-center justify-center p-5 rounded-xl border border-dashed border-white/[0.15] hover:border-orange-500/50 hover:bg-white/[0.02] cursor-pointer transition-all text-center gap-2 group"
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging2(true); }}
+                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging2(false); }}
+                    onDrop={(e) => handleSlotDrop(e, 2)}
+                    className={`flex flex-col items-center justify-center p-5 rounded-xl border-2 border-dashed cursor-pointer transition-all text-center gap-2 group ${
+                      isDragging2
+                        ? "border-orange-500 bg-orange-500/10 scale-[1.01]"
+                        : "border-white/[0.15] hover:border-orange-500/50 hover:bg-white/[0.02]"
+                    }`}
                   >
-                    <Upload size={20} className="text-gray-500 group-hover:text-orange-400 transition-colors" />
+                    <Upload size={20} className={`transition-colors ${isDragging2 ? "text-orange-400 animate-bounce" : "text-gray-500 group-hover:text-orange-400"}`} />
                     <span className="text-xs font-medium text-gray-300 group-hover:text-white">
-                      사진 2 업로드 클릭 (선택)
+                      {isDragging2 ? "여기에 사진을 놓으세요!" : "사진 2를 드래그하여 놓거나 클릭하여 업로드 (선택)"}
                     </span>
                     <span className="text-[10px] text-gray-500">
                       음식 단면, 사이드 메뉴, 영수증 등

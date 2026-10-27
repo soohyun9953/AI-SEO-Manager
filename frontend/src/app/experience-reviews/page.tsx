@@ -61,6 +61,7 @@ export default function ExperienceReviewWriterPage() {
 
   // 2. 다중 사진 상태 (최대 5장)
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 3. 브라우저 자동화 & 티스토리 옵션 상태
@@ -131,17 +132,17 @@ export default function ExperienceReviewWriterPage() {
     }
   }, []);
 
-  // 사진 업로드 핸들러
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  // 공통 사진 파일 처리 핸들러 (파일 선택 및 드래그 앤 드롭 공용)
+  const processFiles = (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
     if (!files || files.length === 0) return;
 
     if (photos.length + files.length > 5) {
-      alert("사진은 최대 5장까지 업로드할 수 있습니다.");
+      alert(`사진은 최대 5장까지 업로드할 수 있습니다. (현재: ${photos.length}장 / 추가 선택: ${files.length}장)`);
       return;
     }
 
-    Array.from(files).forEach((file, index) => {
+    files.forEach((file, index) => {
       if (!file.type.startsWith("image/")) {
         alert(`${file.name}은(는) 이미지 파일이 아닙니다.`);
         return;
@@ -155,7 +156,7 @@ export default function ExperienceReviewWriterPage() {
       reader.onload = (event) => {
         const result = event.target?.result as string;
         const newPhoto: PhotoItem = {
-          id: `photo_${Date.now()}_${index}`,
+          id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${index}`,
           dataUrl: result,
           caption: `${placeName || '방문 장소'} 현장 컷 #${photos.length + index + 1}`,
           fileName: file.name,
@@ -167,6 +168,34 @@ export default function ExperienceReviewWriterPage() {
     });
 
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      processFiles(e.target.files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      processFiles(e.dataTransfer.files);
+    }
   };
 
   const removePhoto = (id: string) => {
@@ -526,12 +555,26 @@ export default function ExperienceReviewWriterPage() {
             </div>
           </div>
 
-          {/* 사진 업로드 섹션 */}
-          <div className="bg-[#0b0c14] border border-white/[0.08] rounded-3xl p-6 shadow-xl space-y-4">
+          {/* 사진 업로드 섹션 (드래그 앤 드롭 지원) */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`bg-[#0b0c14] border rounded-3xl p-6 shadow-xl space-y-4 transition-all duration-200 relative ${
+              isDragging
+                ? "border-purple-500 bg-purple-950/20 ring-2 ring-purple-500/40 shadow-purple-500/10"
+                : "border-white/[0.08]"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Camera size={18} className="text-purple-400" />
                 2. 현장 사진 등록 ({photos.length}/5)
+                {isDragging && (
+                  <span className="text-xs text-purple-400 font-normal animate-pulse">
+                    (마우스를 놓으면 즉시 업로드됩니다)
+                  </span>
+                )}
               </h2>
               <input
                 ref={fileInputRef}
@@ -555,11 +598,19 @@ export default function ExperienceReviewWriterPage() {
             {photos.length === 0 ? (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-white/[0.1] hover:border-purple-500/50 rounded-2xl p-6 text-center cursor-pointer transition-all bg-white/[0.01] hover:bg-white/[0.03]"
+                className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+                  isDragging
+                    ? "border-purple-400 bg-purple-500/10 scale-[1.01] shadow-lg shadow-purple-500/20"
+                    : "border-white/[0.1] hover:border-purple-500/50 bg-white/[0.01] hover:bg-white/[0.03]"
+                }`}
               >
-                <Camera size={28} className="mx-auto text-slate-500 mb-2" />
-                <p className="text-xs text-slate-300 font-medium">현장 사진을 업로드하세요 (최대 5장)</p>
-                <p className="text-[11px] text-slate-500 mt-1">외관, 시그니처 메뉴, 인테리어 등 (Claude에 첨부되어 분석됩니다)</p>
+                <Camera size={32} className={`mx-auto mb-2 transition-colors ${isDragging ? "text-purple-400 animate-bounce" : "text-slate-500"}`} />
+                <p className="text-sm text-slate-200 font-semibold">
+                  {isDragging ? "여기에 사진을 놓으세요! (드래그 앤 드롭)" : "사진을 드래그하여 여기에 놓거나 클릭하여 업로드 (최대 5장)"}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  JPG, PNG, WEBP 지원 · 외관, 시그니처 메뉴, 인테리어 등 (Claude에 첨부되어 분석됩니다)
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -595,6 +646,23 @@ export default function ExperienceReviewWriterPage() {
                     </button>
                   </div>
                 ))}
+
+                {/* 5장 미만일 때 추가 드롭존 안내 */}
+                {photos.length < 5 && (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border border-dashed rounded-xl p-3.5 text-center cursor-pointer transition-all ${
+                      isDragging
+                        ? "border-purple-400 bg-purple-500/10 text-purple-300"
+                        : "border-white/[0.08] hover:border-purple-500/40 hover:bg-white/[0.02] text-slate-400"
+                    }`}
+                  >
+                    <p className="text-xs flex items-center justify-center gap-1.5 font-medium">
+                      <Upload size={13} className={isDragging ? "text-purple-400 animate-bounce" : "text-purple-400"} />
+                      {isDragging ? "여기에 놓아서 추가하세요!" : `+ 추가 사진을 여기에 드래그하거나 클릭하여 추가 (${5 - photos.length}장 더 가능)`}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
