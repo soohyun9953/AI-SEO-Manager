@@ -29,6 +29,7 @@ import {
 import Link from "next/link";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
 import { compress_image_file } from "@/utils/imageCompressor";
+import { 기본_상호명, 기본_위치, 기본_지도링크, 기본_주요정보, 기본_샘플_사진 } from "@/utils/sampleData";
 import AutoRegisterModal from "@/components/AutoRegisterModal";
 
 interface PhotoItem {
