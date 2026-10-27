@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 if hasattr(sys.stdout, 'reconfigure'):
@@ -870,18 +871,20 @@ async def generate_review(
    - 뻔하고 기계적인 AI 말투나 과도한 미사여구를 배제하고, 실제 손님의 입장에서 느낀 장단점과 팁을 솔직하게 기술하세요.
    - 모바일에서 읽기 편하게 2~3줄 단위로 줄바꿈을 적용하세요.
 3. 본문 구성 및 사진 슬롯 마커 배치:
+   - 각 소제목은 마크다운 "## 제목" 형식으로 쓰되, "소제목 1:", "[소제목]" 같은 번호·라벨 문구는 절대 쓰지 말고 매력적인 제목 문장만 쓰세요. (예: ## 광교 호수공원 뷰가 좋은 로스터리 카페, 위치와 주차 꿀팁)
+   - 아래 괄호 안의 "주제"는 내용 방향일 뿐이므로 제목에 그대로 복사하지 마세요.
    - [도입부]: 방문하게 된 계기와 첫인상, 매장 외관
-   - [소제목 1: 위치 & 매장 분위기, 웨이팅/주차 꿀팁]:
+   - 첫 번째 소제목 (주제: 위치 & 매장 분위기, 웨이팅/주차 꿀팁):
      - 인테리어 분위기, 테이블 간격, 예약/웨이팅 방법, 주차장 정보 등 현실적인 팁.
      - 본문 중간 적절한 위치에 반드시 다음 마커를 단독 라인으로 삽입하세요:
        <!-- [PHOTO_1_SLOT] -->
-   - [소제목 2: 대표 메뉴 솔직 맛 평가]:
+   - 두 번째 소제목 (주제: 대표 메뉴 솔직 맛 평가):
      - 주문한 메뉴들의 비주얼, 향, 식감, 양, 가격 대비 만족도(가성비)를 상세히 묘사.
      - 사진이 2장 등록되어 있다면, 이 단락 중간 적절한 위치에 다음 마커를 단독 라인으로 삽입하세요:
        <!-- [PHOTO_2_SLOT] -->
-   - [소제목 3: 방문 전 필독! 핵심 요약표]:
+   - 세 번째 소제목 (주제: 방문 전 필독! 핵심 요약표):
      - 상호명, 위치, 주요 메뉴/가격, 웨이팅 팁, 주차 여부, 총점 등을 깔끔한 마크다운 표(Table)로 정리.
-   - [소제목 4: 위치 안내 및 지도 정보]:
+   - 네 번째 소제목 (주제: 위치 안내 및 지도 정보):
      - 식당 위치와 지도 링크 안내
    - [마무리 총평]:
      - 이런 분들께 추천합니다 (데이트, 가족모임, 친구 모임 등), 최종 한 줄 평.
@@ -936,7 +939,16 @@ async def generate_review(
   <figcaption style="font-size: 13px; color: #71717a; margin-top: 10px; font-weight: 500; text-align: center;">📷 {cap}</figcaption>
 </figure>
 """
-                html_body = html_body.replace(slot, figure_html)
+                if slot in html_body:
+                    html_body = html_body.replace(slot, figure_html)
+                else:
+                    # AI가 사진 자리 마커를 빠뜨린 경우: 해당 순번 소제목 앞(없으면 본문 끝)에 사진 삽입
+                    h2_positions = [m.start() for m in re.finditer(r"<h2", html_body)]
+                    if len(h2_positions) > idx + 1:
+                        pos = h2_positions[idx + 1]
+                        html_body = html_body[:pos] + figure_html + html_body[pos:]
+                    else:
+                        html_body += figure_html
             else:
                 html_body = html_body.replace(slot, "")
 

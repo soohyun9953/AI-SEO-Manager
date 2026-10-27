@@ -365,7 +365,12 @@ class ClaudeWebAutomator:
                         log(f"   생성 진행 중... ({elapsed}초 경과, 현재 글자 수: {curr_len}자)")
 
                 # 6. 최종 텍스트 추출 및 파싱
-                full_raw_text = self._get_latest_assistant_message(page)
+                # 코드블록(원본 마크다운)이 있으면 우선 사용: 렌더링된 텍스트는 ##, 표 등의 서식이 사라짐
+                full_raw_text = self._get_latest_markdown_block(page)
+                if full_raw_text:
+                    log("[OK] [Claude Bot] 코드블록에서 원본 마크다운을 추출했습니다.")
+                else:
+                    full_raw_text = self._get_latest_assistant_message(page)
                 if not full_raw_text or len(full_raw_text.strip()) < 100:
                     raise Exception("Claude로부터 생성된 원고 텍스트를 추출하지 못했습니다.")
 
@@ -386,6 +391,18 @@ class ClaudeWebAutomator:
                     pass
 
         return result
+
+    def _get_latest_markdown_block(self, page: Page) -> str:
+        """가장 마지막 코드블록(원본 마크다운) 텍스트 추출. 없거나 너무 짧으면 빈 문자열"""
+        try:
+            blocks = page.locator("pre code").all()
+            if blocks:
+                text = blocks[-1].inner_text().strip()
+                if len(text) > 200:
+                    return text
+        except Exception as e:
+            log(f"코드블록 추출 중 경미한 에러: {e}")
+        return ""
 
     def _get_latest_assistant_message(self, page: Page) -> str:
         """가장 마지막 어시스턴트(Claude) 메시지 텍스트 추출"""
@@ -462,15 +479,20 @@ class ClaudeWebAutomator:
    - 모바일 가독성을 위해 2~3줄마다 빈 줄(줄바꿈) 적용.
 2. 구성:
    - 도입부: 방문 동기와 첫인상
-   - 소제목 1 (위치, 인테리어/분위기, 주차 및 웨이팅 꿀팁)
-   - 소제목 2 (핵심 특징, 대표 메뉴/체험 솔직 평가)
-   - 소제목 3 (한눈에 보는 핵심 요약 - 마크다운 표 Table로 정리: 장소명, 위치, 주요 가격/메뉴, 편의시설, 총점)
-   - 마무리 (이런 분께 추천, 재방문 의사, 최종 한 줄 평)
+   - 첫 번째 소제목 (주제: 위치, 인테리어/분위기, 주차 및 웨이팅 꿀팁)
+   - 두 번째 소제목 (주제: 핵심 특징, 대표 메뉴/체험 솔직 평가)
+   - 세 번째 소제목 (주제: 한눈에 보는 핵심 요약 - 마크다운 표 Table로 정리: 장소명, 위치, 주요 가격/메뉴, 편의시설, 총점)
+   - 마무리 소제목 (이런 분께 추천, 재방문 의사, 최종 한 줄 평)
+   - 각 소제목은 반드시 마크다운 "## 소제목 문장" 형식으로 쓰고, "소제목 1:" 같은 번호·라벨 문구는 쓰지 말고 주제를 담은 매력적인 제목 문장만 쓸 것
 3. 사진 슬롯 마커 배치:
 {photo_slots_guide}
 
 [태그]
 #지역명, #장소명, #카테고리, #내돈내산 등 검색 유입용 태그 10~15개를 쉼표로 구분하여 작성 (예: #성수동맛집, #성수핫플, #내돈내산)
+
+[출력 형식 - 매우 중요]
+[제목]부터 [태그]까지 전체 결과물을 반드시 하나의 마크다운 코드블록(```markdown 으로 시작해서 ``` 로 끝남) 안에 작성하세요.
+코드블록 밖에는 어떤 설명이나 인사말도 쓰지 마세요. 코드블록 안에서 소제목은 "## "로, 표는 마크다운 표로 쓰세요.
 
 이제 위 지침에 맞추어 전문 블로그 원고를 정성껏 작성해주세요!
 """.strip()
@@ -549,7 +571,13 @@ class ClaudeWebAutomator:
                     if slot_marker in html:
                         html = html.replace(slot_marker, img_card)
                     else:
-                        html += img_card
+                        # 마커가 없으면 해당 순번 소제목 앞(없으면 본문 끝)에 삽입
+                        h2_positions = [m.start() for m in re.finditer(r"<h2", html)]
+                        if len(h2_positions) > idx + 1:
+                            pos = h2_positions[idx + 1]
+                            html = html[:pos] + img_card + html[pos:]
+                        else:
+                            html += img_card
                 else:
                     html = html.replace(slot_marker, "")
         

@@ -7,7 +7,10 @@
 """
 
 import os
+import re
 import sys
+import base64
+import tempfile
 import time
 import json
 from datetime import datetime
@@ -70,6 +73,92 @@ class TistoryAutomator:
                 log(f"[LOGIN] 확인 중 일시 오류(무시): {e}")
         log("[ERROR] 로그인 대기 시간(5분)이 초과되었습니다.")
         return False
+
+    def _extract_photos(self, content_html: str):
+        """본문 속 base64 사진(<figure> 또는 <img>)을 임시 파일로 저장하고, 해당 위치에 업로드용 자리표시자를 남긴다."""
+        photo_files = []
+        tmp_dir = tempfile.mkdtemp(prefix="tistory_photos_")
+
+        def save_data_url(data_url: str, idx: int) -> Optional[str]:
+            m = re.match(r"data:image/(\w+);base64,(.+)", data_url, re.S)
+            if not m:
+                return None
+            ext = "jpg" if m.group(1).lower() == "jpeg" else m.group(1).lower()
+            path = os.path.join(tmp_dir, f"photo_{idx}.{ext}")
+            with open(path, "wb") as f:
+                f.write(base64.b64decode(m.group(2)))
+            return path
+
+        def figure_repl(m):
+            block = m.group(0)
+            img = re.search(r'<img[^>]+src="(data:image/[^"]+)"', block)
+            if not img:
+                return block
+            path = save_data_url(img.group(1), len(photo_files) + 1)
+            if not path:
+                return block
+            photo_files.append(path)
+            cap = re.search(r"<figcaption[^>]*>(.*?)</figcaption>", block, re.S)
+            cap_html = ""
+            if cap:
+                cap_html = f'<p style="text-align:center; font-size:13px; color:#71717a;">{cap.group(1).strip()}</p>'
+            return f'<p id="photo-slot-{len(photo_files)}"><br></p>{cap_html}'
+
+        html = re.sub(r"<figure[^>]*>.*?</figure>", figure_repl, content_html, flags=re.S)
+
+        def img_repl(m):
+            path = save_data_url(m.group(1), len(photo_files) + 1)
+            if not path:
+                return m.group(0)
+            photo_files.append(path)
+            return f'<p id="photo-slot-{len(photo_files)}"><br></p>'
+
+        html = re.sub(r'<img[^>]+src="(data:image/[^"]+)"[^>]*>', img_repl, html)
+        return html, photo_files
+
+    def _upload_photos(self, page: Page, photo_files: List[str]) -> int:
+        """에디터의 [첨부 > 사진] 메뉴로 사진을 업로드해 자리표시자 위치에 삽입"""
+        uploaded = 0
+        for n, path in enumerate(photo_files, start=1):
+            try:
+                before = page.evaluate("() => tinymce.activeEditor.getBody().querySelectorAll('img').length")
+                placed = page.evaluate(
+                    """(id) => {
+                        const ed = tinymce.activeEditor;
+                        const el = ed.dom.get(id);
+                        if (!el) return false;
+                        ed.focus();
+                        ed.selection.setCursorLocation(el, 0);
+                        return true;
+                    }""", f"photo-slot-{n}")
+                if not placed:
+                    log(f"[WARN] 사진 {n} 자리를 찾지 못해 건너뜁니다.")
+                    continue
+                page.locator("#mceu_0-open").click()
+                time.sleep(0.5)
+                with page.expect_file_chooser(timeout=10000) as fc_info:
+                    page.locator("#attach-image").click()
+                fc_info.value.set_files(path)
+                # 업로드 완료(이미지 개수 증가) 대기
+                page.wait_for_function(
+                    "(b) => tinymce.activeEditor.getBody().querySelectorAll('img').length > b",
+                    arg=before, timeout=45000)
+                time.sleep(1.5)
+                uploaded += 1
+                log(f"[OK] 사진 {n}/{len(photo_files)} 업로드 완료")
+            except Exception as ph_err:
+                log(f"[WARN] 사진 {n} 업로드 실패: {ph_err}")
+        # 비어 있는 자리표시자 정리
+        try:
+            page.evaluate("""() => {
+                const ed = tinymce.activeEditor;
+                ed.getBody().querySelectorAll('p[id^=photo-slot-]').forEach(p => {
+                    if (!p.querySelector('img') && !p.textContent.trim()) p.remove();
+                });
+            }""")
+        except Exception:
+            pass
+        return uploaded
 
     def post_content(
         self,
@@ -196,6 +285,11 @@ class TistoryAutomator:
                 # 5. 본문 입력 (HTML 모드 전환 주입)
                 print("📄 본문 내용 주입 준비 (HTML 모드 전환)...")
                 
+                # 본문 속 base64 사진은 티스토리에 직접 업로드하기 위해 분리
+                body_html, photo_files = self._extract_photos(content_html)
+                if photo_files:
+                    print(f"📷 업로드할 사진 {len(photo_files)}장 확인")
+
                 # 0순위: TinyMCE API로 본문 HTML 직접 주입 (티스토리 기본 에디터)
                 content_injected = False
                 try:
@@ -208,9 +302,12 @@ class TistoryAutomator:
                             ed.save();
                             ed.fire('change');
                             return ed.getContent().length > 0;
-                        }""", content_html))
+                        }""", body_html))
                     if content_injected:
                         print("✅ 본문 HTML 주입 성공 (TinyMCE)")
+                        if photo_files:
+                            ok_cnt = self._upload_photos(page, photo_files)
+                            print(f"📷 사진 업로드 결과: {ok_cnt}/{len(photo_files)}장")
                 except Exception as mce_err:
                     print(f"⚠️ TinyMCE 주입 실패, 대체 방식 시도: {mce_err}")
 
@@ -305,9 +402,48 @@ class TistoryAutomator:
                     print("💾 [정책: 임시저장] 안전 모드로 임시저장을 수행합니다...")
                     temp_btn = page.locator("a.action:has-text('임시저장'), #temp-save-btn, button:has-text('임시저장'), button.btn_temp").first
                     if temp_btn.is_visible(timeout=4000):
+                        # 저장 요청(POST /manage/drafts)의 성공 응답을 확인한 뒤에만 종료
+                        save_ok = {"done": False}
+
+                        def _on_response(resp):
+                            try:
+                                if resp.request.method == "POST" and resp.url.rstrip("/").endswith("/manage/drafts") and resp.status == 200:
+                                    save_ok["done"] = True
+                            except Exception:
+                                pass
+
+                        def _draft_count() -> int:
+                            try:
+                                return int(page.locator("a.count").first.inner_text(timeout=2000).strip() or 0)
+                            except Exception:
+                                return -1
+
+                        count_before = _draft_count()
+                        page.on("response", _on_response)
+                        try:
+                            page.evaluate("() => { if (window.tinymce && tinymce.activeEditor) tinymce.activeEditor.save(); }")
+                        except Exception:
+                            pass
                         temp_btn.click()
+                        waited = 0
+                        retried = False
+                        while waited < 40 and not save_ok["done"]:
+                            # time.sleep은 Playwright 이벤트를 처리하지 못하므로 wait_for_timeout 사용
+                            page.wait_for_timeout(1000)
+                            waited += 1
+                            count_now = _draft_count()
+                            if count_before >= 0 and count_now > count_before:
+                                save_ok["done"] = True
+                                break
+                            if waited == 12 and not retried:
+                                print("⏳ 저장 응답이 없어 [임시저장]을 한 번 더 누릅니다...")
+                                temp_btn.click()
+                                retried = True
+                        page.remove_listener("response", _on_response)
+                        if not save_ok["done"]:
+                            raise Exception("임시저장 완료 응답을 확인하지 못했습니다. 티스토리 임시저장함을 직접 확인해 주세요.")
                         time.sleep(2)
-                        print("🎉 임시저장이 성공적으로 완료되었습니다!")
+                        print(f"🎉 임시저장이 성공적으로 완료되었습니다! ({waited}초)")
                         result["success"] = True
                         result["message"] = "티스토리 편집기에 제목, 본문, 사진, 태그가 입력되고 [임시저장] 완료되었습니다."
                     else:
@@ -351,6 +487,13 @@ class TistoryAutomator:
             except Exception as e:
                 import traceback
                 traceback.print_exc()
+                try:
+                    shot = os.path.join(BASE_DIR, "tistory_last_error.png")
+                    page.screenshot(path=shot)
+                    layers = page.evaluate("""() => Array.from(document.querySelectorAll('[class*=layer],[class*=modal],[class*=toast],[class*=alert],[class*=popup],[role=dialog]')).filter(e => e.offsetParent !== null).map(e => e.className.slice(0,40) + '|' + e.innerText.trim().slice(0,80))""")
+                    log(f"[DEBUG] 실패 시점 화면 저장: {shot} / 열린 레이어: {layers}")
+                except Exception:
+                    pass
                 result["success"] = False
                 result["error"] = str(e)
                 result["message"] = f"자동 등록 실패: {str(e)}"
