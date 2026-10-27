@@ -32,6 +32,36 @@ import {
 import Link from "next/link";
 import AutoRegisterModal from "@/components/AutoRegisterModal";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
+import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
+
+// 진행 단계 정의 목록 (스네이크 케이스 및 한글 설명 준수)
+const 체험_후기_단계_목록: 단계_정보[] = [
+  {
+    id: 1,
+    title: "현장 사진 및 방문 정보 데이터 전처리",
+    description: "업로드된 사진 스마트 압축 최적화(1280px) 및 네이버 플레이스/인스타그램 정보 분석",
+  },
+  {
+    id: 2,
+    title: "Chrome 브라우저 구동 및 Claude.ai 연결",
+    description: "사용자 PC의 크롬 브라우저 자동 실행 및 Claude.ai 세션 연결 확인",
+  },
+  {
+    id: 3,
+    title: "Claude 3.7 Sonnet 사진 분석 및 내돈내산 원고 집필",
+    description: "사진 속 공간 분위기와 메뉴를 정밀 분석하여 사실적이고 생생한 방문 후기 본문 작성",
+  },
+  {
+    id: 4,
+    title: "티스토리 에디터 자동 접속 및 임시저장 연동",
+    description: "서식과 사진이 온전히 반영된 고품질 포스팅으로 티스토리 블로그 임시저장함에 등록",
+  },
+  {
+    id: 5,
+    title: "최종 원고 완성 및 SEO 메타데이터 검증",
+    description: "포털 검색 상위 노출을 위한 제목, 메타 설명, 추천 검색 태그 완성 및 보관",
+  },
+];
 import { compress_image_file } from "@/utils/imageCompressor";
 import { 기본_상호명, 기본_위치, 기본_지도링크, 기본_주요정보, 기본_카테고리, 기본_샘플_사진 } from "@/utils/sampleData";
 
@@ -81,6 +111,11 @@ export default function ExperienceReviewWriterPage() {
   const [tagsString, setTagsString] = useState("");
   const [metaDesc, setMetaDesc] = useState("");
   const [savedContentId, setSavedContentId] = useState<string | null>(null);
+
+  // 진행 단계별 표시 상태 관리 (스네이크 케이스 준수)
+  const [current_step, set_current_step] = useState<number>(1);
+  const [elapsed_seconds, set_elapsed_seconds] = useState<number>(0);
+  const [is_step_completed, set_is_step_completed] = useState<boolean>(false);
 
   // 임시 테스트 데이터(도미닉커피로스터즈) 자동 입력 함수
   const loadSampleData = () => {
@@ -289,7 +324,28 @@ export default function ExperienceReviewWriterPage() {
     }
 
     setLoading(true);
-    setProgressStep("🚀 Playwright 브라우저 구동 및 Claude.ai 접속 중...");
+    set_current_step(1);
+    set_elapsed_seconds(0);
+    set_is_step_completed(false);
+    setProgressStep("📷 현장 사진 최적화 및 장소 데이터 전처리 중...");
+
+    let timer_seconds = 0;
+    const timer_interval = setInterval(() => {
+      timer_seconds += 1;
+      set_elapsed_seconds(timer_seconds);
+
+      // 시간 경과에 따라 진행 단계를 자연스럽게 전환
+      if (timer_seconds === 2) {
+        set_current_step(2);
+        setProgressStep("🚀 사용자 PC 크롬 브라우저 구동 및 Claude.ai 세션 연결 중...");
+      } else if (timer_seconds === 6) {
+        set_current_step(3);
+        setProgressStep("🧠 Claude 3.7 Sonnet 사진 정밀 분석 및 내돈내산 원고 집필 중...");
+      } else if (timer_seconds === 22 && autoTistorySave) {
+        set_current_step(4);
+        setProgressStep("📝 티스토리 에디터 자동 접속 및 원스톱 임시저장 진행 중...");
+      }
+    }, 1000);
 
     const photosPayload = photos.map(p => ({
       data_url: p.dataUrl,
@@ -334,6 +390,11 @@ export default function ExperienceReviewWriterPage() {
       if (!res.ok) {
         throw new Error(data.detail || `원고 생성 실패 (${res.status}): ${rawText.slice(0, 200)}`);
       }
+      clearInterval(timer_interval);
+      set_current_step(5);
+      set_is_step_completed(true);
+      setProgressStep("🎉 원고 작성 및 최적화가 성공적으로 완료되었습니다!");
+
       setGeneratedTitle(data.title || `${placeName} 솔직 방문 후기`);
       setArticle(data.article || "");
       setHtmlArticle(data.html_article || "");
@@ -369,6 +430,7 @@ export default function ExperienceReviewWriterPage() {
       console.error(err);
       alert(`오류: ${err.message || "원고 생성 중 문제가 발생했습니다."}`);
     } finally {
+      clearInterval(timer_interval);
       setLoading(false);
       setProgressStep("");
     }
@@ -849,28 +911,21 @@ export default function ExperienceReviewWriterPage() {
                   </p>
                 </div>
               ) : loading ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center animate-pulse">
-                      <Bot size={32} className="text-blue-400" />
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white mb-1">Claude 브라우저에서 작업 중입니다</h3>
-                    <p className="text-xs text-blue-400 font-medium">{progressStep}</p>
-                  </div>
-                  <div className="max-w-md p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs text-left space-y-2 mt-2">
-                    <div className="font-bold flex items-center gap-1.5 text-amber-200">
-                      <AlertCircle size={15} />
-                      열린 크롬 브라우저 창에서 로그인을 진행해 주세요!
-                    </div>
-                    <p className="text-[11px] text-amber-300/80 leading-relaxed">
-                      화면에 새로 열린 크롬 브라우저 창에서 <strong>Claude.ai 로그인(Google 또는 이메일)</strong>을 완료해 주시면, 봇이 즉시 감지하여 <strong>사진 첨부 ➔ 원고 작성 ➔ 티스토리 임시저장</strong>을 자동으로 진행합니다.
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      (최초 1회 로그인 완료 시 세션이 영구 보존되어 다음부터는 자동으로 진행됩니다.)
-                    </p>
-                  </div>
+                <div className="h-full flex flex-col items-center justify-center py-6 px-4">
+                  <StepProgressIndicator
+                    steps={체험_후기_단계_목록}
+                    current_step={current_step}
+                    is_completed={is_step_completed}
+                    elapsed_seconds={elapsed_seconds}
+                    sub_message={progressStep}
+                    tip_message={
+                      current_step === 2
+                        ? "새로 열린 크롬 브라우저 창에서 Claude.ai 로그인을 완료해 주시면 봇이 감지하여 바로 다음 단계로 진행합니다."
+                        : current_step === 4
+                        ? "티스토리 에디터에 접속하여 제목, 본문, 서식 및 사진을 안전하게 임시저장하고 있습니다."
+                        : ""
+                    }
+                  />
                 </div>
               ) : (
                 <div className="space-y-6">

@@ -31,6 +31,31 @@ import ExportModal, { ContentItem } from "@/components/ExportModal";
 import { compress_image_file } from "@/utils/imageCompressor";
 import { 기본_상호명, 기본_위치, 기본_지도링크, 기본_주요정보, 기본_샘플_사진 } from "@/utils/sampleData";
 import AutoRegisterModal from "@/components/AutoRegisterModal";
+import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
+
+// 맛집 후기 진행 단계 정의 목록 (스네이크 케이스 및 한글 설명 준수)
+const 맛집_후기_단계_목록: 단계_정보[] = [
+  {
+    id: 1,
+    title: "현장 사진 스마트 최적화 및 메타데이터 추출",
+    description: "업로드된 음식/매장 사진 자동 압축(1280px) 및 시각적 캡션 매핑 완료",
+  },
+  {
+    id: 2,
+    title: "네이버 지도 및 맛집 방문 경험 데이터 분석",
+    description: "상호명, 위치, 대표 메뉴, 특별 메모를 조합한 최적의 프롬프트 컨텍스트 구성",
+  },
+  {
+    id: 3,
+    title: "Gemini 2.5 Flash 고품질 솔직 후기 작성",
+    description: "맛, 인테리어 분위기, 가성비, 주차 팁이 포함된 신뢰도 높은 후기 원고 생성",
+  },
+  {
+    id: 4,
+    title: "SEO 검색 태그 및 Schema.org 구조화 데이터 빌드",
+    description: "포털 상위 노출을 위한 최적화 제목, 메타 디스크립션, 검색 태그 및 구조화 데이터 완성",
+  },
+];
 
 interface PhotoItem {
 
@@ -67,6 +92,12 @@ export default function ReviewWriterPage() {
   const [tagsString, setTagsString] = useState("");
   const [metaDesc, setMetaDesc] = useState("");
   const [jsonLd, setJsonLd] = useState<any>(null);
+
+  // 단계별 진행 상태 관리 (스네이크 케이스 준수)
+  const [current_step, set_current_step] = useState<number>(1);
+  const [elapsed_seconds, set_elapsed_seconds] = useState<number>(0);
+  const [is_step_completed, set_is_step_completed] = useState<boolean>(false);
+  const [progress_sub_message, set_progress_sub_message] = useState<string>("");
 
   // 광고 플레이스홀더 클린업 헬퍼 함수
   const removeAdCode = (html: string) => {
@@ -234,6 +265,28 @@ export default function ReviewWriterPage() {
     }
 
     setLoading(true);
+    set_current_step(1);
+    set_elapsed_seconds(0);
+    set_is_step_completed(false);
+    set_progress_sub_message("📷 사진 스마트 최적화 및 이미지 분석 중...");
+
+    let timer_seconds = 0;
+    const timer_interval = setInterval(() => {
+      timer_seconds += 1;
+      set_elapsed_seconds(timer_seconds);
+
+      if (timer_seconds === 2) {
+        set_current_step(2);
+        set_progress_sub_message("🗺️ 네이버 플레이스 및 방문 경험 데이터 분석 중...");
+      } else if (timer_seconds === 4) {
+        set_current_step(3);
+        set_progress_sub_message("🤖 Gemini 2.5 Flash 고품질 솔직 후기 원고 작성 중...");
+      } else if (timer_seconds === 7) {
+        set_current_step(4);
+        set_progress_sub_message("🏷️ SEO 검색 태그 및 Schema.org 구조화 데이터 빌드 중...");
+      }
+    }, 1000);
+
     const geminiKey = localStorage.getItem("GEMINI_API_KEY") || "";
 
     // 사진 배열 구성
@@ -279,6 +332,11 @@ export default function ReviewWriterPage() {
       }
 
       const data = await res.json();
+      clearInterval(timer_interval);
+      set_current_step(4);
+      set_is_step_completed(true);
+      set_progress_sub_message("🎉 SEO 최적화 맛집 후기 생성이 완료되었습니다!");
+
       const cleanedHtml = removeAdCode(data.html_article || "");
       setGeneratedTitle(data.title || `${restaurantName} 방문 후기`);
       setArticle(data.article || "");
@@ -305,6 +363,7 @@ export default function ReviewWriterPage() {
       console.error(err);
       alert(`오류: ${err.message || "원고 생성 중 문제가 발생했습니다."}`);
     } finally {
+      clearInterval(timer_interval);
       setLoading(false);
     }
   };
@@ -1058,14 +1117,15 @@ export default function ReviewWriterPage() {
             {/* 탭 본문 영역 */}
             <div className="flex-1 mt-2">
               {loading ? (
-                <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-500">
-                  <Loader2 size={36} className="animate-spin text-orange-500" />
-                  <p className="text-sm font-medium text-gray-300">
-                    방문 정보와 사진을 결합하여 SEO 최적화 후기를 작성하고 있습니다...
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    약 5~10초 소요됩니다 (Gemini 2.5 Flash 고속 엔진)
-                  </p>
+                <div className="flex flex-col items-center justify-center py-6 px-2">
+                  <StepProgressIndicator
+                    steps={맛집_후기_단계_목록}
+                    current_step={current_step}
+                    is_completed={is_step_completed}
+                    elapsed_seconds={elapsed_seconds}
+                    sub_message={progress_sub_message}
+                    tip_message="Gemini 2.5 Flash AI가 실제 방문 경험을 토대로 생생한 감상과 추천 메뉴, 유용한 팁을 작성합니다."
+                  />
                 </div>
               ) : !article ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3 text-center border-2 border-dashed border-white/[0.05] rounded-2xl p-8">
