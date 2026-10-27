@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
+import { compress_image_file } from "@/utils/imageCompressor";
 import AutoRegisterModal from "@/components/AutoRegisterModal";
 
 interface PhotoItem {
@@ -127,28 +128,22 @@ export default function ReviewWriterPage() {
     }
   }, []);
 
-  // 단일 사진 파일 처리 (파일 선택 & 드래그 앤 드롭 공용)
-  const processSingleFile = (file: File, slot: 1 | 2) => {
+  // 단일 사진 파일 처리 (Vercel 413 방지를 위한 스마트 자동 압축 적용)
+  const processSingleFile = async (file: File, slot: 1 | 2) => {
     if (!file.type.startsWith("image/")) {
       alert("이미지 파일(JPG, PNG, WEBP 등)만 업로드할 수 있습니다.");
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert("이미지 크기는 10MB 이하여야 합니다.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      const sizeStr = (file.size / 1024).toFixed(1) + " KB";
+    try {
+      // 1280px, 품질 0.8로 자동 리사이징 & 압축 (수 MB -> 100~200KB)
+      const { data_url, file_size_str } = await compress_image_file(file, 1280, 0.8);
       const newPhoto: PhotoItem = {
         id: `photo_${Date.now()}_${slot}`,
-        dataUrl: result,
+        dataUrl: data_url,
         caption: slot === 1 ? `${restaurantName || '매장'} 외관 및 첫인상` : `대표 메뉴 및 시식`,
         fileName: file.name,
-        fileSize: sizeStr,
+        fileSize: file_size_str,
       };
 
       if (slot === 1) {
@@ -156,8 +151,10 @@ export default function ReviewWriterPage() {
       } else {
         setPhoto2(newPhoto);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("Image compression error:", err);
+      alert("이미지 최적화 중 오류가 발생했습니다: " + (err.message || ""));
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, slot: 1 | 2) => {

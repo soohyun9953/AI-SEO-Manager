@@ -32,6 +32,7 @@ import {
 import Link from "next/link";
 import AutoRegisterModal from "@/components/AutoRegisterModal";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
+import { compress_image_file } from "@/utils/imageCompressor";
 
 interface PhotoItem {
   id: string;
@@ -132,8 +133,8 @@ export default function ExperienceReviewWriterPage() {
     }
   }, []);
 
-  // 공통 사진 파일 처리 핸들러 (파일 선택 및 드래그 앤 드롭 공용)
-  const processFiles = (fileList: FileList | File[]) => {
+  // 공통 사진 파일 처리 핸들러 (Vercel 413 방지를 위한 스마트 자동 압축 적용)
+  const processFiles = async (fileList: FileList | File[]) => {
     const files = Array.from(fileList);
     if (!files || files.length === 0) return;
 
@@ -142,30 +143,27 @@ export default function ExperienceReviewWriterPage() {
       return;
     }
 
-    files.forEach((file, index) => {
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
       if (!file.type.startsWith("image/")) {
         alert(`${file.name}은(는) 이미지 파일이 아닙니다.`);
-        return;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`${file.name}의 크기가 10MB를 초과합니다.`);
-        return;
+        continue;
       }
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
+      try {
+        const { data_url, file_size_str } = await compress_image_file(file, 1280, 0.8);
         const newPhoto: PhotoItem = {
           id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${index}`,
-          dataUrl: result,
+          dataUrl: data_url,
           caption: `${placeName || '방문 장소'} 현장 컷 #${photos.length + index + 1}`,
           fileName: file.name,
-          fileSize: (file.size / 1024).toFixed(1) + " KB",
+          fileSize: file_size_str,
         };
         setPhotos(prev => [...prev, newPhoto]);
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err: any) {
+        console.error("Image compression error:", err);
+      }
+    }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
