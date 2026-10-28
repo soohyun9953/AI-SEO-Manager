@@ -1333,6 +1333,172 @@ def run_tistory_direct_register(req: TistoryDirectRegisterRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"티스토리 임시저장 실패: {str(e)}")
 
+class NaverReviewRequest(BaseModel):
+    place_name: str
+    category: Optional[str] = "맛집/카페"
+    location: Optional[str] = ""
+    place_url: Optional[str] = ""
+    key_info: Optional[str] = ""
+    special_notes: Optional[str] = ""
+    rating: Optional[str] = "5.0"
+    photo_captions: Optional[List[str]] = []
+    model_name: Optional[str] = None
+
+
+def _ensure_naver_photo_slots(md: str, count: int) -> str:
+    """AI가 사진 자리 마커를 빠뜨리면 소제목 사이에 보충 삽입"""
+    for i in range(1, count + 1):
+        marker = f"<!-- [PHOTO_{i}_SLOT] -->"
+        if marker in md:
+            continue
+        heads = [m.start() for m in re.finditer(r"\n## ", md)]
+        pos = heads[i] if i < len(heads) else len(md)
+        md = md[:pos] + f"\n\n{marker}\n\n" + md[pos:]
+    return md
+
+
+@app.post("/api/naver/generate-review")
+async def generate_naver_review(
+    req: NaverReviewRequest,
+    x_gemini_key: Optional[str] = Header(None)
+):
+    """네이버 블로그용 방문/체험 후기 생성 (복사해서 붙여넣는 반자동 방식, 브라우저 자동화 없음)"""
+    api_key = x_gemini_key or GEMINI_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Gemini API Key missing")
+    if not req.place_name or not req.place_name.strip():
+        raise HTTPException(status_code=400, detail="장소 또는 상호명을 입력해주세요.")
+
+    captions = [c.strip() for c in (req.photo_captions or []) if c is not None][:10]
+    photo_count = len(captions)
+    if photo_count:
+        photo_lines = "\n".join(f"- 사진 {i + 1}: {c or '현장 사진'}" for i, c in enumerate(captions))
+        slot_guide = (
+            f"본문 흐름에 맞게 사진 {photo_count}장의 위치를 정하고, 각 위치에 아래 마커를 단독 줄로 삽입하세요 "
+            f"(번호 순서대로, 모든 번호를 한 번씩만 사용):\n"
+            + "\n".join(f"   <!-- [PHOTO_{i + 1}_SLOT] -->" for i in range(photo_count))
+        )
+    else:
+        photo_lines = "첨부된 사진 없음"
+        slot_guide = "사진이 없으므로 사진 마커는 넣지 마세요."
+
+    prompt = f"""
+당신은 네이버 블로그 검색(스마트블록, C-Rank, D.I.A.)에 강한 '{req.category or '맛집/카페'}' 전문 블로거입니다.
+직접 다녀온 사람의 시선으로 쓴 '내돈내산 방문 후기'를 네이버 블로그용으로 작성해주세요.
+
+[방문 정보]
+- 장소/상호명: {req.place_name}
+- 카테고리: {req.category or '맛집/카페'}
+- 위치/지역: {req.location or '정보 없음'}
+- 지도/플레이스 링크: {req.place_url or '정보 없음'}
+- 주요 정보(메뉴/가격/시설 등): {req.key_info or '정보 없음'}
+- 방문 메모/특이사항: {req.special_notes or '정보 없음'}
+- 만족도: {req.rating or '5.0'} / 5.0
+- 등록된 사진:
+{photo_lines}
+
+[네이버 블로그 작성 지침]
+1. 제목
+   - 공백 포함 25~40자. 핵심 키워드(지역 + 상호명 + 대표 메뉴/특징)를 앞쪽에 배치하고, 자연스럽게 클릭하고 싶은 표현을 쓰세요.
+   - "내돈내산 솔직 후기! ... 총정리" 같은 반복 틀은 피하세요.
+2. 본문 (공백 제외 1,800~2,500자)
+   - 첫 문단 3~4줄 안에 장소명과 핵심 키워드를 자연스럽게 포함하고, 방문 계기와 한 줄 요약을 쓰세요.
+   - 모바일에서 읽기 편하도록 한 문단은 2~3줄, 문단 사이에 빈 줄을 넣으세요.
+   - 소제목은 마크다운 "## 소제목 문장" 형식으로 3~5개, 번호나 "소제목 1:" 같은 라벨은 쓰지 마세요.
+   - 구성: 도입 → 위치·주차·웨이팅 → 분위기·공간 → 메뉴/체험 상세 평가 → 아쉬운 점 → 한눈에 보기(글머리표 목록) → 이런 분께 추천 + 마무리.
+   - 표는 쓰지 말고 글머리표(-) 목록으로 정리하세요. (네이버 에디터에 붙여넣기 좋게)
+   - 장점만 늘어놓지 말고 아쉬운 점도 솔직하게 1~2가지 쓰세요.
+   - 사진 배치: {slot_guide}
+3. 사실 관계 (매우 중요)
+   - 위 [방문 정보]에 없는 구체적 사실(영업시간, 가격, 주소, 전화번호, 개업 연도, 웨이팅 시간 등)은 절대 지어내지 마세요.
+   - 모르는 정보는 "방문 전 네이버 지도에서 영업시간을 꼭 확인하세요"처럼 확인을 안내하는 문장으로 처리하세요.
+   - 입력된 메모와 사진 설명에서 알 수 있는 내용만 경험처럼 풀어 쓰세요.
+4. 어조: 친근하고 담백한 블로그 말투(~했어요, ~더라고요). 과장된 표현과 광고 같은 문구, 기계적인 문장은 피하세요.
+5. 태그: 지역 + 업종 + 메뉴 + 추천 대상 조합으로 20~25개 (# 없이 단어만).
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{
+  "title": "네이버용 제목",
+  "content_markdown": "작성된 전체 마크다운 본문 (사진 마커 포함)",
+  "summary": "글 요약 한 줄 (60자 내외)",
+  "tags": ["태그1", "태그2"]
+}}
+"""
+
+    try:
+        response = safe_generate_content(api_key, prompt, is_json=True, target_model=req.model_name)
+        result = json.loads(response.text)
+
+        title = (result.get("title") or f"{req.place_name} 방문 후기").strip()
+        raw_md = (result.get("content_markdown") or "").strip()
+        if not raw_md:
+            raise ValueError("생성된 본문이 비어 있습니다.")
+        tags_list = [str(t).replace("#", "").strip() for t in (result.get("tags") or []) if str(t).strip()][:30]
+        summary = result.get("summary", "")
+
+        raw_md = _ensure_naver_photo_slots(raw_md, photo_count)
+
+        # 편집용 텍스트: 사진 마커를 안내 문구로 치환
+        article_text = raw_md
+        for i in range(photo_count):
+            article_text = article_text.replace(
+                f"<!-- [PHOTO_{i + 1}_SLOT] -->", f"📷 [사진 {i + 1}: {captions[i] or '현장 사진'}]")
+
+        html_body = markdown.markdown(raw_md, extensions=["nl2br"])
+        html_body = html_body.replace(
+            "<h2>", '<h2 style="font-size: 20px; font-weight: bold; margin: 32px 0 14px;">')
+        html_body = html_body.replace("<p>", '<p style="line-height: 1.9; margin: 0 0 14px; font-size: 15px;">')
+
+        plain = re.sub(r"<!--.*?-->|[#*>\-`]", "", raw_md)
+        char_count = len(re.sub(r"\s", "", plain))
+
+        content_id = None
+        try:
+            import uuid
+            content_id = f"cont_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}"
+            database.create_content({
+                "id": content_id,
+                "title": title,
+                "keyword": req.place_name,
+                "related_keywords": ", ".join(tags_list),
+                "category": req.category or "맛집/카페",
+                "content": article_text,
+                "content_html": html_body,
+                "meta_description": summary,
+                "tags": ", ".join(tags_list),
+                "thumbnail_url": "",
+                "body_images": [],
+                "reference_urls": [req.place_url] if req.place_url else [],
+                "internal_links": [],
+                "ai_model": "Gemini-Naver",
+                "status": "DRAFT",
+                "scheduled_at": "",
+                "tistory_url": "",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }, check_duplicate=False)
+        except Exception as db_err:
+            print(f"[WARN] 네이버 후기 DB 저장 실패(무시): {db_err}")
+            content_id = None
+
+        return {
+            "title": title,
+            "article": article_text,
+            "html_article": html_body,
+            "tags": tags_list,
+            "tags_hash_string": " ".join(f"#{t}" for t in tags_list),
+            "summary": summary,
+            "char_count": char_count,
+            "photo_count": photo_count,
+            "content_id": content_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"네이버 후기 생성 실패: {str(e)}")
+
+
 @app.post("/api/publish/auto-register")
 def run_auto_register(req: AutoRegisterRequest):
     """
