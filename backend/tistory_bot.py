@@ -51,28 +51,55 @@ class TistoryAutomator:
     def _is_login_url(self, url: str) -> bool:
         return "accounts.kakao.com" in url or "/auth/login" in url or "login" in url.split("?")[0]
 
-    def _wait_for_user_login(self, page: Page, timeout_seconds: int = 300) -> bool:
-        """사용자가 카카오 로그인을 완료할 때까지 대기 (로그인 화면을 벗어나면 글쓰기 화면으로 재진입해 확인)"""
+    def _wait_for_user_login(self, page: Page, timeout_seconds: int = 300) -> Optional[Page]:
+        """사용자가 카카오 로그인을 완료할 때까지 대기. 열린 모든 탭을 확인하고, 로그인 완료된 탭(Page)을 반환"""
         log("[LOGIN] 카카오 로그인이 필요합니다. 열린 브라우저 창에서 로그인을 진행해주세요...")
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
-            time.sleep(2)
+            # time.sleep은 Playwright 이벤트(주소 변경 등)를 처리하지 못하므로 wait_for_timeout 사용
+            page.wait_for_timeout(2000)
             try:
-                curr_url = page.url
-                log(f"[LOGIN] 현재 주소 확인: {curr_url}")
-                if self._is_login_url(curr_url):
-                    continue
-                # 블로그 도메인(관리/에디터 화면)에 도달했다면 로그인 완료
-                if f"{self.blog_name}.tistory.com/manage" in curr_url:
-                    log("[OK] 로그인 확인 완료! 글쓰기 편집기로 진입합니다.")
-                    return True
-                # 그 외 주소(티스토리 메인 등)라면 글쓰기 화면으로 이동해 다시 확인
-                page.goto(self.write_url, wait_until="domcontentloaded", timeout=60000)
-                time.sleep(2)
+                urls = []
+                for pg in page.context.pages:
+                    try:
+                        curr_url = pg.url
+                    except Exception:
+                        continue
+                    urls.append(curr_url[:90])
+                    if self._is_login_url(curr_url) or curr_url.startswith("about:"):
+                        continue
+                    # 블로그 도메인(관리/에디터 화면)에 도달했다면 로그인 완료
+                    if f"{self.blog_name}.tistory.com/manage" in curr_url:
+                        log("[OK] 로그인 확인 완료! 글쓰기 편집기로 진입합니다.")
+                        return pg
+                    # 그 외 주소(티스토리 메인 등)라면 글쓰기 화면으로 이동해 다시 확인
+                    if "tistory.com" in curr_url:
+                        pg.goto(self.write_url, wait_until="domcontentloaded", timeout=60000)
+                log(f"[LOGIN] 열린 탭: {urls}")
             except Exception as e:
                 log(f"[LOGIN] 확인 중 일시 오류(무시): {e}")
         log("[ERROR] 로그인 대기 시간(5분)이 초과되었습니다.")
-        return False
+        return None
+
+    def _dismiss_resume_prompt(self, page: Page):
+        """'작성 중인 글이 있습니다. 이어서 작성할까요?' 확인창이 뜨면 새 글로 시작(취소)"""
+        try:
+            page.wait_for_timeout(1500)
+            handled = page.evaluate("""() => {
+                const keys = ['이어서', '작성 중인', '작성중인', '저장된 글'];
+                const layers = Array.from(document.querySelectorAll('[class*=layer],[class*=modal],[class*=popup],[class*=confirm],[role=dialog],[role=alertdialog]'))
+                    .filter(e => e.offsetParent !== null && keys.some(k => e.innerText.includes(k)));
+                for (const layer of layers) {
+                    const btns = Array.from(layer.querySelectorAll('button, a'));
+                    const cancel = btns.find(b => /취소|아니|새로|닫기/.test(b.innerText));
+                    if (cancel) { cancel.click(); return layer.innerText.trim().slice(0, 60); }
+                }
+                return '';
+            }""")
+            if handled:
+                log(f"[OK] '이어서 작성' 확인창을 닫고 새 글로 시작합니다: {handled}")
+        except Exception as e:
+            log(f"[WARN] 확인창 처리 중 오류(무시): {e}")
 
     def _extract_photos(self, content_html: str):
         """본문 속 base64 사진(<figure> 또는 <img>)을 임시 파일로 저장하고, 해당 위치에 업로드용 자리표시자를 남긴다."""
@@ -224,7 +251,12 @@ class TistoryAutomator:
             # 다이얼로그(alert, confirm) 자동 수락 설정 (모드 변경 시 확인창 등)
             def _accept_dialog(dialog):
                 try:
-                    dialog.accept()
+                    msg = dialog.message or ""
+                    if any(k in msg for k in ("이어서", "작성 중인", "작성중인", "저장된 글")):
+                        log(f"[OK] 이어쓰기 확인창 취소(새 글로 시작): {msg[:60]}")
+                        dialog.dismiss()
+                    else:
+                        dialog.accept()
                 except Exception:
                     pass
             page.on("dialog", _accept_dialog)
@@ -237,15 +269,19 @@ class TistoryAutomator:
                 # 1. 로그인 상태 점검
                 current_url = page.url
                 if "accounts.kakao.com" in current_url or "login" in current_url:
-                    logged_in = self._wait_for_user_login(page)
-                    if not logged_in:
+                    logged_page = self._wait_for_user_login(page)
+                    if not logged_page:
                         raise Exception("로그인이 완료되지 않아 작업을 중단합니다. (5분 내 카카오 로그인을 완료해 주세요)")
+                    if logged_page is not page:
+                        page = logged_page
+                        page.on("dialog", _accept_dialog)
                     if "/manage/" not in page.url:
                         page.goto(self.write_url, wait_until="domcontentloaded", timeout=60000)
                     time.sleep(3)
 
                 # 2. 에디터 로딩 대기
                 print("📝 티스토리 에디터 로딩 확인 중...")
+                self._dismiss_resume_prompt(page)
                 # 제목 입력 요소 탐색 (다양한 티스토리 에디터 버전 대응)
                 title_selector = None
                 for sel in ["#post-title", "textarea.textarea_tit", "textarea[placeholder*='제목']", "input.tit_post"]:
