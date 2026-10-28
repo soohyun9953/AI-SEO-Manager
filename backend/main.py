@@ -163,6 +163,7 @@ class TistoryDirectRegisterRequest(BaseModel):
     category: Optional[str] = "맛집/카페"
     blog_name: Optional[str] = "s-elegant"
     action: Optional[str] = "TEMP_SAVE"
+    meta_description: Optional[str] = ""
 
 class AnalyticsSettingsRequest(BaseModel):
     site_url: Optional[str] = "https://s-elegant.tistory.com/"
@@ -963,6 +964,12 @@ async def publish_tistory(
 # 콘텐츠 관리 및 발행 대기열 API (고도화 시스템)
 # ==============================================================================
 
+@app.get("/api/contents/check-duplicate")
+def check_duplicate_contents(keyword: str):
+    """같은 장소(키워드)로 이미 만든 글이 있는지 확인 (중복 콘텐츠/키워드 잠식 경고용)"""
+    items = database.find_similar_contents(keyword)
+    return {"count": len(items), "items": items}
+
 @app.get("/api/contents/stats")
 async def get_contents_stats():
     """콘텐츠 관리 대시보드 통계 조회"""
@@ -1149,8 +1156,11 @@ async def generate_review(
 
 [필수 작성 지침 및 포맷]
 1. 제목:
-   - 검색 사용자의 클릭률(CTR)을 극대화하는 매력적인 SEO 최적화 제목을 지어주세요.
-   - 예시: [{req.location or '핫플'} 맛집] {req.restaurant_name} 솔직 후기! 대표메뉴 3가지와 웨이팅·주차 꿀팁 총정리
+   - 검색 사용자의 클릭률(CTR)을 극대화하는 SEO 최적화 제목을 지어주세요.
+   - 제목은 공백 포함 35자 이내로 짧게 쓰세요(검색 결과에서 길면 잘립니다). 40자를 넘기지 마세요.
+   - 핵심 키워드(지역 + 상호명 + 대표 메뉴)를 제목 앞쪽에 배치하세요.
+   - "내돈내산 솔직 후기! ... 총정리" 같은 반복적인 틀은 피하고 글마다 다른 표현을 쓰세요.
+   - 예시: {req.location or '핫플'} {req.restaurant_name} 후기 | 대표메뉴와 웨이팅·주차 팁
 2. 톤 앤 매너:
    - 직접 다녀온 경험을 풀어내는 생생한 E-E-A-T 기반의 친근하고 다정한 블로그 어조(~했어요, ~있더라고요, ~추천해요)를 유지하세요.
    - 뻔하고 기계적인 AI 말투나 과도한 미사여구를 배제하고, 실제 손님의 입장에서 느낀 장단점과 팁을 솔직하게 기술하세요.
@@ -1311,7 +1321,8 @@ def run_tistory_direct_register(req: TistoryDirectRegisterRequest):
             content_html=req.content_html,
             tags=req.tags,
             category=req.category,
-            action="TEMP_SAVE"
+            action="TEMP_SAVE",
+            meta_description=req.meta_description or ""
         )
         return {
             "success": bot_result.get("success", False),
@@ -1360,7 +1371,8 @@ def run_auto_register(req: AutoRegisterRequest):
             content_html=content_html,
             tags=tags,
             category=category,
-            action=req.publish_action or "TEMP_SAVE"
+            action=req.publish_action or "TEMP_SAVE",
+            meta_description=content.get("meta_description") or ""
         )
 
         success = bot_result.get("success", False)
@@ -1627,7 +1639,8 @@ def generate_claude_review(req: ClaudeReviewRequest):
                 content_html=html_article,
                 tags=tags,
                 category=req.category,
-                action="TEMP_SAVE"
+                action="TEMP_SAVE",
+                meta_description=meta_description
             )
             tistory_saved = bot_res.get("success", False)
             tistory_msg = bot_res.get("message", "")

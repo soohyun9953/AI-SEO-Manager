@@ -358,6 +358,26 @@ export default function ExperienceReviewWriterPage() {
       return;
     }
 
+    // 같은 장소로 이미 만든 글이 있으면 중복 생성 여부를 확인 (로컬 백엔드에서만 동작, 실패 시 무시)
+    try {
+      const dupRes = await fetch(getApiUrl(`/api/contents/check-duplicate?keyword=${encodeURIComponent(placeName.trim())}`));
+      if (dupRes.ok) {
+        const dup = await dupRes.json();
+        if (dup.count > 0) {
+          const list = (dup.items as { title: string; created_at: string }[])
+            .slice(0, 3)
+            .map(it => `· ${it.title} (${(it.created_at || "").slice(0, 10)})`)
+            .join("\n");
+          const proceed = confirm(
+            `'${placeName}'(으)로 이미 만든 글이 ${dup.count}건 있습니다.\n\n${list}\n\n같은 장소의 비슷한 글을 여러 개 발행하면 검색에서 서로 순위를 깎아먹을 수 있습니다.\n그래도 새로 생성할까요?`
+          );
+          if (!proceed) return;
+        }
+      }
+    } catch {
+      // 중복 확인 실패 시 그대로 진행
+    }
+
     setLoading(true);
     set_current_step(1);
     set_elapsed_seconds(0);
@@ -461,6 +481,7 @@ export default function ExperienceReviewWriterPage() {
                 tags: contentTags,
                 category: category || "맛집/카페",
                 blog_name: blogTarget,
+                meta_description: data.meta_description || "",
                 action: "TEMP_SAVE"
               })
             });

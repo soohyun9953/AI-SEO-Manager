@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import base64
+import html as html_lib
 import tempfile
 import time
 import json
@@ -100,6 +101,59 @@ class TistoryAutomator:
                 log(f"[OK] '이어서 작성' 확인창을 닫고 새 글로 시작합니다: {handled}")
         except Exception as e:
             log(f"[WARN] 확인창 처리 중 오류(무시): {e}")
+
+    def _meta_summary_html(self, meta_description: str) -> str:
+        """티스토리는 별도 검색 설명 입력란이 없어 본문 첫 부분이 검색 설명으로 쓰이므로, 메타 설명을 맨 위 요약 문단으로 삽입"""
+        meta = (meta_description or "").strip()
+        if not meta:
+            return ""
+        return (
+            '<p style="padding: 14px 18px; background: #f8fafc; border-left: 4px solid #3b82f6; '
+            'border-radius: 6px; color: #334155; font-size: 15px; line-height: 1.7;">'
+            f'<strong>핵심 요약</strong> · {html_lib.escape(meta)}</p>'
+        )
+
+    def _category_candidates(self, category: str, hint_text: str) -> List[str]:
+        """앱 카테고리를 블로그의 실제 카테고리명 후보 목록(우선순위순)으로 변환"""
+        cat = (category or "").strip()
+        cands = [cat] if cat else []
+        if cat == "맛집/카페":
+            if re.search(r"카페|커피|로스터|디저트|베이커리|브런치", hint_text):
+                cands += ["카페", "음식점", "맛집"]
+            else:
+                cands += ["음식점", "맛집", "카페"]
+        elif cat == "여행/나들이":
+            cands += ["여행", "나들이", "일상"]
+        elif cat == "숙소/호텔":
+            cands += ["숙소", "호텔", "여행", "일상"]
+        elif cat == "문화/전시":
+            cands += ["문화", "전시", "일상"]
+        elif cat == "생활/체험":
+            cands += ["체험", "일상"]
+        return cands
+
+    def _select_category(self, page: Page, category: str, hint_text: str) -> bool:
+        """블로그의 실제 카테고리 목록에서 후보와 일치하는 항목을 찾아 선택"""
+        try:
+            page.locator("#category-btn").first.click(timeout=4000)
+            page.wait_for_timeout(800)
+            options = page.evaluate(
+                "() => Array.from(document.querySelectorAll('[id^=category-item-]')).map(e => ({id: e.id, text: e.innerText.trim()}))")
+            names = [o["text"].lstrip("- ").strip() for o in options]
+            log(f"📂 블로그 카테고리 목록: {names}")
+            for cand in self._category_candidates(category, hint_text):
+                for opt, name in zip(options, names):
+                    if name == cand or cand in name:
+                        page.locator(f"[id='{opt['id']}']").first.click()
+                        page.wait_for_timeout(600)
+                        log(f"✅ 카테고리 '{name}' 선택 완료 (요청: {category})")
+                        return True
+            # 맞는 항목이 없으면 목록을 닫음
+            page.locator("#category-btn").first.click()
+            log(f"⚠️ '{category}'에 맞는 블로그 카테고리를 찾지 못해 카테고리를 지정하지 않았습니다.")
+        except Exception as cat_e:
+            log(f"⚠️ 카테고리 선택 스킵 ({cat_e})")
+        return False
 
     def _extract_photos(self, content_html: str):
         """본문 속 base64 사진(<figure> 또는 <img>)을 임시 파일로 저장하고, 해당 위치에 업로드용 자리표시자를 남긴다."""
@@ -193,14 +247,15 @@ class TistoryAutomator:
         content_html: str,
         tags: Optional[List[str]] = None,
         category: Optional[str] = None,
-        action: str = "TEMP_SAVE"
+        action: str = "TEMP_SAVE",
+        meta_description: str = ""
     ) -> Dict[str, Any]:
         """
         티스토리 에디터에 콘텐츠 등록 실행 (독립 스레드 보장)
         """
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(self._run_post_content, title, content_html, tags, category, action)
+            future = executor.submit(self._run_post_content, title, content_html, tags, category, action, meta_description)
             return future.result()
 
     def _run_post_content(
@@ -209,7 +264,8 @@ class TistoryAutomator:
         content_html: str,
         tags: Optional[List[str]] = None,
         category: Optional[str] = None,
-        action: str = "TEMP_SAVE"
+        action: str = "TEMP_SAVE",
+        meta_description: str = ""
     ) -> Dict[str, Any]:
         start_time = datetime.now().isoformat()
         result = {
@@ -302,26 +358,19 @@ class TistoryAutomator:
                 page.fill(title_selector, title)
                 time.sleep(1)
 
-                # 4. 카테고리 선택 (있는 경우)
+                # 4. 카테고리 선택 (블로그의 실제 카테고리명과 매칭)
                 if category:
-                    print(f"📂 카테고리 선택 시도: {category}")
-                    try:
-                        category_btn = page.locator("#category-btn, .btn_category, button.btn_choice, #category-selector").first
-                        if category_btn.is_visible(timeout=3000):
-                            category_btn.click()
-                            time.sleep(1)
-                            # 카테고리 텍스트 일치 항목 클릭
-                            item = page.locator(f"//span[contains(text(), '{category}')] | //li[contains(., '{category}')]").first
-                            if item.is_visible(timeout=2000):
-                                item.click()
-                                print(f"✅ 카테고리 '{category}' 선택 완료")
-                    except Exception as cat_e:
-                        print(f"⚠️ 카테고리 선택 스킵 ({cat_e})")
+                    hint = f"{title} {re.sub(r'<[^>]+>', ' ', content_html)[:600]}"
+                    self._select_category(page, category, hint)
 
                 # 5. 본문 입력 (HTML 모드 전환 주입)
                 print("📄 본문 내용 주입 준비 (HTML 모드 전환)...")
                 
                 # 본문 속 base64 사진은 티스토리에 직접 업로드하기 위해 분리
+                summary_html = self._meta_summary_html(meta_description)
+                if summary_html:
+                    content_html = summary_html + content_html
+                    print("📝 메타 설명을 본문 상단 요약 문단으로 추가")
                 body_html, photo_files = self._extract_photos(content_html)
                 if photo_files:
                     print(f"📷 업로드할 사진 {len(photo_files)}장 확인")

@@ -515,3 +515,23 @@ def get_publish_history(content_id: Optional[str] = None) -> List[Dict[str, Any]
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def find_similar_contents(keyword: str, limit: int = 5) -> List[Dict[str, Any]]:
+    """같은 장소/키워드로 이미 만들어진 글 조회 (공백 무시 비교)"""
+    kw = (keyword or "").replace(" ", "").strip()
+    if not kw:
+        return []
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, title, status, created_at FROM contents
+        WHERE REPLACE(keyword, ' ', '') = ? OR REPLACE(title, ' ', '') LIKE ?
+        ORDER BY created_at DESC LIMIT ?
+        """,
+        (kw, f"%{kw}%", limit)
+    )
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
