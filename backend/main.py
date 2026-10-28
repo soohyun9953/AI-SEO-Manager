@@ -1692,6 +1692,113 @@ def launch_claude_browser():
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"브라우저 실행 실패: {str(e)}")
 
+class NaverClaudeReviewRequest(BaseModel):
+    place_name: str
+    category: Optional[str] = "맛집/카페"
+    location: Optional[str] = ""
+    place_url: Optional[str] = ""
+    key_info: Optional[str] = ""
+    special_notes: Optional[str] = ""
+    rating: Optional[str] = "5.0"
+    photos: Optional[List[ClaudePhotoItem]] = []
+
+@app.post("/api/claude/naver-review")
+def generate_claude_naver_review(req: NaverClaudeReviewRequest):
+    """Claude.ai 웹(Playwright)으로 네이버 블로그용 후기 원고 생성 (사진 첨부, 복사 붙여넣기 방식)"""
+    if not req.place_name or not req.place_name.strip():
+        raise HTTPException(status_code=400, detail="방문 장소 또는 상호명을 입력해주세요.")
+
+    import shutil
+    import tempfile
+    import uuid
+    import claude_bot
+
+    temp_dir = os.path.join(tempfile.gettempdir(), f"claude_naver_{uuid.uuid4().hex[:8]}")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_photo_paths = []
+    photos_data_list = []
+
+    try:
+        for idx, p in enumerate((req.photos or [])[:10]):
+            caption = p.caption.strip() if p.caption else f"{req.place_name} 사진 {idx+1}"
+            photos_data_list.append({"caption": caption, "name": p.name or f"photo_{idx+1}.jpg"})
+            if p.data_url and "base64," in p.data_url:
+                try:
+                    header, b64_data = p.data_url.split("base64,", 1)
+                    ext = "png" if "image/png" in header else ("webp" if "image/webp" in header else "jpg")
+                    file_path = os.path.join(temp_dir, f"photo_{idx+1}.{ext}")
+                    with open(file_path, "wb") as f_img:
+                        f_img.write(base64.b64decode(b64_data))
+                    temp_photo_paths.append(file_path)
+                except Exception as b64_err:
+                    print(f"사진 파일 변환 실패 ({idx}): {b64_err}")
+
+        print(f"\n[API] Claude 네이버 후기 생성 시작: {req.place_name} (사진 {len(temp_photo_paths)}장)")
+        claude_automator = claude_bot.ClaudeWebAutomator(headless=False)
+        result = claude_automator.generate_review_article(
+            place_name=req.place_name,
+            category=req.category or "맛집/카페",
+            location=req.location or "",
+            place_url=req.place_url or "",
+            key_info=req.key_info or "",
+            special_notes=req.special_notes or "",
+            rating=req.rating or "5.0",
+            photo_paths=temp_photo_paths,
+            photo_captions=[d["caption"] for d in photos_data_list],
+            photos_data=photos_data_list,
+            platform="naver"
+        )
+        if not result.get("success"):
+            raise Exception(result.get("error") or "Claude 웹에서 원고 생성에 실패했습니다.")
+
+        title = result.get("title") or f"{req.place_name} 방문 후기"
+        tags = result.get("tags", [])
+        content_id = f"cont_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        try:
+            database.create_content({
+                "id": content_id,
+                "title": title,
+                "keyword": req.place_name,
+                "related_keywords": ", ".join(tags),
+                "category": req.category or "맛집/카페",
+                "content": result.get("article", ""),
+                "content_html": result.get("html_article", ""),
+                "meta_description": result.get("meta_description", ""),
+                "tags": ", ".join(tags),
+                "thumbnail_url": "",
+                "body_images": [],
+                "reference_urls": [req.place_url] if req.place_url else [],
+                "internal_links": [],
+                "ai_model": "Claude-Naver",
+                "status": "DRAFT",
+                "scheduled_at": "",
+                "tistory_url": "",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }, check_duplicate=False)
+        except Exception as db_err:
+            print(f"[WARN] 네이버 후기 DB 저장 실패(무시): {db_err}")
+            content_id = None
+
+        return {
+            "title": title,
+            "article": result.get("article", ""),
+            "html_article": result.get("html_article", ""),
+            "tags": tags,
+            "tags_hash_string": " ".join(f"#{t}" for t in tags),
+            "summary": result.get("meta_description", ""),
+            "char_count": result.get("char_count", 0),
+            "photo_count": len(photos_data_list),
+            "content_id": content_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Claude 네이버 후기 생성 실패: {str(e)}")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 @app.post("/api/claude/generate-review")
 def generate_claude_review(req: ClaudeReviewRequest):
     """

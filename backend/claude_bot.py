@@ -171,7 +171,8 @@ class ClaudeWebAutomator:
         rating: str = "5.0",
         photo_paths: Optional[List[str]] = None,
         photo_captions: Optional[List[str]] = None,
-        photos_data: Optional[List[Dict[str, str]]] = None
+        photos_data: Optional[List[Dict[str, str]]] = None,
+        platform: str = "tistory"
     ) -> Dict[str, Any]:
         """
         Claude.ai 웹에 접속하여 사진 첨부 및 프롬프트를 전송하고 생성된 원고를 추출 (독립 스레드 보장)
@@ -189,7 +190,8 @@ class ClaudeWebAutomator:
                 rating,
                 photo_paths,
                 photo_captions,
-                photos_data
+                photos_data,
+                platform
             )
             return future.result()
 
@@ -204,7 +206,8 @@ class ClaudeWebAutomator:
         rating: str = "5.0",
         photo_paths: Optional[List[str]] = None,
         photo_captions: Optional[List[str]] = None,
-        photos_data: Optional[List[Dict[str, str]]] = None
+        photos_data: Optional[List[Dict[str, str]]] = None,
+        platform: str = "tistory"
     ) -> Dict[str, Any]:
         start_time = datetime.now().isoformat()
         result = {
@@ -229,7 +232,8 @@ class ClaudeWebAutomator:
             special_notes=special_notes,
             rating=rating,
             photo_count=len(photo_paths) if photo_paths else 0,
-            photo_captions=photo_captions
+            photo_captions=photo_captions,
+            platform=platform
         )
 
         # 1. 정식 Google Chrome 실행 및 CDP 포트 확보
@@ -374,7 +378,7 @@ class ClaudeWebAutomator:
                 if not full_raw_text or len(full_raw_text.strip()) < 100:
                     raise Exception("Claude로부터 생성된 원고 텍스트를 추출하지 못했습니다.")
 
-                parsed = self._parse_claude_response(full_raw_text, place_name, category, photos=photos_data)
+                parsed = self._parse_claude_response(full_raw_text, place_name, category, photos=photos_data, platform=platform)
                 result.update(parsed)
                 result["success"] = True
                 result["end_time"] = datetime.now().isoformat()
@@ -436,9 +440,15 @@ class ClaudeWebAutomator:
         special_notes: str,
         rating: str,
         photo_count: int,
-        photo_captions: Optional[List[str]] = None
+        photo_captions: Optional[List[str]] = None,
+        platform: str = "tistory"
     ) -> str:
         """Claude에게 전달할 고수익/SEO 최적화 블로그 원고 작성 프롬프트"""
+        if platform == "naver":
+            return self._build_naver_prompt(
+                place_name, category, location, place_url, key_info,
+                special_notes, rating, photo_count, photo_captions
+            )
         captions_info = ""
         if photo_captions:
             for idx, c in enumerate(photo_captions):
@@ -501,7 +511,107 @@ class ClaudeWebAutomator:
 이제 위 지침에 맞추어 전문 블로그 원고를 정성껏 작성해주세요!
 """.strip()
 
-    def _parse_claude_response(self, text: str, place_name: str, category: str, photos: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+    def _build_naver_prompt(
+        self,
+        place_name: str,
+        category: str,
+        location: str,
+        place_url: str,
+        key_info: str,
+        special_notes: str,
+        rating: str,
+        photo_count: int,
+        photo_captions: Optional[List[str]] = None
+    ) -> str:
+        """네이버 블로그(검색 노출 기준)용 후기 작성 프롬프트"""
+        captions_info = ""
+        for idx, c in enumerate(photo_captions or []):
+            captions_info += f"- 사진 {idx+1}: {c}\n"
+        photo_count = min(photo_count, 10)
+        if photo_count:
+            slot_guide = (
+                f"첨부된 사진 {photo_count}장을 직접 보고 내용에 맞는 위치를 정해, 각 위치에 아래 마커를 단독 줄로 삽입하세요 "
+                f"(사진 번호는 첨부 순서와 같고, 모든 번호를 한 번씩만 사용):\n"
+                + "\n".join(f"   <!-- [PHOTO_{i+1}_SLOT] -->" for i in range(photo_count))
+            )
+        else:
+            slot_guide = "사진이 없으므로 사진 마커는 넣지 마세요."
+
+        return f"""
+당신은 네이버 블로그 검색(스마트블록, C-Rank, D.I.A.)에 강한 '{category}' 전문 블로거입니다.
+직접 다녀온 사람의 시선으로 쓴 '내돈내산 방문 후기'를 네이버 블로그용으로 작성해주세요.
+
+[방문 정보]
+- 장소/상호명: {place_name}
+- 카테고리: {category}
+- 위치/지역: {location or '정보 없음'}
+- 지도/플레이스 링크: {place_url or '정보 없음'}
+- 주요 정보(메뉴/가격/시설 등): {key_info or '정보 없음'}
+- 방문 메모/특이사항: {special_notes or '정보 없음'}
+- 만족도: {rating} / 5.0
+- 사진 설명:
+{captions_info or '사진 설명 없음'}
+
+[네이버 블로그 작성 지침]
+1. 제목: 공백 포함 25~40자. 핵심 키워드(지역 + 상호명 + 대표 메뉴/특징)를 앞쪽에 배치하고 "내돈내산 솔직 후기! ... 총정리" 같은 반복 틀은 피할 것.
+2. 본문 (공백 제외 1,800~2,500자):
+   - 첫 문단 3~4줄 안에 장소명과 핵심 키워드를 자연스럽게 포함하고 방문 계기와 한 줄 요약을 쓸 것.
+   - 모바일 가독성을 위해 한 문단은 2~3줄, 문단 사이에 빈 줄.
+   - 소제목은 마크다운 "## 소제목 문장" 형식으로 3~5개. "소제목 1:" 같은 번호·라벨 문구는 쓰지 말 것.
+   - 구성: 도입 → 위치·주차·웨이팅 → 분위기·공간 → 메뉴/체험 상세 평가 → 아쉬운 점 → 한눈에 보기(글머리표 목록) → 이런 분께 추천 + 마무리.
+   - 표는 쓰지 말고 글머리표(-) 목록으로 정리할 것.
+   - 장점만 늘어놓지 말고 아쉬운 점도 솔직하게 1~2가지 쓸 것.
+   - 사진 배치: {slot_guide}
+3. 사실 관계 (매우 중요):
+   - 위 [방문 정보]와 첨부 사진에서 확인할 수 있는 내용만 쓰고, 영업시간, 가격, 주소, 전화번호, 개업 연도, 웨이팅 시간 등 구체적 사실은 입력되지 않았다면 절대 지어내지 말 것.
+   - 모르는 정보는 "방문 전 네이버 지도에서 영업시간을 꼭 확인하세요"처럼 확인을 안내할 것.
+4. 어조: 친근하고 담백한 블로그 말투(~했어요, ~더라고요). 과장 표현과 광고 같은 문구, 기계적인 문장은 피할 것.
+
+반드시 아래 구조로 작성하고 각 라벨을 정확하게 포함하세요:
+
+[제목]
+네이버용 제목
+
+[메타설명]
+글 요약 한 줄 (60자 내외)
+
+[본문]
+(마크다운 본문)
+
+[태그]
+지역 + 업종 + 메뉴 + 추천 대상 조합의 단어형 태그 20~25개를 쉼표로 구분 (# 없이, 띄어쓰기 없는 단어로)
+
+[출력 형식 - 매우 중요]
+[제목]부터 [태그]까지 전체 결과물을 반드시 하나의 마크다운 코드블록(```markdown 으로 시작해서 ``` 로 끝남) 안에 작성하세요.
+코드블록 밖에는 어떤 설명이나 인사말도 쓰지 마세요.
+""".strip()
+
+    def _naver_html(self, md_content: str, photos: Optional[List[Dict[str, str]]] = None):
+        """네이버용: 사진 마커는 그대로 두고(화면에서 실제 사진으로 치환) 본문 HTML과 편집용 텍스트를 생성"""
+        import markdown
+        photos = photos or []
+        count = min(len(photos), 10)
+        md = md_content
+        for i in range(1, count + 1):
+            marker = f"<!-- [PHOTO_{i}_SLOT] -->"
+            if marker in md:
+                continue
+            heads = [m.start() for m in re.finditer(r"\n## ", md)]
+            pos = heads[i] if i < len(heads) else len(md)
+            md = md[:pos] + f"\n\n{marker}\n\n" + md[pos:]
+
+        article_text = md
+        for i in range(count):
+            cap = (photos[i].get("caption") or "현장 사진") if isinstance(photos[i], dict) else "현장 사진"
+            article_text = article_text.replace(f"<!-- [PHOTO_{i+1}_SLOT] -->", f"📷 [사진 {i+1}: {cap}]")
+
+        html = markdown.markdown(md, extensions=["nl2br"])
+        html = html.replace("<h2>", '<h2 style="font-size: 20px; font-weight: bold; margin: 32px 0 14px;">')
+        html = html.replace("<p>", '<p style="line-height: 1.9; margin: 0 0 14px; font-size: 15px;">')
+        plain = re.sub(r"<!--.*?-->|[#*>\-`]", "", md)
+        return html, article_text, len(re.sub(r"\s", "", plain))
+
+    def _parse_claude_response(self, text: str, place_name: str, category: str, photos: Optional[List[Dict[str, str]]] = None, platform: str = "tistory") -> Dict[str, Any]:
         """Claude의 응답 텍스트를 제목, 본문, 태그 등으로 분리"""
         title = f"{place_name} 솔직 방문 후기"
         meta_desc = ""
@@ -535,6 +645,19 @@ class ClaudeWebAutomator:
             if tags_match:
                 cleaned = cleaned.replace(tags_match.group(0), "")
             article = cleaned.strip()
+
+        if platform == "naver":
+            tags = tags[:30]
+            html_article, article_text, char_count = self._naver_html(article, photos)
+            return {
+                "title": title,
+                "article": article_text,
+                "html_article": html_article,
+                "tags": tags,
+                "tags_string": ", ".join(tags),
+                "meta_description": meta_desc,
+                "char_count": char_count
+            }
 
         html_article = self._markdown_to_tistory_html(article, place_name, photos=photos)
 

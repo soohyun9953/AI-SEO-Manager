@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Compass,
   MapPin,
@@ -19,6 +19,7 @@ import {
   Check,
   PenLine,
   AlertCircle,
+  Globe,
 } from "lucide-react";
 import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
 import { compress_image_file } from "@/utils/imageCompressor";
@@ -47,6 +48,30 @@ const 네이버_단계_목록: 단계_정보[] = [
   },
 ];
 
+const 네이버_클로드_단계_목록: 단계_정보[] = [
+  {
+    id: 1,
+    title: "방문 정보 및 사진 준비",
+    description: "입력한 장소 정보와 사진(최대 10장)을 Claude에 전달할 형태로 정리",
+  },
+  {
+    id: 2,
+    title: "Chrome 구동 및 Claude.ai 연결",
+    description: "내 PC의 크롬을 실행하고 Claude.ai 로그인 세션을 확인 (최초 1회 로그인 필요)",
+  },
+  {
+    id: 3,
+    title: "Claude가 사진을 보고 후기 집필",
+    description: "첨부된 사진과 입력 정보를 바탕으로 네이버 검색 기준의 사실 기반 후기 작성",
+  },
+  {
+    id: 4,
+    title: "사진 삽입 및 서식 완성",
+    description: "사진 위치 마커를 실제 사진으로 치환하고 복사용 서식 완성",
+  },
+];
+
+const LOCAL_BACKEND = "http://localhost:8002";
 const NAVER_WRITE_URL = "https://blog.naver.com/GoBlogWrite.naver";
 const MAX_PHOTOS = 10;
 
@@ -98,6 +123,34 @@ export default function NaverReviewWriterPage() {
   const [activeTab, setActiveTab] = useState<"preview" | "text" | "seo">("preview");
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // 생성 엔진: Gemini(어디서나) / Claude(내 PC 로컬 서버에서만 가능)
+  const [engine, setEngine] = useState<"gemini" | "claude">("gemini");
+  const [isLocal, setIsLocal] = useState(false);
+  const [launchingClaude, setLaunchingClaude] = useState(false);
+
+  useEffect(() => {
+    const host = window.location.hostname;
+    setIsLocal(host === "localhost" || host === "127.0.0.1");
+  }, []);
+
+  const handleLaunchClaude = async () => {
+    setLaunchingClaude(true);
+    try {
+      const res = await fetch(`${LOCAL_BACKEND}/api/claude/launch-browser`, { method: "POST" });
+      const raw = await res.text();
+      let data: { detail?: string } = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {}
+      if (!res.ok) throw new Error(data.detail || raw || "Claude 브라우저 실행 실패");
+      alert("크롬 브라우저가 열렸습니다. 열린 창에서 Claude.ai 로그인을 진행해 주세요! (로그인 세션은 유지됩니다)");
+    } catch (err) {
+      alert(`오류: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLaunchingClaude(false);
+    }
+  };
 
   const loadSampleData = () => {
     setPlaceName(기본_상호명);
@@ -206,8 +259,12 @@ export default function NaverReviewWriterPage() {
       return;
     }
     const geminiKey = typeof window !== "undefined" ? localStorage.getItem("GEMINI_API_KEY") || "" : "";
-    if (!geminiKey) {
+    if (engine === "gemini" && !geminiKey) {
       alert("상단의 API 키 입력란에 Gemini API 키를 먼저 등록해주세요.");
+      return;
+    }
+    if (engine === "claude" && !isLocal) {
+      alert("Claude 엔진은 내 PC의 로컬 서버(http://localhost:3000)에서만 사용할 수 있습니다.");
       return;
     }
     if (!(await confirmIfDuplicate())) return;
@@ -221,25 +278,41 @@ export default function NaverReviewWriterPage() {
     const timer = setInterval(() => {
       seconds += 1;
       set_elapsed_seconds(seconds);
-      if (seconds === 2) set_current_step(2);
-      else if (seconds === 4) set_current_step(3);
+      if (engine === "gemini") {
+        if (seconds === 2) set_current_step(2);
+        else if (seconds === 4) set_current_step(3);
+      } else {
+        if (seconds === 2) set_current_step(2);
+        else if (seconds === 8) set_current_step(3);
+      }
     }, 1000);
 
     try {
-      const res = await fetch("/api/naver/generate-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Gemini-Key": geminiKey },
-        body: JSON.stringify({
-          place_name: placeName,
-          category,
-          location,
-          place_url: placeUrl,
-          key_info: keyInfo,
-          special_notes: specialNotes,
-          rating,
-          photo_captions: photos.map(p => p.caption),
-        }),
-      });
+      const baseBody = {
+        place_name: placeName,
+        category,
+        location,
+        place_url: placeUrl,
+        key_info: keyInfo,
+        special_notes: specialNotes,
+        rating,
+      };
+      const res =
+        engine === "gemini"
+          ? await fetch("/api/naver/generate-review", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "X-Gemini-Key": geminiKey },
+              body: JSON.stringify({ ...baseBody, photo_captions: photos.map(p => p.caption) }),
+            })
+          : // Claude는 사진을 직접 보고 쓰므로 사진을 함께 전송 (로컬 백엔드 직접 호출로 프록시 타임아웃 방지)
+            await fetch(`${LOCAL_BACKEND}/api/claude/naver-review`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...baseBody,
+                photos: photos.map(p => ({ data_url: p.dataUrl, caption: p.caption, name: p.fileName })),
+              }),
+            });
 
       const rawText = await res.text();
       let data: {
@@ -338,7 +411,7 @@ export default function NaverReviewWriterPage() {
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30 mb-3">
               <PenLine size={14} className="text-emerald-400" />
-              <span>Naver Blog · Gemini 2.5 Flash</span>
+              <span>Naver Blog · Gemini / Claude</span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">체험·방문 후기 (네이버)</h1>
             <p className="text-sm text-slate-300 mt-2 max-w-2xl leading-relaxed">
@@ -583,6 +656,63 @@ export default function NaverReviewWriterPage() {
             )}
           </div>
 
+          {/* 생성 엔진 선택 */}
+          <div className="bg-[#0b0c14] border border-white/[0.08] rounded-3xl p-6 shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Sparkles size={18} className="text-emerald-400" />
+                3. AI 생성 엔진 선택
+              </h2>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {engine === "gemini" ? "⚡ 어디서나 사용 가능" : "🧠 내 PC 로컬 전용"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setEngine("gemini")}
+                className={`p-3.5 rounded-2xl border text-left transition-all ${
+                  engine === "gemini"
+                    ? "bg-emerald-600/20 border-emerald-500/60 ring-1 ring-emerald-500/40 text-white"
+                    : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200 hover:border-white/[0.12]"
+                }`}
+              >
+                <span className="text-xs font-bold text-emerald-300">⚡ Gemini 2.5 Flash</span>
+                <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                  5~10초 만에 완성. 사진 설명(캡션)만 사용합니다. 배포 사이트에서도 사용 가능.
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEngine("claude")}
+                disabled={!isLocal}
+                className={`p-3.5 rounded-2xl border text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  engine === "claude"
+                    ? "bg-purple-600/20 border-purple-500/60 ring-1 ring-purple-500/40 text-white"
+                    : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200 hover:border-white/[0.12]"
+                }`}
+              >
+                <span className="text-xs font-bold text-purple-300">🧠 Claude (사진 직접 분석)</span>
+                <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                  {isLocal
+                    ? "사진을 직접 보고 작성. 30~60초 소요, Claude.ai 로그인 필요."
+                    : "로컬 서버(localhost:3000)에서만 사용 가능합니다."}
+                </p>
+              </button>
+            </div>
+            {engine === "claude" && isLocal && (
+              <button
+                type="button"
+                onClick={handleLaunchClaude}
+                disabled={launchingClaude || loading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white border border-white/[0.1] text-xs font-semibold transition-all disabled:opacity-50"
+              >
+                <Globe size={15} className="text-orange-400" />
+                {launchingClaude ? "브라우저 구동 중..." : "Claude 로그인 창 열기 (최초 1회)"}
+              </button>
+            )}
+          </div>
+
           <button
             onClick={handleGenerate}
             disabled={loading}
@@ -591,12 +721,12 @@ export default function NaverReviewWriterPage() {
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>네이버용 후기 작성 중...</span>
+                <span>{engine === "gemini" ? "네이버용 후기 작성 중..." : "Claude가 후기 작성 중..."}</span>
               </>
             ) : (
               <>
                 <Sparkles size={18} />
-                <span>⚡ 네이버 블로그용 후기 작성하기</span>
+                <span>{engine === "gemini" ? "⚡ Gemini로 네이버 후기 작성하기" : "🧠 Claude로 네이버 후기 작성하기"}</span>
               </>
             )}
           </button>
@@ -654,12 +784,16 @@ export default function NaverReviewWriterPage() {
               {loading ? (
                 <div className="h-full flex flex-col items-center justify-center py-6 px-4">
                   <StepProgressIndicator
-                    steps={네이버_단계_목록}
+                    steps={engine === "gemini" ? 네이버_단계_목록 : 네이버_클로드_단계_목록}
                     current_step={current_step}
                     is_completed={is_step_completed}
                     elapsed_seconds={elapsed_seconds}
-                    sub_message="네이버 블로그용 후기를 작성하고 있습니다"
-                    tip_message="입력하지 않은 영업시간·가격·주소는 지어내지 않고, 방문 전 확인하도록 안내합니다."
+                    sub_message={engine === "gemini" ? "Gemini가 네이버 블로그용 후기를 작성하고 있습니다" : "Claude가 사진을 보고 네이버 블로그용 후기를 작성하고 있습니다"}
+                    tip_message={
+                      engine === "claude" && current_step === 2
+                        ? "새로 열린 크롬 창에서 Claude.ai 로그인이 필요하면 로그인을 완료해 주세요. 완료되면 자동으로 이어서 진행합니다."
+                        : "입력하지 않은 영업시간·가격·주소는 지어내지 않고, 방문 전 확인하도록 안내합니다."
+                    }
                   />
                 </div>
               ) : !hasResult ? (
