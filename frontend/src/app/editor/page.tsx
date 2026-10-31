@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PenTool, Send, Copy, Eye, FileText, Loader2, CheckCircle, Zap, Layout, Hash, Trash2, Save, Download, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import ExportModal, { ContentItem } from "@/components/ExportModal";
+import { APP_VERSION, APP_RELEASE_DATE } from "@/utils/appVersion";
 
 function EditorContent() {
   const searchParams = useSearchParams();
@@ -255,7 +256,7 @@ function EditorContent() {
              <PenTool size={14} className="text-purple-500" />
              <span className="text-[10px] font-bold text-purple-500 uppercase tracking-widest font-outfit">Content Generation Engine</span>
           </div>
-          <span className="text-xs font-medium text-gray-500 font-outfit">최종 배포일: 2026.10.18 (v2.0.0)</span>
+          <span className="text-xs font-medium text-gray-500 font-outfit">최종 배포일: {APP_RELEASE_DATE} ({APP_VERSION})</span>
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-white font-outfit">친근한 지식 메이트 <span className="text-purple-400 font-light italic">Story.</span></h1>
         <p className="text-gray-400 text-lg leading-relaxed max-w-2xl">
