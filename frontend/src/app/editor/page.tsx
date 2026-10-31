@@ -11,6 +11,7 @@ function EditorContent() {
   const searchParams = useSearchParams();
   const urlTopic = searchParams.get("topic");
   const urlKeyword = searchParams.get("keyword");
+  const fromAnalytics = searchParams.get("from") === "analytics";
 
   const [topic, setTopic] = useState(urlTopic || "");
   const [keyword, setKeyword] = useState(urlKeyword || "");
@@ -29,6 +30,7 @@ function EditorContent() {
   const [isExportOpen, setIsExportOpen] = useState(false);
 
   useEffect(() => {
+    const prevTopic = localStorage.getItem("seo_editor_topic");
     if (!urlTopic) {
       const savedTopic = localStorage.getItem("seo_editor_topic");
       if (savedTopic) setTopic(savedTopic);
@@ -41,6 +43,19 @@ function EditorContent() {
       if (savedKeyword) setKeyword(savedKeyword);
     } else {
       localStorage.setItem("seo_editor_keyword", urlKeyword);
+    }
+
+    // 새로고침해도 방금 쓴 원고가 지워지지 않도록, 저장된 주제와 다른 새 주제로 들어왔을 때만 비운다
+    if (fromAnalytics && urlTopic && prevTopic !== urlTopic) {
+      // 분석 화면의 후속 주제로 새 글을 시작하므로 이전 원고는 비운다 (이전 원고가 새 주제 아래 보이는 혼선 방지)
+      localStorage.removeItem("seo_editor_article");
+      localStorage.removeItem("seo_editor_html_article");
+      localStorage.removeItem("seo_editor_json_ld");
+      setArticle("");
+      setHtmlArticle("");
+      setJsonLd(null);
+      setActiveTab("editor");
+      return;
     }
 
     const savedArticle = localStorage.getItem("seo_editor_article");
@@ -56,7 +71,7 @@ function EditorContent() {
     if (savedJsonLd) {
       try { setJsonLd(JSON.parse(savedJsonLd)); } catch (e) {}
     }
-  }, [urlTopic, urlKeyword]);
+  }, [urlTopic, urlKeyword, fromAnalytics]);
 
   const clearEditor = () => {
     setTopic("");

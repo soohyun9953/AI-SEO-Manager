@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { X, Sparkles, Copy, Check, Lightbulb, FileText, ArrowRight, ExternalLink } from "lucide-react";
 
 interface AiImprovementModalProps {
@@ -241,6 +242,13 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
                       <p className="text-xs font-semibold text-white">{f.topic}</p>
                       <p className="text-[11px] text-blue-400">타깃 키워드: {f.target_keyword}</p>
                       <p className="text-[10px] text-gray-400">{f.reason}</p>
+                      <Link
+                        href={`/editor?topic=${encodeURIComponent(f.topic || "")}&keyword=${encodeURIComponent(f.target_keyword || "")}&from=analytics`}
+                        onClick={onClose}
+                        className="inline-flex items-center gap-1 mt-1.5 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-colors"
+                      >
+                        ✍️ 이 주제로 글쓰기
+                      </Link>
                     </div>
                   ))}
                 </div>
