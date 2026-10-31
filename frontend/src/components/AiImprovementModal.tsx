@@ -8,6 +8,7 @@ interface AiImprovementModalProps {
   isOpen: boolean;
   onClose: () => void;
   pageItem: any | null;
+  days?: number;
 }
 
 // 링크 주소는 그대로 두고, 화면에는 인코딩된 한글 주소를 풀어서 보여준다
@@ -19,10 +20,11 @@ function readableUrl(url: string): string {
   }
 }
 
-export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImprovementModalProps) {
+export default function AiImprovementModal({ isOpen, onClose, pageItem, days = 28 }: AiImprovementModalProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const [queries, setQueries] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [copiedTitleIndex, setCopiedTitleIndex] = useState<number | null>(null);
 
@@ -46,7 +48,7 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
           "Content-Type": "application/json",
           "x-gemini-api-key": apiKey
         },
-        body: JSON.stringify({ page: pageItem })
+        body: JSON.stringify({ page: { ...pageItem, days } })
       });
 
       if (!res.ok) {
@@ -55,6 +57,7 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
       }
 
       const data = await res.json();
+      setQueries(Array.isArray(data.queries) ? data.queries : []);
       setFallbackReason(data.ai_used === false ? (data.fallback_reason || "AI 호출 없이 기본 템플릿으로 생성되었습니다.") : null);
       if (data.recommendation) {
         setResult(data.recommendation);
@@ -161,6 +164,25 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
             {fallbackReason && (
               <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 leading-relaxed">
                 ⚠️ AI가 만든 제안이 아니라 기본 템플릿입니다. {fallbackReason}
+              </div>
+            )}
+            {queries.length > 0 && (
+              <div>
+                <h3 className="text-xs font-bold text-gray-300 mb-2 uppercase tracking-wider">🔎 이 글로 실제 들어온 검색어 TOP {queries.length}</h3>
+                <div className="rounded-xl border border-white/5 overflow-hidden">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-3 py-1.5 text-[10px] text-gray-500 bg-white/5">
+                    <span>검색어</span><span className="text-right">클릭</span><span className="text-right">노출</span><span className="text-right">순위</span>
+                  </div>
+                  {queries.map((q: any, i: number) => (
+                    <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-3 py-1.5 text-xs border-t border-white/5">
+                      <span className="text-white truncate">{q.query}</span>
+                      <span className="text-blue-300 text-right">{q.clicks}</span>
+                      <span className="text-gray-400 text-right">{q.impressions}</span>
+                      <span className="text-emerald-300 text-right">{q.position}위</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1.5">제목에는 클릭·노출이 높은 검색어를 앞쪽에 넣으면 유리해요. 제목 제안도 이 검색어를 반영해 만들어요.</p>
               </div>
             )}
             {/* 1. 총평 */}

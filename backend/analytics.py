@@ -493,6 +493,36 @@ class AnalyticsEngine:
             "action_needed_count": len([p for p in pages_analysis if p["priority_score"] >= 80])
         }
 
+    def fetch_page_queries(self, page_url: str, days: int = 28, limit: int = 10) -> List[Dict[str, Any]]:
+        """한 글로 실제 유입된 검색어 TOP (Search Console). 미연동·실패 시 빈 목록"""
+        if not (_oauth_env() and _gsc_site() and page_url):
+            return []
+        try:
+            from urllib.parse import quote
+            end = datetime.now().date() - timedelta(days=2)
+            start = end - timedelta(days=days - 1)
+            res = requests.post(
+                GSC_API.format(site=quote(_gsc_site(), safe="")),
+                headers={"Authorization": f"Bearer {_access_token()}"},
+                json={
+                    "startDate": start.strftime("%Y-%m-%d"), "endDate": end.strftime("%Y-%m-%d"),
+                    "dimensions": ["query"], "rowLimit": limit,
+                    "dimensionFilterGroups": [{"filters": [{"dimension": "page", "operator": "equals", "expression": page_url}]}],
+                },
+                timeout=30,
+            )
+            if res.status_code != 200:
+                print(f"[Analytics] 검색어 조회 실패({res.status_code}): {res.text[:150]}")
+                return []
+            return [
+                {"query": r["keys"][0], "clicks": int(r["clicks"]), "impressions": int(r["impressions"]),
+                 "ctr": round(r["ctr"] * 100, 2), "position": round(r["position"], 1)}
+                for r in res.json().get("rows", [])
+            ]
+        except Exception as e:
+            print(f"[Analytics] 검색어 조회 오류: {e}")
+            return []
+
     def generate_ai_recommendation(self, page_item: Dict[str, Any], api_key: str) -> Dict[str, Any]:
         """
         개별 페이지에 대한 Gemini AI 심층 최적화 처방전 생성
@@ -504,6 +534,12 @@ class AnalyticsEngine:
         impressions = page_item.get("impressions", 0)
         ctr = page_item.get("ctr", 0.0)
         position = page_item.get("position", 0.0)
+
+        top_queries = self.fetch_page_queries(url, int(page_item.get("days", 28) or 28))
+        query_block = ""
+        if top_queries:
+            lines = "\n".join(f"  - {q['query']} (클릭 {q['clicks']}, 노출 {q['impressions']}, 평균 {q['position']}위)" for q in top_queries)
+            query_block = f"- 실제 유입 검색어 TOP (Search Console):\n{lines}"
 
         prompt = f"""
 당신은 대한민국 1티어 검색엔진 최적화(SEO) 및 구글 애드센스 수익화 수석 컨설턴트입니다.
@@ -518,10 +554,13 @@ class AnalyticsEngine:
 - 평균 검색 순위: {position}위
 - 성과 진단 유형: {page_item.get('scenario_label', '')}
 - 핵심 문제점: {page_item.get('diagnosis', '')}
+{query_block}
 
 [작성 지시사항]
 1. 제목 개선안 (Title Rewrites):
    - 검색 클릭률(CTR)을 2배 이상 끌어올릴 수 있는 매력적인 제목 3가지 대안을 제시하세요.
+   - 제목은 공백 포함 35자 이내로 쓰고, 위 '실제 유입 검색어' 중 클릭·노출이 높은 핵심 검색어를 제목 앞쪽에 자연스럽게 넣으세요.
+   - 근거 없는 최상급·순위 표현(1위, 충격 등)이나 지어낸 통계는 쓰지 마세요.
    - 숫자, 혜택, 구체적 호기심 요소를 포함하세요.
 2. 콘텐츠 본문 보완 가이드 (Content Enhancements):
    - 독자의 체류시간을 늘리고 이탈을 막을 수 있는 본문 서두 3줄 요약 박스, 추가할 소제목 2개, 보완할 최신 정보를 제시하세요.
@@ -567,6 +606,7 @@ class AnalyticsEngine:
                             return {
                                 "success": True,
                                 "ai_used": True,
+                                "queries": top_queries,
                                 "url": url,
                                 "title": title,
                                 "recommendation": json.loads(response.text)
@@ -618,6 +658,7 @@ class AnalyticsEngine:
         return {
             "success": True,
             "ai_used": False,
+            "queries": top_queries,
             "fallback_reason": fallback_reason,
             "url": url,
             "title": title,

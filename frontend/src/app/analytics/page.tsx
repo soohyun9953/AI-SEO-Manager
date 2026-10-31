@@ -542,6 +542,7 @@ export default function AnalyticsPage() {
         isOpen={Boolean(selectedPageForAi)}
         onClose={() => setSelectedPageForAi(null)}
         pageItem={selectedPageForAi}
+        days={days}
       />
     </div>
   );
