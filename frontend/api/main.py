@@ -32,6 +32,14 @@ except ImportError:
     except ImportError:
         import api.database as database
 
+try:
+    import auth_guard
+except ImportError:
+    try:
+        from . import auth_guard
+    except ImportError:
+        import api.auth_guard as auth_guard
+
 load_dotenv()
 
 # Vercel 배포 시에는 제목에 배포 환경임을 명시
@@ -45,6 +53,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 사이트 비밀번호 보호 (APP_PASSWORD 환경변수)
+auth_guard.install(app)
 
 # API 키 설정
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

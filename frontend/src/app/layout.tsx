@@ -3,7 +3,9 @@ import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal, UtensilsCrossed, TrendingUp, Compass, PenLine } from "lucide-react";
 import Link from "next/link";
-import ApiKeyHeader from "@/components/ApiKeyHeader";
+import AppChrome from "@/components/AppChrome";
+import AuthFetchGuard from "@/components/AuthFetchGuard";
+import LogoutButton from "@/components/LogoutButton";
 import { APP_VERSION, APP_RELEASE_DATE } from "@/utils/appVersion";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -23,9 +25,9 @@ export default function RootLayout({
     <html lang="ko" className={`${inter.variable} ${outfit.variable} dark`}>
       <body className="bg-[#050508] text-slate-200 antialiased font-sans selection:bg-blue-500/30 selection:text-blue-200">
         <div className="bg-mesh" />
-        <div className="flex h-screen overflow-hidden relative">
-          
-          {/* Enhanced Sidebar */}
+        <AuthFetchGuard />
+        <AppChrome
+          sidebar={
           <aside className="w-64 bg-[#0a0a0f]/60 backdrop-blur-3xl border-r border-white/[0.05] p-6 flex flex-col gap-8 z-40 relative overflow-hidden flex-shrink-0">
             <Link href="/" className="flex items-center gap-3 px-2 group">
               <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/30 group-hover:scale-110 transition-all duration-500">
@@ -57,6 +59,7 @@ export default function RootLayout({
               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] px-4 mb-2">Support</p>
               <NavItem href="/settings" icon={<Settings size={18} />} label="환경 설정" />
               <NavItem href="/help" icon={<HelpCircle size={18} />} label="도움말 센터" />
+              <LogoutButton />
             </nav>
 
             <div className="mt-8 p-4 rounded-2xl bg-gradient-to-br from-blue-600/10 to-purple-600/10 border border-white/[0.05] flex flex-col gap-3 relative overflow-hidden group">
@@ -68,15 +71,10 @@ export default function RootLayout({
                <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-blue-600/20 blur-2xl group-hover:scale-150 transition-all duration-500" />
             </div>
           </aside>
-
-          {/* Main Visual Component Hub */}
-          <div className="flex-1 flex flex-col min-h-screen relative overflow-hidden">
-            <ApiKeyHeader />
-            <main className="flex-1 overflow-y-auto px-10 py-8 relative scroll-smooth focus:outline-none">
-              {children}
-            </main>
-          </div>
-        </div>
+          }
+        >
+          {children}
+        </AppChrome>
       </body>
     </html>
   );

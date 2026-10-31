@@ -23,6 +23,7 @@ import time
 import json
 from datetime import datetime
 import database
+import auth_guard
 
 load_dotenv()
 
@@ -36,6 +37,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 사이트 비밀번호 보호 (APP_PASSWORD 환경변수)
+auth_guard.install(app)
 
 # API 키 설정
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
