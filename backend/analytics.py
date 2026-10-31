@@ -12,6 +12,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import requests
+from urllib.parse import unquote
 
 # 기본 설정 디렉토리 (Vercel Serverless의 Read-Only 파일시스템 대응: /tmp 사용)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -299,7 +300,8 @@ class AnalyticsEngine:
         pc = int(prev["clicks"]) if prev else 0
         diff = c - pc
         diff_pct = _pct(c, pc)
-        title = url.rstrip("/").split("/")[-1] or url
+        # 티스토리 주소의 마지막 부분을 한글로 풀어 제목 대용으로 사용 (API는 제목을 주지 않음)
+        title = unquote(url.rstrip("/").split("/")[-1]).replace("-", " ").strip() or url
 
         if imp >= 300 and ctr < 2.0 and pos <= 15:
             scenario, label, action = "HIGH_IMP_LOW_CTR", "⚠️ 노출 대비 클릭률 저조", "REVISE_TITLE"
