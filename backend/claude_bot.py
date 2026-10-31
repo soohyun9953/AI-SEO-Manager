@@ -93,8 +93,35 @@ def ensure_debug_chrome() -> Optional[subprocess.Popen]:
             
     return proc
 
+def force_foreground_window():
+    """Windows에서 크롬 브라우저 창을 강제로 화면 맨 앞으로 활성화"""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            EnumWindows = ctypes.windll.user32.EnumWindows
+            EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+            GetWindowText = ctypes.windll.user32.GetWindowTextW
+            GetWindowTextLength = ctypes.windll.user32.GetWindowTextLengthW
+            SetForegroundWindow = ctypes.windll.user32.SetForegroundWindow
+            ShowWindow = ctypes.windll.user32.ShowWindow
+
+            def foreach_window(hwnd, lParam):
+                length = GetWindowTextLength(hwnd)
+                buff = ctypes.create_unicode_buffer(length + 1)
+                GetWindowText(hwnd, buff, length + 1)
+                title = buff.value
+                if "Claude" in title or "Sign in" in title:
+                    ShowWindow(hwnd, 9)  # SW_RESTORE
+                    SetForegroundWindow(hwnd)
+                    return False
+                return True
+
+            EnumWindows(EnumWindowsProc(foreach_window), 0)
+        except Exception:
+            pass
+
 class ClaudeWebAutomator:
-    def __init__(self, headless: bool = False, timeout_login: int = 180):
+    def __init__(self, headless: bool = False, timeout_login: int = 300):
         self.headless = headless
         self.profile_dir = CLAUDE_PROFILE_DIR
         self.timeout_login = timeout_login
@@ -113,8 +140,16 @@ class ClaudeWebAutomator:
             # 1. 로그인 페이지인 경우 사용자가 브라우저 창에서 직접 로그인할 때까지 대기
             if "login" in curr_url or "signup" in curr_url or "accounts.google.com" in curr_url:
                 log("[LOGIN_WAIT] 크롬 브라우저 창에서 Claude.ai 로그인을 진행해주세요... (로그인 대기 중)")
+                force_foreground_window()
                 try:
                     page.bring_to_front()
+                except Exception:
+                    pass
+                # 쿠키 팝업 자동 수락
+                try:
+                    cookie_btn = page.locator("button:has-text('모든 쿠키 허용'), button:has-text('Accept all cookies'), button:has-text('모두 허용')").first
+                    if cookie_btn.is_visible(timeout=500):
+                        cookie_btn.click()
                 except Exception:
                     pass
                 time.sleep(3)
