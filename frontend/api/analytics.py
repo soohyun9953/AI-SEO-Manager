@@ -95,7 +95,7 @@ def _adsense_daily(account: str, start, end):
         ("metrics", "ESTIMATED_EARNINGS"), ("metrics", "PAGE_VIEWS"), ("metrics", "CLICKS"),
     ]
     res = requests.get(
-        ADSENSE_API.format(account=f"accounts/{account}"),
+        ADSENSE_API.format(account=account),
         headers={"Authorization": f"Bearer {_access_token()}"},
         params=params, timeout=30,
     )
