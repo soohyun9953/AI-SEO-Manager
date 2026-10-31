@@ -179,7 +179,10 @@ export default function ExperienceReviewWriterPage() {
   // 로컬 스토리지 복원 및 환경 감지
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setIsVercelEnv(window.location.hostname.includes("vercel.app"));
+      const onVercel = window.location.hostname.includes("vercel.app");
+      setIsVercelEnv(onVercel);
+      // 티스토리 자동 임시저장은 내 PC의 크롬을 띄우는 기능이라 클라우드(Vercel)에서는 쓸 수 없다
+      if (onVercel) setAutoTistorySave(false);
     }
     const savedBlog = localStorage.getItem("tistory_blog");
     if (savedBlog) setTistoryBlog(savedBlog);
@@ -487,7 +490,11 @@ export default function ExperienceReviewWriterPage() {
             });
             const autoData = await autoRes.json().catch(() => ({}));
             tistoryOk = !!autoData.success;
-            if (!tistoryOk) tistoryErr = autoData.error || autoData.detail || autoData.message || `HTTP ${autoRes.status}`;
+            if (!tistoryOk) {
+              tistoryErr = autoRes.status === 404
+                ? "이 서버(Vercel)에는 티스토리 자동 임시저장 기능이 없습니다. 아래 결과의 HTML을 복사해 티스토리에 붙여넣거나, 내 PC에서 실행(localhost:3000)해 주세요."
+                : autoData.error || autoData.detail || autoData.message || `HTTP ${autoRes.status}`;
+            }
           } catch (tErr) {
             console.warn("티스토리 임시저장 연계 알림:", tErr);
             tistoryErr = "로컬 백엔드(8002)에 연결할 수 없습니다. 로컬 서버를 실행해 주세요.";
@@ -1011,6 +1018,7 @@ export default function ExperienceReviewWriterPage() {
                 <input
                   type="checkbox"
                   checked={autoTistorySave}
+                  disabled={isVercelEnv}
                   onChange={e => setAutoTistorySave(e.target.checked)}
                   className="mt-1 rounded bg-black/40 border-white/20 text-blue-500 focus:ring-0 w-4 h-4 cursor-pointer"
                 />
@@ -1024,6 +1032,11 @@ export default function ExperienceReviewWriterPage() {
                   <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                     Claude에서 원고 작성이 완료되는 즉시, 티스토리 에디터에 제목/본문(HTML)/태그를 주입하고 [임시저장]까지 자동으로 완료합니다.
                   </p>
+                  {isVercelEnv && (
+                    <p className="text-[11px] text-amber-300 mt-1 leading-relaxed">
+                      웹(Vercel)에서는 사용할 수 없어 꺼져 있습니다. 원고 생성 후 HTML을 복사해 티스토리에 붙여넣으세요. 자동 저장은 내 PC(localhost:3000)에서만 가능합니다.
+                    </p>
+                  )}
                 </div>
               </label>
 
