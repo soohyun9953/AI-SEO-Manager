@@ -9,6 +9,15 @@ interface AiImprovementModalProps {
   pageItem: any | null;
 }
 
+// 링크 주소는 그대로 두고, 화면에는 인코딩된 한글 주소를 풀어서 보여준다
+function readableUrl(url: string): string {
+  try {
+    return decodeURI(url);
+  } catch {
+    return url;
+  }
+}
+
 export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImprovementModalProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
@@ -90,7 +99,7 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-blue-400 font-mono transition-colors"
             >
-              <span>{pageItem.url}</span>
+              <span>{readableUrl(pageItem.url)}</span>
               <ExternalLink size={11} />
             </a>
           </div>
