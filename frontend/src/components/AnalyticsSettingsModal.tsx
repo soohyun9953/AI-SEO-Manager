@@ -15,6 +15,7 @@ interface ConnectionStatus {
   adsense_connected?: boolean;
   adsense_account_id?: string;
   mode?: string;
+  missing_env?: string[];
 }
 
 const ENV_GUIDE = `GOOGLE_CLIENT_ID=...
@@ -120,6 +121,12 @@ export default function AnalyticsSettingsModal({ isOpen, onClose, onSaved }: Ana
               </div>
               <p className="text-xs text-gray-400 font-mono break-all">게시자 ID: {status.adsense_account_id || "미설정"}</p>
             </div>
+
+            {status.missing_env && status.missing_env.length > 0 && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
+                서버에 설정되지 않은 환경변수: <span className="font-mono">{status.missing_env.join(", ")}</span>
+              </div>
+            )}
 
             {!anyConnected && (
               <div className="space-y-2">

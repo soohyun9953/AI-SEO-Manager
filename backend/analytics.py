@@ -184,6 +184,8 @@ class AnalyticsEngine:
             "mode": "LIVE" if (gsc or ads) else "DEMO",
             "last_sync": self.config.get("last_sync"),
             "error": getattr(self, "last_error", None),
+            # 값은 노출하지 않고 비어 있는 환경변수 이름만 알려준다 (연동 설정 점검용)
+            "missing_env": [k for k in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN", "GSC_SITE_URL", "ADSENSE_ACCOUNT_ID") if not os.getenv(k, "").strip()],
         }
 
     def fetch_metrics(self, days: int = 28) -> Dict[str, Any]:
