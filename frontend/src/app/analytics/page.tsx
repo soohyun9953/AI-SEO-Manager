@@ -55,19 +55,6 @@ export default function AnalyticsPage() {
         const json = await res.json();
         const conn = json.connection || {};
 
-        // Vercel 인스턴스 무상태 대응: 브라우저 로컬 캐시 확인 및 결합
-        try {
-          const cached = localStorage.getItem("gsc_analytics_config");
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (parsed.gsc_connected || parsed.adsense_connected) {
-              conn.gsc_connected = Boolean(parsed.gsc_connected);
-              conn.adsense_connected = Boolean(parsed.adsense_connected);
-              if (parsed.site_url) conn.site_url = parsed.site_url;
-            }
-          }
-        } catch (e) {}
-
         setConnection(conn);
         setData(json.data || null);
       }
@@ -79,6 +66,9 @@ export default function AnalyticsPage() {
   };
 
   const summary = data?.summary || {};
+  // 애드센스 계정 통화에 맞춰 표시 (USD는 소수점 유지)
+  const currencySymbol = summary.currency === "USD" ? "$" : summary.currency === "JPY" ? "¥" : (!summary.currency || summary.currency === "KRW") ? "₩" : `${summary.currency} `;
+  const fmtMoney = (n: any) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
   const pages = data?.pages || [];
   const dailyTrends = data?.daily_trends || [];
 
@@ -192,7 +182,7 @@ export default function AnalyticsPage() {
             <DollarSign size={16} className="text-amber-400" />
           </div>
           <div className="text-lg font-bold text-white tracking-tight">
-            ₩{summary.total_estimated_earnings ? summary.total_estimated_earnings.toLocaleString() : "0"}
+            {currencySymbol}{fmtMoney(summary.total_estimated_earnings)}
           </div>
           <div className="flex items-center gap-1 text-[11px] text-emerald-400 mt-2 font-medium">
             <ArrowUpRight size={12} />
@@ -207,7 +197,7 @@ export default function AnalyticsPage() {
             <BarChart3 size={16} className="text-purple-400" />
           </div>
           <div className="text-lg font-bold text-white tracking-tight">
-            ₩{summary.avg_page_rpm ? summary.avg_page_rpm.toLocaleString() : "0"}
+            {currencySymbol}{fmtMoney(summary.avg_page_rpm)}
           </div>
           <div className="text-[11px] text-gray-500 mt-2">
             1,000회 조회당 수익
@@ -309,9 +299,9 @@ export default function AnalyticsPage() {
               </div>
               <div className="flex items-center gap-1.5 text-amber-400 font-semibold ml-auto sm:ml-0">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span>예상 수익: <strong>₩{hoveredDay.estimated_earnings?.toLocaleString()}</strong></span>
+                <span>예상 수익: <strong>{currencySymbol}{fmtMoney(hoveredDay.estimated_earnings)}</strong></span>
                 <span className="text-[10px] text-gray-400 font-normal">
-                  (RPM ₩{hoveredDay.page_rpm?.toLocaleString()})
+                  (RPM {currencySymbol}{fmtMoney(hoveredDay.page_rpm)})
                 </span>
               </div>
             </div>
@@ -363,7 +353,7 @@ export default function AnalyticsPage() {
                         ? "bg-gradient-to-t from-amber-500 to-yellow-300 shadow-lg shadow-amber-500/40 ring-1 ring-amber-400"
                         : "bg-gradient-to-t from-amber-600 to-amber-400 shadow-sm shadow-amber-500/20"
                     }`}
-                    title={`${d.date} 수익: ₩${d.estimated_earnings}`}
+                    title={`${d.date} 수익: ${currencySymbol}${fmtMoney(d.estimated_earnings)}`}
                   />
                 </div>
 

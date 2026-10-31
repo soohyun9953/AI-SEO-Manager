@@ -1626,19 +1626,9 @@ async def get_analytics_overview(days: int = 28):
 async def get_analytics_settings():
     try:
         import analytics
-        config = analytics.load_analytics_config()
-        return {
-            "success": True,
-            "config": {
-                "site_url": config.get("site_url", "https://s-elegant.tistory.com/"),
-                "gsc_connected": config.get("gsc_connected", False),
-                "adsense_connected": config.get("adsense_connected", False),
-                "adsense_account_id": config.get("adsense_account_id", ""),
-                "gsc_auth_type": config.get("gsc_auth_type", "SERVICE_ACCOUNT"),
-                "service_account_email": config.get("service_account_email", ""),
-                "last_sync": config.get("last_sync")
-            }
-        }
+        # 저장된 체크박스 값이 아니라 환경변수 기준의 실제 연동 상태를 반환
+        status = analytics.AnalyticsEngine().get_connection_status()
+        return {"success": True, "config": status}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"설정 조회 실패: {str(e)}")
 

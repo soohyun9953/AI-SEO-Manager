@@ -115,6 +115,11 @@ def _adsense_daily(account: str, start, end):
     return out, currency
 
 
+def _money(amount: float, currency: str):
+    """원화·엔화는 정수, 그 외 통화(USD 등)는 소수 둘째 자리까지 유지"""
+    return int(round(amount)) if currency in ("KRW", "JPY") else round(amount, 2)
+
+
 def _pct(cur: float, prev: float) -> float:
     return round((cur - prev) / prev * 100, 1) if prev else 0.0
 
@@ -249,9 +254,9 @@ class AnalyticsEngine:
             cur_ads, currency = _adsense_daily(acc, start, end)
             for k, v in cur_ads.items():
                 if k in daily:
-                    daily[k]["estimated_earnings"] = int(round(v["earnings"]))
+                    daily[k]["estimated_earnings"] = _money(v["earnings"], currency)
                     daily[k]["page_views"] = int(v["page_views"])
-                    daily[k]["page_rpm"] = int(v["earnings"] / v["page_views"] * 1000) if v["page_views"] else 0
+                    daily[k]["page_rpm"] = _money(v["earnings"] / v["page_views"] * 1000, currency) if v["page_views"] else 0
                     earnings += v["earnings"]
                     pageviews += v["page_views"]
             prev_ads, _ = _adsense_daily(acc, prev_start, prev_end)
@@ -265,10 +270,10 @@ class AnalyticsEngine:
                 "data_disclaimer": "Search Console은 2~3일 지연됩니다. AdSense 수익은 계정 단위 집계라 글별 수익은 제공되지 않으며, 예상 수익은 확정 전 추정치입니다.",
             },
             "summary": {
-                "total_estimated_earnings": int(round(earnings)),
+                "total_estimated_earnings": _money(earnings, currency),
                 "currency": currency,
                 "total_pageviews": int(pageviews),
-                "avg_page_rpm": int(earnings / pageviews * 1000) if pageviews else 0,
+                "avg_page_rpm": _money(earnings / pageviews * 1000, currency) if pageviews else 0,
                 "total_search_clicks": clicks,
                 "total_search_impressions": impressions,
                 "avg_search_ctr": round(clicks / impressions * 100, 2) if impressions else 0.0,
@@ -611,6 +616,7 @@ class AnalyticsEngine:
         pages = days_data.get("pages", [])
         
         report_date = datetime.now().strftime("%Y년 %m월 %d일")
+        cur_sym = {"KRW": "₩", "USD": "$", "JPY": "¥"}.get(summary.get("currency", "KRW"), summary.get("currency", "KRW") + " ")
         
         markdown_report = f"""# 📊 AI SEO & AdSense 주간 성과 분석 보고서
 **보고 일자**: {report_date}  
@@ -627,8 +633,8 @@ class AnalyticsEngine:
 | **Google 검색 클릭수** | **{summary.get('total_search_clicks', 0):,}회** | {summary.get('diff_clicks_pct', 0):+}% | 검색 유입 견고한 성장세 |
 | **Google 검색 노출수** | **{summary.get('total_search_impressions', 0):,}회** | {summary.get('diff_impressions_pct', 0):+}% | 브랜드 및 키워드 인지도 확장 |
 | **평균 검색 CTR** | **{summary.get('avg_search_ctr', 0)}%** | - | 양호한 클릭 전환율 유지 |
-| **예상 광고 수익** | **₩{summary.get('total_estimated_earnings', 0):,}** | {summary.get('diff_earnings_pct', 0):+}% | 유입 증가에 따른 수익 동반 상승 |
-| **페이지 RPM** | **₩{summary.get('avg_page_rpm', 0):,}** | - | 1,000회당 고효율 수익 단가 |
+| **예상 광고 수익** | **{cur_sym}{summary.get('total_estimated_earnings', 0):,}** | {summary.get('diff_earnings_pct', 0):+}% | 유입 증가에 따른 수익 동반 상승 |
+| **페이지 RPM** | **{cur_sym}{summary.get('avg_page_rpm', 0):,}** | - | 1,000회당 고효율 수익 단가 |
 
 > [!NOTE]
 > 검색 유입 클릭수가 지난주 대비 **+{summary.get('diff_clicks_pct', 0)}%** 상승하며 애드센스 예상 수익도 긍정적인 우상향 흐름을 나타내고 있습니다.
