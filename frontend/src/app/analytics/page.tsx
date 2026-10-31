@@ -388,6 +388,7 @@ export default function AnalyticsPage() {
               { id: "ALL", label: "전체 보기" },
               { id: "HIGH_IMP_LOW_CTR", label: "⚠️ 클릭률 저조" },
               { id: "TRENDING_UP", label: "🚀 유입 급상승" },
+              { id: "NEAR_TOP", label: "🎯 상위 진입 기회" },
               { id: "TRENDING_DOWN", label: "📉 유입 급감소" },
               { id: "HIGH_REVENUE_TOPIC", label: "💰 고단가 주제" },
               { id: "HIGH_TRAFFIC_LOW_RPM", label: "📊 단가 보완" }

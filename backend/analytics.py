@@ -303,18 +303,27 @@ class AnalyticsEngine:
         # 티스토리 주소의 마지막 부분을 한글로 풀어 제목 대용으로 사용 (API는 제목을 주지 않음)
         title = unquote(url.rstrip("/").split("/")[-1]).replace("-", " ").strip() or url
 
-        if imp >= 300 and ctr < 2.0 and pos <= 15:
+        # 트래픽이 적은 블로그를 고려한 기준 (표본이 너무 작은 글은 여전히 제외)
+        if imp >= 100 and ctr < 2.0 and pos <= 20:
             scenario, label, action = "HIGH_IMP_LOW_CTR", "⚠️ 노출 대비 클릭률 저조", "REVISE_TITLE"
-            score = 60 + min(25, imp // 400) + min(15, int((3 - ctr) * 5))
-            diag = f"노출 {imp:,}회, 평균 {pos}위로 상위에 보이지만 클릭률이 {ctr}%입니다. 제목과 메타 설명 개선으로 유입을 늘릴 수 있습니다."
-        elif pc >= 10 and diff_pct <= -30:
+            score = 60 + min(25, imp // 150) + min(15, int((3 - ctr) * 5))
+            diag = f"노출 {imp:,}회, 평균 {pos}위로 검색에 보이지만 클릭률이 {ctr}%입니다. 제목과 메타 설명 개선으로 유입을 늘릴 수 있습니다."
+        elif pc >= 3 and diff <= -3 and diff_pct <= -30:
             scenario, label, action = "TRENDING_DOWN", "📉 검색 유입 급감소", "UPDATE_CONTENT"
             score = 60 + min(30, int(abs(diff_pct) / 3))
             diag = f"이전 기간 대비 클릭이 {diff_pct}% 감소했습니다(평균 {pos}위). 최신 정보로 갱신을 검토하세요."
-        elif pc >= 10 and diff_pct >= 30:
+        elif pc >= 3 and diff >= 3 and diff_pct >= 30:
             scenario, label, action = "TRENDING_UP", "🚀 검색 유입 급상승", "EXPAND_SERIES"
             score = 55 + min(35, int(diff_pct / 4))
             diag = f"이전 기간 대비 클릭이 +{diff_pct}% 증가했습니다. 관련 후속 글로 확장하면 효과가 큽니다."
+        elif pc == 0 and c >= 5:
+            scenario, label, action = "TRENDING_UP", "🚀 검색 유입 급상승", "EXPAND_SERIES"
+            score = 55 + min(20, c)
+            diag = f"이전 기간에는 유입이 없었는데 이번 기간 클릭 {c}회가 생긴 새 글입니다. 관련 후속 글로 확장하면 효과가 큽니다."
+        elif 8 <= pos <= 20 and imp >= 50:
+            scenario, label, action = "NEAR_TOP", "🎯 상위 진입 기회", "UPDATE_CONTENT"
+            score = 50 + min(25, imp // 20) + min(12, int(20 - pos))
+            diag = f"평균 {pos}위(노출 {imp:,}회)로 첫 페이지 바로 아래에 있습니다. 본문 보강과 내부 링크 추가로 순위를 끌어올릴 수 있습니다."
         else:
             return None
         return {
