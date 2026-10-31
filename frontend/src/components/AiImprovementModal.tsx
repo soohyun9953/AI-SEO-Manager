@@ -12,6 +12,7 @@ interface AiImprovementModalProps {
 export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImprovementModalProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copiedTitleIndex, setCopiedTitleIndex] = useState<number | null>(null);
 
@@ -44,6 +45,7 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
       }
 
       const data = await res.json();
+      setFallbackReason(data.ai_used === false ? (data.fallback_reason || "AI 호출 없이 기본 템플릿으로 생성되었습니다.") : null);
       if (data.recommendation) {
         setResult(data.recommendation);
       } else if (data.fallback) {
@@ -146,6 +148,11 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem }: AiImpr
         {/* 결과 표시 */}
         {result && !loading && (
           <div className="space-y-6">
+            {fallbackReason && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200 leading-relaxed">
+                ⚠️ AI가 만든 제안이 아니라 기본 템플릿입니다. {fallbackReason}
+              </div>
+            )}
             {/* 1. 총평 */}
             {result.summary_verdict && (
               <div className="p-3 bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-500/20 rounded-xl">

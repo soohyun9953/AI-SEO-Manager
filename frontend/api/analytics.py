@@ -540,6 +540,7 @@ class AnalyticsEngine:
   "summary_verdict": "전체 1줄 총평 요약"
 }}
 """
+        fallback_reason = "Gemini API 키가 설정되지 않았습니다 (환경 설정에서 키를 저장하세요)."
         # 1. API 키가 있는 경우 Gemini 2.5 Flash 직접 호출
         if api_key:
             try:
@@ -555,12 +556,14 @@ class AnalyticsEngine:
                 result = json.loads(response.text)
                 return {
                     "success": True,
+                    "ai_used": True,
                     "url": url,
                     "title": title,
                     "recommendation": result
                 }
             except Exception as e:
                 print(f"[Analytics] Gemini direct call failed: {e}")
+                fallback_reason = f"Gemini 호출 실패: {str(e)[:120]}"
 
         # 2. API 키 미설정 또는 실패 시 5대 시나리오별 전문가 스마트 처방전 폴백
         fallback_titles = [
@@ -572,11 +575,11 @@ class AnalyticsEngine:
             fallback_titles = [
                 f"[충격] {title} 진짜 효과 있을까? 3가지 핵심 검증",
                 f"{title} 모르면 손해보는 실전 꿀팁 총정리",
-                f"10명 중 9명이 놓치는 {title} 결정적 차이점"
+                f"{title} 놓치기 쉬운 결정적 차이점"
             ]
         elif scenario == "TRENDING_UP":
             fallback_titles = [
-                f"[급상승 1위] {title} 핵심 포인트 3줄 요약",
+                f"{title} 핵심 포인트 3줄 요약",
                 f"{title} 2026 최신 개정판 완벽 가이드",
                 f"{title} 이것만 알면 끝! 솔직 후기"
             ]
@@ -595,6 +598,8 @@ class AnalyticsEngine:
 
         return {
             "success": True,
+            "ai_used": False,
+            "fallback_reason": fallback_reason,
             "url": url,
             "title": title,
             "recommendation": {
