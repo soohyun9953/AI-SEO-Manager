@@ -61,7 +61,6 @@ export default function AnalyticsPage() {
           if (cached) {
             const parsed = JSON.parse(cached);
             if (parsed.gsc_connected || parsed.adsense_connected) {
-              conn.mode = "LIVE";
               conn.gsc_connected = Boolean(parsed.gsc_connected);
               conn.adsense_connected = Boolean(parsed.adsense_connected);
               if (parsed.site_url) conn.site_url = parsed.site_url;
@@ -169,7 +168,9 @@ export default function AnalyticsPage() {
           <span>
             {connection.mode === "LIVE"
               ? "Google Search Console 및 AdSense 공식 API를 통해 실제 운영 데이터가 안전하게 동기화되었습니다."
-              : "현재 Google 연동 전 단계로, 실제 API 규격과 100% 동일한 필드 구조의 검증용 샘플 데이터로 동작 중입니다."}
+              : connection.error
+                ? `Google 실데이터 조회에 실패해 샘플 데이터를 표시 중입니다. 사유: ${connection.error}`
+                : "현재 Google 연동 전 단계로, 실제 API 규격과 100% 동일한 필드 구조의 검증용 샘플 데이터로 동작 중입니다."}
           </span>
         </div>
         {connection.mode === "DEMO" && (

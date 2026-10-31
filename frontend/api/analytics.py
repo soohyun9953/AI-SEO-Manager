@@ -20,6 +20,105 @@ if os.environ.get("VERCEL") or not os.access(BASE_DIR, os.W_OK):
 else:
     CONFIG_FILE = os.path.join(BASE_DIR, "analytics_config.json")
 
+# -------------------------------------------------------------------------
+# Google API 연동 (OAuth 리프레시 토큰 방식, 환경변수로만 인증 정보를 받는다)
+#   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN : 공통
+#   GSC_SITE_URL      : Search Console 속성 (예: https://s-elegant.tistory.com/ 또는 sc-domain:example.com)
+#   ADSENSE_ACCOUNT_ID: 애드센스 계정 (예: pub-1234567890123456)
+# -------------------------------------------------------------------------
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+GSC_API = "https://www.googleapis.com/webmasters/v3/sites/{site}/searchAnalytics/query"
+ADSENSE_API = "https://adsense.googleapis.com/v2/accounts/{account}/reports:generate"
+_token_cache: Dict[str, Any] = {"token": None, "expires_at": 0.0}
+
+
+class GoogleApiError(Exception):
+    pass
+
+
+def _oauth_env() -> Optional[Dict[str, str]]:
+    cid = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+    refresh = os.getenv("GOOGLE_REFRESH_TOKEN", "").strip()
+    if cid and secret and refresh:
+        return {"client_id": cid, "client_secret": secret, "refresh_token": refresh}
+    return None
+
+
+def _gsc_site() -> str:
+    return os.getenv("GSC_SITE_URL", "").strip()
+
+
+def _adsense_account() -> str:
+    acc = os.getenv("ADSENSE_ACCOUNT_ID", "").strip()
+    if acc and not acc.startswith("pub-"):
+        acc = f"pub-{acc}"
+    return acc
+
+
+def _access_token() -> str:
+    import time
+    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
+        return _token_cache["token"]
+    creds = _oauth_env()
+    if not creds:
+        raise GoogleApiError("Google OAuth 환경변수가 설정되지 않았습니다.")
+    res = requests.post(TOKEN_URL, data={**creds, "grant_type": "refresh_token"}, timeout=20)
+    if res.status_code != 200:
+        raise GoogleApiError(f"Google 토큰 갱신 실패({res.status_code}): {res.text[:200]}")
+    body = res.json()
+    _token_cache["token"] = body["access_token"]
+    _token_cache["expires_at"] = time.time() + int(body.get("expires_in", 3600))
+    return _token_cache["token"]
+
+
+def _gsc_query(site: str, start: str, end: str, dimension: str, row_limit: int) -> List[Dict[str, Any]]:
+    from urllib.parse import quote
+    res = requests.post(
+        GSC_API.format(site=quote(site, safe="")),
+        headers={"Authorization": f"Bearer {_access_token()}"},
+        json={"startDate": start, "endDate": end, "dimensions": [dimension], "rowLimit": row_limit},
+        timeout=30,
+    )
+    if res.status_code != 200:
+        raise GoogleApiError(f"Search Console 조회 실패({res.status_code}): {res.text[:200]}")
+    return res.json().get("rows", [])
+
+
+def _adsense_daily(account: str, start, end):
+    """일별 {date: {earnings, page_views, clicks}}와 통화 코드를 반환 (계정 단위 집계)"""
+    params = [
+        ("dateRange", "CUSTOM"),
+        ("startDate.year", start.year), ("startDate.month", start.month), ("startDate.day", start.day),
+        ("endDate.year", end.year), ("endDate.month", end.month), ("endDate.day", end.day),
+        ("dimensions", "DATE"),
+        ("metrics", "ESTIMATED_EARNINGS"), ("metrics", "PAGE_VIEWS"), ("metrics", "CLICKS"),
+    ]
+    res = requests.get(
+        ADSENSE_API.format(account=f"accounts/{account}"),
+        headers={"Authorization": f"Bearer {_access_token()}"},
+        params=params, timeout=30,
+    )
+    if res.status_code != 200:
+        raise GoogleApiError(f"AdSense 조회 실패({res.status_code}): {res.text[:200]}")
+    body = res.json()
+    currency = "KRW"
+    for h in body.get("headers", []):
+        if h.get("currencyCode"):
+            currency = h["currencyCode"]
+    out: Dict[str, Dict[str, float]] = {}
+    for row in body.get("rows", []):
+        cells = [c.get("value", "0") for c in row.get("cells", [])]
+        if len(cells) < 4:
+            continue
+        out[cells[0]] = {"earnings": float(cells[1]), "page_views": float(cells[2]), "clicks": float(cells[3])}
+    return out, currency
+
+
+def _pct(cur: float, prev: float) -> float:
+    return round((cur - prev) / prev * 100, 1) if prev else 0.0
+
+
 def load_analytics_config() -> Dict[str, Any]:
     """저장된 GSC 및 AdSense 연동 설정 로드 (Vercel Read-Only 완벽 대응)"""
     candidate_paths = [
@@ -68,34 +167,152 @@ class AnalyticsEngine:
         self.config = load_analytics_config()
 
     def get_connection_status(self) -> Dict[str, Any]:
-        """현재 Google 연동 상태 조회 (토큰 마스킹)"""
+        """현재 Google 연동 상태 조회 (토큰 마스킹: 값은 노출하지 않고 설정 여부만 반환)"""
+        has_oauth = _oauth_env() is not None
+        gsc = bool(has_oauth and _gsc_site())
+        ads = bool(has_oauth and _adsense_account())
         return {
-            "site_url": self.site_url,
-            "gsc_connected": bool(self.config.get("gsc_connected")),
-            "adsense_connected": bool(self.config.get("adsense_connected")),
-            "adsense_account_id": self.config.get("adsense_account_id", ""),
-            "mode": "LIVE" if (self.config.get("gsc_connected") or self.config.get("adsense_connected")) else "DEMO",
-            "last_sync": self.config.get("last_sync")
+            "site_url": _gsc_site() or self.site_url,
+            "gsc_connected": gsc,
+            "adsense_connected": ads,
+            "adsense_account_id": _adsense_account(),
+            "mode": "LIVE" if (gsc or ads) else "DEMO",
+            "last_sync": self.config.get("last_sync"),
+            "error": getattr(self, "last_error", None),
         }
 
     def fetch_metrics(self, days: int = 28) -> Dict[str, Any]:
         """
         통합 대시보드 지표 수집
-        - 실제 API 연동이 되어 있으면 공식 API 호출
-        - 미연동 시 사실에 입각하여 '연동 대기 상태'와 검증용 '데모 샘플' 데이터 분리 제공
+        - 환경변수로 Google OAuth가 설정되어 있으면 Search Console / AdSense 실데이터 조회
+        - 미설정이거나 실패하면 DEMO 샘플로 대체하고 실패 사유는 last_error에 남긴다
+          (실패했는데 가짜 데이터를 LIVE로 보여주지 않기 위함)
         """
-        is_live = self.config.get("gsc_connected") or self.config.get("adsense_connected")
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days)
-        prev_start_date = start_date - timedelta(days=days)
 
-        if is_live:
-            # 실제 Google API 호출 처리 (설정된 토큰 또는 서비스 계정 사용)
-            # 여기서는 연결된 실제 데이터를 정규화하여 반환
-            pass
-
-        # 미연동 상태: 원칙에 따라 "데모 모드"임을 명확히 선언하고 구조화된 샘플 지표 반환
+        status = self.get_connection_status()
+        self.last_error = None
+        if status["mode"] == "LIVE":
+            try:
+                return self._fetch_live(days, status)
+            except Exception as e:
+                self.last_error = str(e)
+                print(f"[Analytics] 실데이터 조회 실패, DEMO로 대체: {e}")
         return self._generate_sample_dataset(days, start_date, end_date)
+
+    def _fetch_live(self, days: int, status: Dict[str, Any]) -> Dict[str, Any]:
+        # Search Console 데이터는 2~3일 지연되므로 종료일을 2일 전으로 잡는다
+        end = datetime.now().date() - timedelta(days=2)
+        start = end - timedelta(days=days - 1)
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=days - 1)
+        fmt = lambda d: d.strftime("%Y-%m-%d")
+
+        daily: Dict[str, Dict[str, Any]] = {}
+        cur = start
+        while cur <= end:
+            daily[fmt(cur)] = {"date": fmt(cur), "search_clicks": 0, "search_impressions": 0, "search_ctr": 0.0,
+                               "page_views": 0, "estimated_earnings": 0, "page_rpm": 0}
+            cur += timedelta(days=1)
+
+        pages: List[Dict[str, Any]] = []
+        clicks = impressions = prev_clicks = prev_impressions = 0
+        pos_weighted = 0.0
+        if status["gsc_connected"]:
+            site = _gsc_site()
+            for r in _gsc_query(site, fmt(start), fmt(end), "date", days + 5):
+                key = r["keys"][0]
+                if key in daily:
+                    daily[key]["search_clicks"] = int(r["clicks"])
+                    daily[key]["search_impressions"] = int(r["impressions"])
+                    daily[key]["search_ctr"] = round(r["ctr"] * 100, 2)
+                    clicks += int(r["clicks"])
+                    impressions += int(r["impressions"])
+                    pos_weighted += r["position"] * r["impressions"]
+            prev_rows = _gsc_query(site, fmt(prev_start), fmt(prev_end), "date", days + 5)
+            prev_clicks = sum(int(r["clicks"]) for r in prev_rows)
+            prev_impressions = sum(int(r["impressions"]) for r in prev_rows)
+
+            prev_pages = {r["keys"][0]: r for r in _gsc_query(site, fmt(prev_start), fmt(prev_end), "page", 500)}
+            for r in _gsc_query(site, fmt(start), fmt(end), "page", 500):
+                item = self._diagnose_page(r, prev_pages.get(r["keys"][0]))
+                if item:
+                    pages.append(item)
+            pages.sort(key=lambda x: x["priority_score"], reverse=True)
+            pages = pages[:30]
+
+        earnings = prev_earnings = pageviews = 0.0
+        currency = "KRW"
+        if status["adsense_connected"]:
+            acc = _adsense_account()
+            cur_ads, currency = _adsense_daily(acc, start, end)
+            for k, v in cur_ads.items():
+                if k in daily:
+                    daily[k]["estimated_earnings"] = int(round(v["earnings"]))
+                    daily[k]["page_views"] = int(v["page_views"])
+                    daily[k]["page_rpm"] = int(v["earnings"] / v["page_views"] * 1000) if v["page_views"] else 0
+                    earnings += v["earnings"]
+                    pageviews += v["page_views"]
+            prev_ads, _ = _adsense_daily(acc, prev_start, prev_end)
+            prev_earnings = sum(v["earnings"] for v in prev_ads.values())
+
+        sources = [n for n, ok in (("Search Console", status["gsc_connected"]), ("AdSense", status["adsense_connected"])) if ok]
+        return {
+            "period": {
+                "days": days, "start_date": fmt(start), "end_date": fmt(end),
+                "data_source_mode": f"LIVE ({' + '.join(sources)} 실데이터)",
+                "data_disclaimer": "Search Console은 2~3일 지연됩니다. AdSense 수익은 계정 단위 집계라 글별 수익은 제공되지 않으며, 예상 수익은 확정 전 추정치입니다.",
+            },
+            "summary": {
+                "total_estimated_earnings": int(round(earnings)),
+                "currency": currency,
+                "total_pageviews": int(pageviews),
+                "avg_page_rpm": int(earnings / pageviews * 1000) if pageviews else 0,
+                "total_search_clicks": clicks,
+                "total_search_impressions": impressions,
+                "avg_search_ctr": round(clicks / impressions * 100, 2) if impressions else 0.0,
+                "avg_search_position": round(pos_weighted / impressions, 1) if impressions else 0.0,
+                "diff_clicks_pct": _pct(clicks, prev_clicks),
+                "diff_impressions_pct": _pct(impressions, prev_impressions),
+                "diff_earnings_pct": _pct(earnings, prev_earnings),
+            },
+            "daily_trends": list(daily.values()),
+            "pages": pages,
+            "trending_up_count": len([p for p in pages if p["scenario"] == "TRENDING_UP"]),
+            "trending_down_count": len([p for p in pages if p["scenario"] == "TRENDING_DOWN"]),
+            "action_needed_count": len([p for p in pages if p["priority_score"] >= 80]),
+        }
+
+    def _diagnose_page(self, row: Dict[str, Any], prev: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """GSC 페이지 지표를 규칙 기반으로 진단. 해당 없는 글과 표본이 작은 글은 None"""
+        url = row["keys"][0]
+        c, imp = int(row["clicks"]), int(row["impressions"])
+        ctr, pos = round(row["ctr"] * 100, 2), round(row["position"], 1)
+        pc = int(prev["clicks"]) if prev else 0
+        diff = c - pc
+        diff_pct = _pct(c, pc)
+        title = url.rstrip("/").split("/")[-1] or url
+
+        if imp >= 300 and ctr < 2.0 and pos <= 15:
+            scenario, label, action = "HIGH_IMP_LOW_CTR", "⚠️ 노출 대비 클릭률 저조", "REVISE_TITLE"
+            score = 60 + min(25, imp // 400) + min(15, int((3 - ctr) * 5))
+            diag = f"노출 {imp:,}회, 평균 {pos}위로 상위에 보이지만 클릭률이 {ctr}%입니다. 제목과 메타 설명 개선으로 유입을 늘릴 수 있습니다."
+        elif pc >= 10 and diff_pct <= -30:
+            scenario, label, action = "TRENDING_DOWN", "📉 검색 유입 급감소", "UPDATE_CONTENT"
+            score = 60 + min(30, int(abs(diff_pct) / 3))
+            diag = f"이전 기간 대비 클릭이 {diff_pct}% 감소했습니다(평균 {pos}위). 최신 정보로 갱신을 검토하세요."
+        elif pc >= 10 and diff_pct >= 30:
+            scenario, label, action = "TRENDING_UP", "🚀 검색 유입 급상승", "EXPAND_SERIES"
+            score = 55 + min(35, int(diff_pct / 4))
+            diag = f"이전 기간 대비 클릭이 +{diff_pct}% 증가했습니다. 관련 후속 글로 확장하면 효과가 큽니다."
+        else:
+            return None
+        return {
+            "url": url, "title": title, "clicks": c, "prev_clicks": pc, "diff_clicks": diff, "diff_pct": diff_pct,
+            "impressions": imp, "ctr": ctr, "position": pos, "scenario": scenario, "scenario_label": label,
+            "diagnosis": diag, "action_type": action, "priority_score": max(0, min(100, int(score))),
+        }
 
     def _generate_sample_dataset(self, days: int, start_date, end_date) -> Dict[str, Any]:
         """
