@@ -553,23 +553,33 @@ class AnalyticsEngine:
         # 1. API 키가 있는 경우 Gemini 2.5 Flash 직접 호출
         if api_key:
             try:
+                import time
                 from google import genai
                 from google.genai import types
-                client = genai.Client(api_key=api_key)
+                client = genai.Client(api_key=api_key.split(",")[0].strip())
                 config = types.GenerateContentConfig(response_mime_type="application/json")
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                    config=config
-                )
-                result = json.loads(response.text)
-                return {
-                    "success": True,
-                    "ai_used": True,
-                    "url": url,
-                    "title": title,
-                    "recommendation": result
-                }
+                last_err = None
+                # 일시적 과부하(503)는 짧게 재시도하고, 계속 실패하면 가벼운 모델로 넘어간다 (서버리스 제한시간 고려)
+                for model_name in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
+                    for attempt in range(2):
+                        try:
+                            response = client.models.generate_content(model=model_name, contents=prompt, config=config)
+                            return {
+                                "success": True,
+                                "ai_used": True,
+                                "url": url,
+                                "title": title,
+                                "recommendation": json.loads(response.text)
+                            }
+                        except Exception as call_err:
+                            last_err = call_err
+                            msg = str(call_err).upper()
+                            print(f"[Analytics] {model_name} 실패({attempt + 1}/2): {call_err}")
+                            if "503" in msg or "UNAVAILABLE" in msg:
+                                time.sleep(1.5)
+                                continue
+                            break  # 한도 초과·인증 오류 등은 같은 모델 재시도가 무의미
+                raise last_err
             except Exception as e:
                 print(f"[Analytics] Gemini direct call failed: {e}")
                 fallback_reason = f"Gemini 호출 실패: {str(e)[:120]}"
