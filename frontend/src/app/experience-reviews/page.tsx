@@ -83,7 +83,6 @@ const 제미나이_단계_목록: 단계_정보[] = [
   },
 ];
 import { compress_image_file } from "@/utils/imageCompressor";
-import { 기본_상호명, 기본_위치, 기본_지도링크, 기본_주요정보, 기본_카테고리, 기본_샘플_사진 } from "@/utils/sampleData";
 
 interface ReviewResponse {
   detail?: string;
@@ -153,23 +152,6 @@ export default function ExperienceReviewWriterPage() {
   const [elapsed_seconds, set_elapsed_seconds] = useState<number>(0);
   const [is_step_completed, set_is_step_completed] = useState<boolean>(false);
 
-  // 임시 테스트 데이터(도미닉커피로스터즈) 자동 입력 함수
-  const loadSampleData = () => {
-    setPlaceName(기본_상호명);
-    setCategory(기본_카테고리);
-    setLocation(기본_위치);
-    setPlaceUrl(기본_지도링크);
-    setKeyInfo(기본_주요정보);
-    setSpecialNotes("매장에서 직접 로스팅하는 스페셜티 커피 전문점. 광교 호수공원 인근 여유로운 분위기.");
-    setPhotos([기본_샘플_사진]);
-
-    localStorage.setItem("exp_review_place", 기본_상호명);
-    localStorage.setItem("exp_review_category", 기본_카테고리);
-    localStorage.setItem("exp_review_loc", 기본_위치);
-    localStorage.setItem("exp_review_url", 기본_지도링크);
-    localStorage.setItem("exp_review_keyinfo", 기본_주요정보);
-  };
-
   // 5. UI 탭 및 모달
   const [activeTab, setActiveTab] = useState<"preview" | "html" | "editor" | "seo">("preview");
   const [copiedType, setCopiedType] = useState<string | null>(null);
@@ -187,11 +169,14 @@ export default function ExperienceReviewWriterPage() {
     const savedBlog = localStorage.getItem("tistory_blog");
     if (savedBlog) setTistoryBlog(savedBlog);
 
-    const savedPlace = localStorage.getItem("exp_review_place");
+    let savedPlace = localStorage.getItem("exp_review_place");
+    // 예전 버전이 자동으로 채워 저장해 둔 테스트 값(도미닉커피로스터즈)이 남아 있으면 비운다
+    if (savedPlace === "도미닉커피로스터즈") {
+      ["place", "category", "loc", "url", "keyinfo", "notes"].forEach(k => localStorage.removeItem(`exp_review_${k}`));
+      savedPlace = null;
+    }
     if (savedPlace && savedPlace.trim()) {
       setPlaceName(savedPlace);
-    } else {
-      loadSampleData();
     }
 
     const savedCat = localStorage.getItem("exp_review_category");
@@ -707,15 +692,6 @@ export default function ExperienceReviewWriterPage() {
                 <Compass size={18} className="text-blue-400" />
                 1. 방문 장소 정보 입력
               </h2>
-              <button
-                type="button"
-                onClick={loadSampleData}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition-all hover:scale-105 shadow-sm"
-                title="도미닉커피로스터즈 테스트 데이터 자동 채우기"
-              >
-                <Sparkles size={13} className="text-blue-400 animate-pulse" />
-                테스트 데이터 자동 입력
-              </button>
             </div>
 
             {/* 카테고리 선택 */}

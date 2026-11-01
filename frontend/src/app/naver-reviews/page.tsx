@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
 import { compress_image_file } from "@/utils/imageCompressor";
-import { 기본_상호명, 기본_위치, 기본_지도링크, 기본_카테고리, 기본_샘플_사진 } from "@/utils/sampleData";
 
 const 네이버_단계_목록: 단계_정보[] = [
   {
@@ -150,16 +149,6 @@ export default function NaverReviewWriterPage() {
     } finally {
       setLaunchingClaude(false);
     }
-  };
-
-  const loadSampleData = () => {
-    setPlaceName(기본_상호명);
-    setCategory(기본_카테고리);
-    setLocation(기본_위치);
-    setPlaceUrl(기본_지도링크);
-    setKeyInfo("");
-    setSpecialNotes("매장에서 직접 로스팅하는 스페셜티 커피 전문점. 광교 호수공원 인근 여유로운 분위기.");
-    setPhotos([기본_샘플_사진]);
   };
 
   const resetForm = () => {
@@ -449,14 +438,6 @@ export default function NaverReviewWriterPage() {
                 <Compass size={18} className="text-emerald-400" />
                 1. 방문 장소 정보 입력
               </h2>
-              <button
-                type="button"
-                onClick={loadSampleData}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all"
-              >
-                <Sparkles size={13} />
-                테스트 데이터 입력
-              </button>
             </div>
 
             <div>
