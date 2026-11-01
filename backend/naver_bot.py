@@ -113,7 +113,7 @@ class NaverAutomator:
         while time.time() < deadline:
             if "nid.naver.com" not in page.url:
                 break
-            time.sleep(2)
+            page.wait_for_timeout(2000)
         else:
             raise Exception("네이버 로그인 대기 시간(5분)이 초과되었습니다.")
         if "blog.naver.com" not in page.url:
@@ -132,16 +132,17 @@ class NaverAutomator:
                         return frame
                 except Exception:
                     continue
-            time.sleep(1)
+            page.wait_for_timeout(1000)
         raise Exception("네이버 글쓰기 에디터를 찾지 못했습니다. 블로그 아이디가 맞는지, 로그인되어 있는지 확인하세요.")
 
     def _dismiss_popups(self, frame: Frame) -> None:
         """'작성 중인 글이 있습니다' 안내와 도움말 패널을 닫는다"""
+        page = frame.page
         try:
             if frame.get_by_text("작성 중인 글이 있습니다").count() > 0:
                 log("[POPUP] [Naver Bot] 이전 작성 글 안내 → 새로 작성")
                 frame.locator(".se-popup-button-cancel").first.click(timeout=3000)
-                time.sleep(1)
+                page.wait_for_timeout(1000)
         except Exception as e:
             log(f"[WARN] [Naver Bot] 이전 글 안내 처리 건너뜀: {e}")
         try:
@@ -155,13 +156,14 @@ class NaverAutomator:
         log("[EDIT] [Naver Bot] 제목 입력")
         el = frame.locator(".se-title-text").first
         el.click()
-        time.sleep(0.3)
+        page.wait_for_timeout(300)
         page.keyboard.insert_text(title)
-        time.sleep(0.5)
+        page.wait_for_timeout(500)
 
     def _body_length(self, frame: Frame) -> int:
+        """에디터 전체 글자 수 (붙여넣기가 반영됐는지 비교용, 기다림 없이 즉시 계산)"""
         try:
-            return len(frame.locator(".se-main-container").first.inner_text())
+            return int(frame.evaluate("() => ((document.querySelector('.se-content') || document.body).innerText || '').length"))
         except Exception:
             return 0
 
@@ -195,7 +197,7 @@ class NaverAutomator:
                 [html, plain],
             )
             page.keyboard.press("Control+V")
-            time.sleep(1.2)
+            page.wait_for_timeout(1200)
         except Exception as e:
             log(f"[WARN] [Naver Bot] 클립보드 붙여넣기 실패: {e}")
         if self._body_length(frame) > before:
@@ -213,7 +215,7 @@ class NaverAutomator:
                 }""",
                 [html, plain],
             )
-            time.sleep(1.2)
+            page.wait_for_timeout(1200)
         except Exception as e:
             log(f"[WARN] [Naver Bot] 이벤트 방식 실패: {e}")
         if self._body_length(frame) > before:
@@ -221,7 +223,7 @@ class NaverAutomator:
 
         log("[WARN] [Naver Bot] 서식 붙여넣기 실패 → 일반 텍스트로 입력 (소제목 서식은 직접 지정 필요)")
         page.keyboard.insert_text(plain)
-        time.sleep(0.8)
+        page.wait_for_timeout(800)
 
     def _upload_photo(self, page: Page, frame: Frame, path: str) -> bool:
         """사진 버튼으로 파일을 업로드하고, 사진 컴포넌트가 늘어날 때까지 기다린다"""
@@ -240,9 +242,9 @@ class NaverAutomator:
         deadline = time.time() + 40
         while time.time() < deadline:
             if frame.locator(".se-component.se-image").count() > before:
-                time.sleep(1)
+                page.wait_for_timeout(1000)
                 return True
-            time.sleep(0.5)
+            page.wait_for_timeout(500)
         log("[WARN] [Naver Bot] 사진 업로드 완료를 확인하지 못했습니다.")
         return False
 
@@ -270,14 +272,16 @@ class NaverAutomator:
 
     def _click_save(self, page: Page, frame: Frame) -> Dict[str, Any]:
         log("[SAVE] [Naver Bot] 저장 버튼 클릭")
-        button = frame.locator("button:text-is('저장')").first
+        button = frame.locator("button[class*='save_btn']").first
+        if button.count() == 0:
+            button = frame.locator("button:text-is('저장')").first
         if button.count() == 0:
             button = page.locator("button:text-is('저장')").first
         button.click(timeout=10000)
 
         confirmed = False
         for _ in range(8):
-            time.sleep(1)
+            page.wait_for_timeout(1000)
             try:
                 if frame.get_by_text("저장되었습니다").count() > 0 or frame.get_by_text("임시저장").count() > 0:
                     confirmed = True
