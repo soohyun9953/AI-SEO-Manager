@@ -429,7 +429,8 @@ export default function ExperienceReviewWriterPage() {
         setProgressStep("⚡ Gemini 2.5 Flash 고속 분석 및 원고 생성 중...");
         const geminiKey = typeof window !== "undefined" ? (localStorage.getItem("GEMINI_API_KEY") || "") : "";
 
-        const res = await fetch("/api/generate-review", {
+        // 로컬에서는 백엔드를 직접 호출한다 (Next 개발 서버 프록시는 약 30초가 넘으면 응답 없이 500을 돌려준다)
+        const res = await fetch(getApiUrl("/api/generate-review"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -450,7 +451,7 @@ export default function ExperienceReviewWriterPage() {
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || `Gemini 후기 생성 실패 (${res.status})`);
+          throw new Error(errData.detail || `Gemini 후기 생성 실패 (${res.status}) - 서버가 사유 없이 응답했습니다. 백엔드 창(SEO Backend)의 오류 로그를 확인해 주세요.`);
         }
 
         const data = await res.json();
