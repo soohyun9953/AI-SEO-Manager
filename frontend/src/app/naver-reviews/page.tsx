@@ -117,6 +117,13 @@ export default function NaverReviewWriterPage() {
   const [summary, setSummary] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [resultPhotos, setResultPhotos] = useState<PhotoItem[]>([]);
+  const [articleMd, setArticleMd] = useState("");
+
+  // 네이버 임시저장 (Claude 전용, 로컬)
+  const [autoNaverSave, setAutoNaverSave] = useState(true);
+  const [naverBlogId, setNaverBlogId] = useState("");
+  const [savingNaver, setSavingNaver] = useState(false);
+  const [naverMessage, setNaverMessage] = useState("");
 
   // UI
   const [activeTab, setActiveTab] = useState<"preview" | "text" | "seo">("preview");
@@ -130,8 +137,54 @@ export default function NaverReviewWriterPage() {
 
   useEffect(() => {
     const host = window.location.hostname;
-    setIsLocal(host === "localhost" || host === "127.0.0.1");
+    const local = host === "localhost" || host === "127.0.0.1";
+    setIsLocal(local);
+    // 네이버는 Claude 기준으로 진행 (Claude는 내 PC 로컬에서만 가능)
+    if (local) setEngine("claude");
+    const savedId = localStorage.getItem("naver_blog_id");
+    if (savedId) setNaverBlogId(savedId);
   }, []);
+
+  // 네이버 임시저장 (내 PC의 크롬이 글쓰기 화면에 입력하고 [저장]까지 실행. 발행은 직접)
+  const saveToNaver = async (titleValue: string, markdown: string, photoList: PhotoItem[]) => {
+    const blogId = naverBlogId.trim();
+    if (!blogId) {
+      alert("네이버 블로그 아이디를 입력해 주세요. (예: blog.naver.com/아이디 의 '아이디')");
+      return;
+    }
+    if (!markdown) {
+      alert("임시저장할 원고가 없습니다. 먼저 Claude로 후기를 작성해 주세요.");
+      return;
+    }
+    localStorage.setItem("naver_blog_id", blogId);
+    setSavingNaver(true);
+    setNaverMessage("📝 네이버 임시저장 진행 중... 크롬 창이 열립니다. 최초에는 그 창에서 네이버 로그인이 필요합니다.");
+    try {
+      const res = await fetch(`${LOCAL_BACKEND}/api/naver/auto-register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: titleValue,
+          article_md: markdown,
+          blog_id: blogId,
+          photos: photoList.map(p => ({ data_url: p.dataUrl, caption: p.caption, name: p.fileName })),
+        }),
+      });
+      const raw = await res.text();
+      let data: { success?: boolean; message?: string; error?: string; detail?: string } = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {}
+      if (!res.ok || !data.success) {
+        throw new Error(data.detail || data.error || `네이버 임시저장 실패 (${res.status})`);
+      }
+      setNaverMessage(`✅ ${data.message || "네이버 임시저장을 완료했습니다."}`);
+    } catch (err) {
+      setNaverMessage(`⚠️ 임시저장 실패: ${err instanceof Error ? err.message : String(err)} (아래 [서식 복사]로 직접 붙여넣을 수 있습니다)`);
+    } finally {
+      setSavingNaver(false);
+    }
+  };
 
   const handleLaunchClaude = async () => {
     setLaunchingClaude(true);
@@ -166,6 +219,8 @@ export default function NaverReviewWriterPage() {
     setSummary("");
     setCharCount(0);
     setResultPhotos([]);
+    setArticleMd("");
+    setNaverMessage("");
   };
 
   // 사진 처리 (클라이언트에서 압축, 서버에는 사진 설명만 전송)
@@ -312,6 +367,7 @@ export default function NaverReviewWriterPage() {
         tags?: string[];
         summary?: string;
         char_count?: number;
+        article_md?: string;
       } = {};
       try {
         data = JSON.parse(rawText);
@@ -328,10 +384,16 @@ export default function NaverReviewWriterPage() {
       setSummary(data.summary || "");
       setCharCount(data.char_count || 0);
       setResultPhotos(photos);
+      setArticleMd(data.article_md || "");
+      setNaverMessage("");
       setActiveTab("preview");
 
       clearInterval(timer);
       set_is_step_completed(true);
+
+      if (engine === "claude" && isLocal && autoNaverSave && data.article_md) {
+        void saveToNaver(data.title || `${placeName} 방문 후기`, data.article_md, photos);
+      }
     } catch (err) {
       console.error(err);
       alert(`오류: ${err instanceof Error ? err.message : "원고 생성 중 문제가 발생했습니다."}`);
@@ -692,6 +754,41 @@ export default function NaverReviewWriterPage() {
                 {launchingClaude ? "브라우저 구동 중..." : "Claude 로그인 창 열기 (최초 1회)"}
               </button>
             )}
+            {engine === "claude" && isLocal && (
+              <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2.5">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoNaverSave}
+                    onChange={e => setAutoNaverSave(e.target.checked)}
+                    className="mt-1 rounded bg-black/40 border-white/20 text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-white flex items-center gap-2">
+                      작성 후 네이버 임시저장까지 자동 실행
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
+                        베타
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                      내 PC의 크롬이 네이버 글쓰기 화면에 제목·본문·사진을 넣고 [저장]까지 합니다. 발행은 직접 하세요. 태그는 입력되지 않으니 [태그 & 점검] 탭에서 복사하세요.
+                    </p>
+                  </div>
+                </label>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    네이버 블로그 아이디 (blog.naver.com/<span className="text-emerald-300">아이디</span>)
+                  </label>
+                  <input
+                    type="text"
+                    value={naverBlogId}
+                    onChange={e => setNaverBlogId(e.target.value)}
+                    placeholder="예: myblog123"
+                    className="w-full px-3 py-1.5 rounded-xl bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <button
@@ -757,9 +854,26 @@ export default function NaverReviewWriterPage() {
                     {copiedType === "rich" ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                     {copiedType === "rich" ? "복사완료" : "서식 복사 (본문+사진)"}
                   </button>
+                  {isLocal && articleMd && (
+                    <button
+                      onClick={() => saveToNaver(title, articleMd, resultPhotos)}
+                      disabled={savingNaver}
+                      title="내 PC 크롬으로 네이버 글쓰기 화면에 입력하고 임시저장합니다 (베타)"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-200 border border-purple-500/30 text-xs font-bold transition-all disabled:opacity-40"
+                    >
+                      {savingNaver ? <Loader2 size={14} className="animate-spin" /> : <Globe size={14} />}
+                      {savingNaver ? "임시저장 중..." : "네이버 임시저장 (베타)"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
+
+            {naverMessage && (
+              <div className="mt-4 p-3 rounded-xl bg-white/[0.04] border border-white/[0.1] text-[12px] text-slate-200 leading-relaxed">
+                {naverMessage}
+              </div>
+            )}
 
             <div className="flex-1 py-5 overflow-y-auto max-h-[800px]">
               {loading ? (

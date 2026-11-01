@@ -1792,6 +1792,7 @@ def generate_claude_naver_review(req: NaverClaudeReviewRequest):
             "tags_hash_string": " ".join(f"#{t}" for t in tags),
             "summary": result.get("meta_description", ""),
             "char_count": result.get("char_count", 0),
+            "article_md": result.get("article_md", ""),
             "photo_count": len(photos_data_list),
             "content_id": content_id
         }
@@ -1800,6 +1801,53 @@ def generate_claude_naver_review(req: NaverClaudeReviewRequest):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Claude 네이버 후기 생성 실패: {str(e)}")
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+class NaverAutoRegisterRequest(BaseModel):
+    title: str
+    article_md: str
+    blog_id: str
+    photos: Optional[List[ClaudePhotoItem]] = []
+
+@app.post("/api/naver/auto-register")
+def run_naver_auto_register(req: NaverAutoRegisterRequest):
+    """생성된 원고(제목·마크다운 본문·사진)를 네이버 블로그 글쓰기 화면에 입력하고 임시저장 (내 PC 로컬 전용, 베타)"""
+    blog_id = (req.blog_id or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_\-]{2,30}", blog_id):
+        raise HTTPException(status_code=400, detail="네이버 블로그 아이디를 영문·숫자로 정확히 입력해 주세요. (예: myblog123)")
+    if not req.title.strip() or not req.article_md.strip():
+        raise HTTPException(status_code=400, detail="제목과 본문이 비어 있습니다.")
+
+    import shutil
+    import tempfile
+    import uuid
+    import naver_bot
+
+    temp_dir = os.path.join(tempfile.gettempdir(), f"naver_save_{uuid.uuid4().hex[:8]}")
+    os.makedirs(temp_dir, exist_ok=True)
+    photo_paths = []
+    try:
+        for idx, p in enumerate((req.photos or [])[:10]):
+            if p.data_url and "base64," in p.data_url:
+                try:
+                    header, b64_data = p.data_url.split("base64,", 1)
+                    ext = "png" if "image/png" in header else ("webp" if "image/webp" in header else "jpg")
+                    file_path = os.path.join(temp_dir, f"photo_{idx+1}.{ext}")
+                    with open(file_path, "wb") as f_img:
+                        f_img.write(base64.b64decode(b64_data))
+                    photo_paths.append(file_path)
+                except Exception as b64_err:
+                    print(f"사진 파일 변환 실패 ({idx}): {b64_err}")
+                    photo_paths.append("")
+            else:
+                photo_paths.append("")
+
+        print(f"\n[API] 네이버 임시저장 시작: {blog_id} / 제목: {req.title[:30]} / 사진 {len([p for p in photo_paths if p])}장")
+        return naver_bot.NaverAutomator(blog_id).save_draft(req.title, req.article_md, photo_paths)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"네이버 임시저장 실패: {str(e)}")
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 

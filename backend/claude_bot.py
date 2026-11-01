@@ -595,8 +595,9 @@ class ClaudeWebAutomator:
 2. 본문 (공백 제외 1,800~2,500자):
    - 첫 문단 3~4줄 안에 장소명과 핵심 키워드를 자연스럽게 포함하고 방문 계기와 한 줄 요약을 쓸 것.
    - 모바일 가독성을 위해 한 문단은 2~3줄, 문단 사이에 빈 줄.
-   - 소제목은 마크다운 "## 소제목 문장" 형식으로 3~5개. "소제목 1:" 같은 번호·라벨 문구는 쓰지 말 것.
-   - 구성: 도입 → 위치·주차·웨이팅 → 분위기·공간 → 메뉴/체험 상세 평가 → 아쉬운 점 → 한눈에 보기(글머리표 목록) → 이런 분께 추천 + 마무리.
+   - 소제목은 마크다운 "## 소제목 문장" 형식으로 4~6개. "소제목 1:" 같은 번호·라벨 문구는 쓰지 말 것.
+   - 도입 바로 아래에 "> **먼저 보고 가세요**" 인용문으로 핵심 3줄(위치/가격대/한 줄 평)을 요약해 이탈을 줄일 것.
+   - 구성: 도입(+3줄 요약) → 위치·주차·웨이팅 → 분위기·공간 → 메뉴/체험 상세 평가 → 솔직히 아쉬웠던 점 → 방문 전 자주 묻는 질문(독자가 검색할 만한 질문 3개를 "**Q.** 질문 / A. 답변" 형식으로) → 한눈에 보기(글머리표 목록) → 이런 분께 추천·비추천 + 마무리.
    - 표는 쓰지 말고 글머리표(-) 목록으로 정리할 것.
    - 장점만 늘어놓지 말고 아쉬운 점도 솔직하게 1~2가지 쓸 것.
    - 사진 배치: {slot_guide}
@@ -647,7 +648,7 @@ class ClaudeWebAutomator:
         html = html.replace("<h2>", '<h2 style="font-size: 20px; font-weight: bold; margin: 32px 0 14px;">')
         html = html.replace("<p>", '<p style="line-height: 1.9; margin: 0 0 14px; font-size: 15px;">')
         plain = re.sub(r"<!--.*?-->|[#*>\-`]", "", md)
-        return html, article_text, len(re.sub(r"\s", "", plain))
+        return html, article_text, len(re.sub(r"\s", "", plain)), md
 
     def _parse_claude_response(self, text: str, place_name: str, category: str, photos: Optional[List[Dict[str, str]]] = None, platform: str = "tistory") -> Dict[str, Any]:
         """Claude의 응답 텍스트를 제목, 본문, 태그 등으로 분리"""
@@ -686,7 +687,7 @@ class ClaudeWebAutomator:
 
         if platform == "naver":
             tags = tags[:30]
-            html_article, article_text, char_count = self._naver_html(article, photos)
+            html_article, article_text, char_count, article_md = self._naver_html(article, photos)
             return {
                 "title": title,
                 "article": article_text,
@@ -694,7 +695,8 @@ class ClaudeWebAutomator:
                 "tags": tags,
                 "tags_string": ", ".join(tags),
                 "meta_description": meta_desc,
-                "char_count": char_count
+                "char_count": char_count,
+                "article_md": article_md
             }
 
         html_article = self._markdown_to_tistory_html(article, place_name, photos=photos)
