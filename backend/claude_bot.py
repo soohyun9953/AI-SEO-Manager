@@ -431,6 +431,178 @@ class ClaudeWebAutomator:
 
         return result
 
+    # ------------------------------------------------------------------ IT 글 SEO 수정 (다이어그램 포함)
+    def generate_it_post(self, original_text: str, keyword: str = "", category: str = "IT") -> Dict[str, Any]:
+        """원문을 SEO에 맞게 다듬고 설명용 다이어그램(SVG)까지 클로드가 작성한 원본 답변을 돌려준다 (독립 스레드)"""
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(self._run_it_post, original_text, keyword, category).result()
+
+    def _run_it_post(self, original_text: str, keyword: str, category: str) -> Dict[str, Any]:
+        result: Dict[str, Any] = {"success": False, "raw": "", "error": None}
+        prompt = self._build_it_prompt(original_text, keyword, category)
+
+        ensure_debug_chrome()
+        with sync_playwright() as p:
+            log(f"[CONNECT] [Claude Bot] Chrome DevTools Protocol로 연결합니다 ({CHROME_CDP_URL})...")
+            browser = p.chromium.connect_over_cdp(CHROME_CDP_URL)
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
+            # 이미 열린 claude.ai 탭이 있으면 재사용하고, 없으면 새 탭을 연다 (다른 사이트 탭을 건드리지 않기 위함)
+            page = next((pg for pg in context.pages if "claude.ai" in pg.url), None) or context.new_page()
+            page.on("dialog", lambda dialog: dialog.accept())
+
+            try:
+                try:
+                    page.goto(CLAUDE_NEW_URL, wait_until="domcontentloaded", timeout=60000)
+                except Exception as nav_e:
+                    log(f"[WARN] 페이지 이동 중 경미한 알림: {nav_e}")
+                try:
+                    page.bring_to_front()
+                except Exception:
+                    pass
+                time.sleep(2)
+
+                input_selector = self._ensure_ready_for_chat(page)
+                self._inject_and_send(page, input_selector, prompt)
+                raw = self._wait_for_answer(page, max_wait_seconds=420)
+                if not raw or len(raw.strip()) < 200:
+                    raise Exception("Claude로부터 답변 텍스트를 추출하지 못했습니다.")
+                result["raw"] = raw
+                result["success"] = True
+                log("[OK] [Claude Bot] IT 글 답변 추출 완료")
+            except Exception as e:
+                log(f"[ERROR] [Claude Bot] 에러 발생: {e}")
+                result["error"] = str(e)
+        return result
+
+    def _inject_and_send(self, page: Page, input_selector: str, prompt: str) -> None:
+        """입력창에 프롬프트를 넣고 전송한다"""
+        input_element = page.locator(input_selector).first
+        input_element.click()
+        time.sleep(0.5)
+        log("[EDIT] [Claude Bot] 프롬프트 텍스트 주입 중...")
+        page.evaluate("""
+            ([selector, text]) => {
+                const el = document.querySelector(selector);
+                if (!el) return;
+                if (el.tagName.toLowerCase() === 'textarea') {
+                    el.value = text;
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                } else {
+                    el.focus();
+                    document.execCommand('selectAll', false, null);
+                    document.execCommand('insertText', false, text);
+                }
+            }
+        """, [input_selector, prompt])
+        time.sleep(1.5)
+        inserted_text = input_element.inner_text()
+        if not inserted_text or len(inserted_text.strip()) < 10:
+            log("[WARN] 텍스트 직접 입력 보완 실행...")
+            input_element.click()
+            page.keyboard.insert_text(prompt)
+            time.sleep(1)
+
+        log("[SEND] [Claude Bot] 전송 버튼 클릭...")
+        send_clicked = False
+        for s_sel in ["button[aria-label*='Send']", "button[aria-label*='전송']", "button:has-text('Send')",
+                      "fieldset button[type='submit']", "button:has(svg)"]:
+            btn = page.locator(s_sel).last
+            try:
+                if btn.is_visible(timeout=1500) and btn.is_enabled():
+                    btn.click()
+                    send_clicked = True
+                    log(f"[OK] 전송 버튼 클릭 완료 ({s_sel})")
+                    break
+            except Exception:
+                continue
+        if not send_clicked:
+            log("[WARN] 전송 버튼 클릭 실패, Enter 키 전송 시도...")
+            input_element.press("Enter")
+
+    def _wait_for_answer(self, page: Page, max_wait_seconds: int = 300) -> str:
+        """답변 생성이 끝날 때까지 기다린 뒤 원본 텍스트(코드블록 우선)를 추출한다"""
+        log("[WAIT] [Claude Bot] 답변 생성 중... 생성이 완료될 때까지 대기합니다...")
+        time.sleep(5)
+        elapsed, last_len, unchanged = 0, 0, 0
+        while elapsed < max_wait_seconds:
+            time.sleep(2)
+            elapsed += 2
+            is_streaming = False
+            try:
+                is_streaming = page.locator("button[aria-label*='Stop'], button:has-text('Stop')").first.is_visible(timeout=1000)
+            except Exception:
+                pass
+            curr_len = len(self._get_latest_assistant_message(page).strip())
+            if curr_len > 100:
+                if curr_len == last_len:
+                    unchanged += 1
+                else:
+                    unchanged, last_len = 0, curr_len
+            if not is_streaming and curr_len > 200 and unchanged >= 3:
+                log("[DONE] [Claude Bot] 답변 생성 완료 감지!")
+                break
+            if elapsed % 10 == 0:
+                log(f"   생성 진행 중... ({elapsed}초 경과, 현재 글자 수: {curr_len}자)")
+        raw = self._get_latest_markdown_block(page)
+        if raw:
+            log("[OK] [Claude Bot] 코드블록에서 원본을 추출했습니다.")
+            return raw
+        return self._get_latest_assistant_message(page)
+
+    def _build_it_prompt(self, original_text: str, keyword: str, category: str) -> str:
+        """IT 글을 SEO에 맞게 다듬고 설명용 다이어그램(SVG)을 함께 쓰게 하는 프롬프트"""
+        return f"""
+당신은 IT 전문 블로그 에디터이자 검색엔진 최적화(SEO) 전문가입니다.
+아래 [원문]을 티스토리 블로그에 올릴 수 있도록 SEO에 맞게 다듬고, 이해를 돕는 설명용 다이어그램을 직접 그려 주세요.
+
+[원문 정보]
+- 카테고리: {category or 'IT'}
+- 핵심 키워드(선택): {keyword.strip() if keyword and keyword.strip() else '없음 (원문에서 가장 중요한 검색어 1~2개를 직접 고를 것)'}
+
+[핵심 원칙 - 가장 중요]
+1. 사실 유지: 원문의 기술 내용, 수치, 버전, 날짜, 주장, 코드, 명령어는 그대로 유지하세요. 원문에 없는 기술 사실·수치·출시일·성능 비교·고유명사를 절대 추가하지 마세요. 확신이 없는 내용은 만들지 말고 "공식 문서에서 확인하세요"처럼 안내하세요.
+2. 고치는 범위: 제목, 메타설명, 도입부, 핵심 3줄 요약, 소제목 구조, 문단 가독성, 키워드 배치, 마무리 정리, FAQ만 개선하세요. 원문의 설명을 바꾸거나 줄이지 말고, 순서가 어색하면 재배치만 하세요.
+3. 코드 블록, 표, 목록은 원문 그대로 보존하세요(마크다운 코드 펜스 유지).
+
+[SEO 지침]
+- 제목: 공백 포함 35자 이내, 핵심 키워드를 앞쪽에 배치, 클릭을 부르되 과장·낚시 표현 금지.
+- 메타설명: 80~120자, 핵심 키워드 포함.
+- 본문 구조: 도입(2~3문장) → 도입 바로 아래 "> **먼저 보고 가세요**" 인용문으로 핵심 3줄 요약 → "## 소제목" 4~7개(필요하면 "### 소제목") → "## 자주 묻는 질문"(원문 내용으로 답할 수 있는 질문 2~3개만, "**Q.** 질문 / A. 답변" 형식) → "## 정리" 마무리.
+- 소제목은 "소제목 1:" 같은 번호·라벨 없이 내용을 담은 문장으로 쓰세요.
+- 핵심 키워드는 제목, 도입부, 소제목 1~2개, 마무리에 자연스럽게 넣고 과도하게 반복하지 마세요.
+- 문단은 2~4줄로 끊고, 어려운 용어는 원문 범위 안에서 첫 등장 때 한 줄로 풀어 주세요.
+- 태그: 검색 유입용 단어형 태그 10~15개(# 없이, 쉼표로 구분).
+
+[다이어그램 지침]
+- 글 이해에 실제로 도움이 되는 설명 그림을 2~4개 직접 SVG로 그리세요(구조도, 처리 흐름도, 비교도, 단계도 등). 억지로 늘리지 말고 원문에 근거한 내용만 그리세요.
+- 본문에서 그림이 들어갈 자리에 단독 줄로 <!-- [PHOTO_1_SLOT] --> , <!-- [PHOTO_2_SLOT] --> 처럼 번호 순서대로 표시하세요.
+- SVG 규칙: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 높이"> 로 시작(높이 300~520), 첫 요소는 흰색 배경 사각형, 글자는 font-family="Malgun Gothic, Apple SD Gothic Neo, Noto Sans KR, sans-serif", 글자 크기 16 이상, 한 칸에 들어가는 글자는 짧게(긴 문장은 text를 나누어 여러 줄로), 글자와 도형이 겹치지 않게 충분한 여백, 선과 화살표로 흐름을 분명하게(화살표는 marker 사용 가능), 색은 3~4가지 이내의 차분한 색. 스크립트·외부 이미지·외부 폰트·링크·애니메이션은 사용하지 마세요.
+
+[출력 형식 - 매우 중요]
+- 전체 결과물을 백틱 4개로 열고 닫는 하나의 코드블록(````markdown 으로 시작해서 ```` 로 끝남) 안에 작성하세요. 그 안의 코드 예제는 백틱 3개를 그대로 써도 됩니다.
+- 코드블록 밖에는 어떤 설명도 쓰지 마세요.
+- 아래 라벨을 각각 독립된 한 줄로 정확히 쓰세요.
+
+[제목]
+수정한 제목
+[메타설명]
+메타설명
+[본문]
+(마크다운 본문. 그림 자리에 <!-- [PHOTO_n_SLOT] --> 표시)
+[태그]
+태그1, 태그2, 태그3
+[다이어그램1]
+캡션: 그림을 설명하는 한 줄(원문에 근거한 내용)
+<svg ...>...</svg>
+[다이어그램2]
+캡션: ...
+<svg ...>...</svg>
+
+[원문]
+{original_text}
+""".strip()
+
     def _get_latest_markdown_block(self, page: Page) -> str:
         """가장 마지막 코드블록(원본 마크다운) 텍스트 추출. 없거나 너무 짧으면 빈 문자열"""
         try:

@@ -1851,6 +1851,128 @@ def run_naver_auto_register(req: NaverAutoRegisterRequest):
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+class ITPostRequest(BaseModel):
+    original_text: str
+    keyword: Optional[str] = ""
+    category: Optional[str] = "IT"
+    blog_name: Optional[str] = ""
+    auto_tistory_save: Optional[bool] = True
+
+@app.post("/api/claude/it-post")
+def generate_claude_it_post(req: ITPostRequest):
+    """IT 원문을 Claude(웹)가 SEO에 맞게 다듬고 설명용 다이어그램을 그리면, 이미지로 바꿔 넣어 티스토리에 임시저장 (내 PC 로컬 전용)"""
+    text = (req.original_text or "").strip()
+    if len(text) < 100:
+        raise HTTPException(status_code=400, detail="원문을 100자 이상 입력해 주세요.")
+    if len(text) > 30000:
+        raise HTTPException(status_code=400, detail="원문이 너무 깁니다. 30,000자 이내로 나누어 입력해 주세요.")
+
+    import claude_bot
+    import it_post
+
+    try:
+        automator = claude_bot.ClaudeWebAutomator(headless=False)
+        print(f"\n[API] IT 글 SEO 수정 시작 (원문 {len(text):,}자, 키워드: {req.keyword or '자동'})")
+        chat = automator.generate_it_post(text, req.keyword or "", req.category or "IT")
+        if not chat.get("success"):
+            raise Exception(chat.get("error") or "Claude 웹에서 답변을 받지 못했습니다.")
+
+        try:
+            parsed = it_post.parse_it_response(chat["raw"])
+        except ValueError as parse_err:
+            raise Exception(f"클로드 답변을 해석하지 못했습니다: {parse_err}")
+
+        # 다이어그램: 안전 정제 → 크롬으로 PNG 변환 → 슬롯 번호에 맞춰 배치
+        slot_count = max([d["number"] for d in parsed["diagrams"]] or [0])
+        valid, svgs = [], []
+        for d in parsed["diagrams"]:
+            clean = it_post.sanitize_svg(d["svg"])
+            if clean:
+                valid.append(d)
+                svgs.append(clean)
+            else:
+                print(f"[WARN] 다이어그램 {d['number']}은(는) SVG가 올바르지 않아 제외합니다.")
+        pngs = it_post.render_svgs_to_png(svgs) if svgs else []
+        images = [None] * slot_count
+        for d, png in zip(valid, pngs):
+            if png:
+                images[d["number"] - 1] = {"data_url": png, "caption": d["caption"]}
+        diagram_ok = sum(1 for img in images if img)
+
+        title = parsed["title"]
+        tags = parsed["tags"] or ["IT", req.category or "IT"]
+        html_article = it_post.build_tistory_html(automator, parsed["article_md"], title, images)
+
+        # 편집용 텍스트: 그림 자리는 설명 문구로 표시
+        article_text = parsed["article_md"]
+        for n, img in enumerate(images, start=1):
+            marker = f"<!-- [PHOTO_{n}_SLOT] -->"
+            article_text = article_text.replace(marker, f"📷 [그림 {n}: {img['caption']}]" if img else "")
+        article_text = re.sub(r"<!--\s*\[PHOTO_\d+_SLOT\]\s*-->", "", article_text)
+
+        import uuid
+        content_id = f"cont_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+        try:
+            database.create_content({
+                "id": content_id,
+                "title": title,
+                "keyword": (req.keyword or title)[:100],
+                "related_keywords": ", ".join(tags),
+                "category": req.category or "IT",
+                "content": article_text,
+                "content_html": html_article,
+                "meta_description": parsed["meta_description"],
+                "tags": ", ".join(tags),
+                "thumbnail_url": "",
+                "body_images": [],
+                "reference_urls": [],
+                "internal_links": [],
+                "ai_model": "Claude-IT",
+                "status": "DRAFT",
+                "scheduled_at": "",
+                "tistory_url": "",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }, check_duplicate=False)
+        except Exception as db_err:
+            print(f"[WARN] IT 글 DB 저장 실패(무시): {db_err}")
+            content_id = None
+
+        tistory_saved, tistory_msg = False, ""
+        if req.auto_tistory_save:
+            import tistory_bot
+            blog_name = req.blog_name or os.getenv("TISTORY_BLOG_NAME", "s-elegant")
+            print(f"\n[START] [API] 티스토리 자동 임시저장 실행 ({blog_name})...")
+            bot_res = tistory_bot.TistoryAutomator(blog_name=blog_name, headless=False).post_content(
+                title=title,
+                content_html=html_article,
+                tags=tags,
+                category=req.category,
+                action="TEMP_SAVE",
+                meta_description=parsed["meta_description"]
+            )
+            tistory_saved = bot_res.get("success", False)
+            tistory_msg = bot_res.get("message", "") if tistory_saved else (bot_res.get("error") or "티스토리 임시저장 중 문제가 발생했습니다.")
+
+        return {
+            "title": title,
+            "article": article_text,
+            "html_article": html_article,
+            "tags": tags,
+            "tags_string": ", ".join(tags),
+            "meta_description": parsed["meta_description"],
+            "diagram_total": len(parsed["diagrams"]),
+            "diagram_ok": diagram_ok,
+            "content_id": content_id,
+            "tistory_saved": tistory_saved,
+            "tistory_message": tistory_msg
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"IT 글 SEO 수정 실패: {str(e)}")
+
 @app.post("/api/claude/generate-review")
 def generate_claude_review(req: ClaudeReviewRequest):
     """

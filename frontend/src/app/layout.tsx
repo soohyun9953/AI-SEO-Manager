@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
-import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal, UtensilsCrossed, TrendingUp, Compass, PenLine } from "lucide-react";
+import { LayoutDashboard, PenTool, Image as ImageIcon, Search, Settings, HelpCircle, Sparkles, FolderKanban, SendHorizontal, UtensilsCrossed, TrendingUp, Compass, PenLine, Cpu } from "lucide-react";
 import Link from "next/link";
 import AppChrome from "@/components/AppChrome";
 import AuthFetchGuard from "@/components/AuthFetchGuard";
@@ -51,6 +51,7 @@ export default function RootLayout({
               <NavItem href="/reviews" icon={<UtensilsCrossed size={18} />} label="맛집·방문 후기" />
               <NavItem href="/experience-reviews" icon={<Compass size={18} />} label="체험·방문 후기 (티스토리)" />
               <NavItem href="/naver-reviews" icon={<PenLine size={18} />} label="체험·방문 후기 (네이버)" />
+              <NavItem href="/it-posts" icon={<Cpu size={18} />} label="IT 글 SEO 수정 (티스토리)" />
               <NavItem href="/images" icon={<ImageIcon size={18} />} label="이미지 생성기" />
               <NavItem href="/auto-write" icon={<Sparkles size={18} />} label="자동 글작성" />
             </nav>
