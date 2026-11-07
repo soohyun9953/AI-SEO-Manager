@@ -41,10 +41,18 @@ def split_by_photo_markers(md: str) -> List[Tuple[str, Any]]:
     return segments
 
 
+BODY_STYLE = "font-size: 15px; font-weight: normal;"
+HEADING_STYLE = "font-size: 19px; font-weight: bold;"
+
+
 def markdown_to_paste_html(md: str) -> str:
-    """에디터에 붙여넣을 HTML (소제목·굵게·목록·인용문 유지)"""
+    """에디터에 붙여넣을 HTML. 소제목(19px·굵게)과 본문(15px·보통)의 서식을 명시해서
+    사진 뒤에 붙여넣은 글이 직전 소제목의 서식을 물려받지 않게 한다"""
     import markdown
-    return markdown.markdown(md, extensions=["nl2br"])
+    html = markdown.markdown(md, extensions=["nl2br"])
+    html = re.sub(r"<(h[1-6])>", lambda m: f'<{m.group(1)} style="{HEADING_STYLE}">', html)
+    html = re.sub(r"<(p|li)>", lambda m: f'<{m.group(1)} style="{BODY_STYLE}">', html)
+    return html
 
 
 def markdown_to_plain(md: str) -> str:
@@ -60,13 +68,13 @@ class NaverAutomator:
         self.blog_id = blog_id.strip()
 
     # ------------------------------------------------------------------ 공개 API
-    def save_draft(self, title: str, article_md: str, photo_paths: Optional[List[str]] = None) -> Dict[str, Any]:
+    def save_draft(self, title: str, article_md: str, photo_paths: Optional[List[str]] = None, save: bool = True) -> Dict[str, Any]:
         """제목·본문·사진을 네이버 글쓰기 화면에 입력하고 임시저장 (독립 스레드에서 실행)"""
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            return executor.submit(self._run, title, article_md, photo_paths or []).result()
+            return executor.submit(self._run, title, article_md, photo_paths or [], save).result()
 
     # ------------------------------------------------------------------ 내부 구현
-    def _run(self, title: str, article_md: str, photo_paths: List[str]) -> Dict[str, Any]:
+    def _run(self, title: str, article_md: str, photo_paths: List[str], save: bool = True) -> Dict[str, Any]:
         ensure_debug_chrome()
         with sync_playwright() as p:
             log(f"[CONNECT] [Naver Bot] Chrome에 연결합니다 ({CHROME_CDP_URL})...")
@@ -89,6 +97,8 @@ class NaverAutomator:
                 self._dismiss_popups(frame)
                 self._fill_title(page, frame, title)
                 self._fill_body(page, frame, article_md, photo_paths)
+                if not save:
+                    return {"success": True, "saved": False, "message": "입력까지만 실행했습니다(저장 안 함)."}
                 return self._click_save(page, frame)
             except Exception as e:
                 log(f"[ERROR] [Naver Bot] {e}")
