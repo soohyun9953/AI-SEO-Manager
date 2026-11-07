@@ -43,6 +43,7 @@ interface ItPostResult {
 export default function ItPostPage() {
   const [originalText, setOriginalText] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [topicType, setTopicType] = useState<"it" | "finance">("it");
   const [category, setCategory] = useState("IT");
   const [tistoryBlog, setTistoryBlog] = useState("s-elegant");
   const [autoSave, setAutoSave] = useState(true);
@@ -68,7 +69,20 @@ export default function ItPostPage() {
     if (savedText) setOriginalText(savedText);
     const savedKeyword = localStorage.getItem("it_post_keyword");
     if (savedKeyword) setKeyword(savedKeyword);
+    if (localStorage.getItem("it_post_topic") === "finance") {
+      setTopicType("finance");
+      setCategory(localStorage.getItem("it_post_category") || "재테크");
+    } else {
+      setCategory(localStorage.getItem("it_post_category") || "IT");
+    }
   }, []);
+
+  const changeTopic = (type: "it" | "finance") => {
+    setTopicType(type);
+    // 카테고리가 기본값(IT/재테크)일 때만 자동으로 바꾼다 (직접 입력한 카테고리는 유지)
+    if (category === "IT" || category === "재테크" || !category) setCategory(type === "finance" ? "재테크" : "IT");
+    localStorage.setItem("it_post_topic", type);
+  };
 
   const charCount = originalText.length;
   const tooShort = charCount > 0 && charCount < 100;
@@ -87,6 +101,7 @@ export default function ItPostPage() {
     localStorage.setItem("it_post_original", originalText);
     localStorage.setItem("it_post_keyword", keyword);
     localStorage.setItem("tistory_blog", tistoryBlog);
+    localStorage.setItem("it_post_category", category);
 
     setLoading(true);
     setCompleted(false);
@@ -110,7 +125,8 @@ export default function ItPostPage() {
         body: JSON.stringify({
           original_text: originalText,
           keyword,
-          category: category || "IT",
+          category: category || (topicType === "finance" ? "재테크" : "IT"),
+          topic_type: topicType,
           blog_name: tistoryBlog,
           auto_tistory_save: autoSave,
         }),
@@ -213,11 +229,11 @@ export default function ItPostPage() {
       <div className="relative rounded-3xl overflow-hidden p-8 border border-white/[0.08] bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-purple-950/40 backdrop-blur-xl">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold border border-blue-500/30 mb-3">
           <Cpu size={14} />
-          <span>IT 글 · Claude · Tistory</span>
+          <span>IT·재테크 글 · Claude · Tistory</span>
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">IT 글 SEO 수정 + 다이어그램 (티스토리)</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight text-white">IT·재테크 글 SEO 수정 + 다이어그램 (티스토리)</h1>
         <p className="text-sm text-slate-300 mt-2 max-w-3xl leading-relaxed">
-          IT 글 원문을 붙여넣으면 Claude가 <strong>사실은 그대로 두고</strong> 제목·소제목 구조·키워드·FAQ를 SEO에 맞게 다듬고,
+          IT·재테크 글 원문을 붙여넣으면 Claude가 <strong>사실은 그대로 두고</strong> 제목·소제목 구조·키워드·FAQ를 SEO에 맞게 다듬고,
           설명용 <strong>다이어그램을 직접 그려 이미지로 삽입</strong>한 뒤 티스토리에 <strong>임시저장</strong>까지 합니다. 발행은 직접 하세요.
         </p>
       </div>
@@ -239,7 +255,7 @@ export default function ItPostPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <FileText size={18} className="text-blue-400" />
-                1. IT 글 원문
+                1. 글 원문
               </h2>
               <button
                 onClick={clearAll}
@@ -251,7 +267,7 @@ export default function ItPostPage() {
             <textarea
               value={originalText}
               onChange={e => setOriginalText(e.target.value)}
-              placeholder="수정할 IT 글을 붙여넣으세요. 마크다운, 코드 블록, 표가 있으면 그대로 유지됩니다."
+              placeholder="수정할 글을 붙여넣으세요. 마크다운, 코드 블록, 표가 있으면 그대로 유지됩니다."
               rows={16}
               className="w-full px-4 py-3 rounded-2xl bg-black/40 border border-white/[0.08] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-y leading-relaxed"
             />
@@ -259,7 +275,7 @@ export default function ItPostPage() {
               <span className={tooLong || tooShort ? "text-red-300" : "text-slate-400"}>
                 {charCount.toLocaleString()} / {MAX_CHARS.toLocaleString()}자 {tooShort && "· 100자 이상 필요"}
               </span>
-              <span className="text-slate-500">원문에 없는 기술 사실은 추가하지 않습니다</span>
+              <span className="text-slate-500">원문에 없는 사실·수치는 추가하지 않습니다</span>
             </div>
           </div>
 
@@ -268,6 +284,30 @@ export default function ItPostPage() {
               <Tag size={18} className="text-purple-400" />
               2. 옵션
             </h2>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">글 주제</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([{ id: "it", label: "💻 IT" }, { id: "finance", label: "💰 재테크·금융" }] as const).map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => changeTopic(t.id)}
+                    className={`py-2 rounded-xl border text-xs font-bold transition-all ${
+                      topicType === t.id
+                        ? "bg-blue-600/20 border-blue-500/60 text-white ring-1 ring-blue-500/40"
+                        : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              {topicType === "finance" && (
+                <p className="text-[11px] text-amber-300/90 mt-1.5 leading-relaxed">
+                  금리·수익률·세율 등 수치는 원문 그대로 유지하고, 매수·가입 권유와 수익 보장 표현은 만들지 않습니다. 글 끝에 면책 안내가 자동으로 붙습니다.
+                </p>
+              )}
+            </div>
             <div>
               <label className="block text-[11px] font-semibold text-slate-400 mb-1">핵심 키워드 (선택, 비우면 Claude가 선택)</label>
               <input
@@ -474,7 +514,7 @@ export default function ItPostPage() {
                           ))}
                         </ul>
                         <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
-                          발행 전에 기술 내용(수치, 버전, 코드)이 원문과 같은지, 다이어그램 내용이 맞는지 꼭 확인하세요.
+                          발행 전에 수치(금리·수익률·세율·버전 등)와 코드가 원문과 같은지, 다이어그램 내용이 맞는지 꼭 확인하세요.
                         </p>
                       </div>
                     </div>

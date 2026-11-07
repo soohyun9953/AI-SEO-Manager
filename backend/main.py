@@ -1855,12 +1855,20 @@ class ITPostRequest(BaseModel):
     original_text: str
     keyword: Optional[str] = ""
     category: Optional[str] = "IT"
+    topic_type: Optional[str] = "it"   # "it" | "finance"
     blog_name: Optional[str] = ""
     auto_tistory_save: Optional[bool] = True
 
+FINANCE_DISCLAIMER_MD = (
+    "---\n\n"
+    "> ※ 이 글은 정보 제공을 위한 것이며 특정 금융상품의 가입·매수·매도를 권유하지 않습니다. "
+    "금리·세율·한도·수수료는 시점과 조건에 따라 달라질 수 있으니 최신 기준은 공식 안내에서 확인하시고, "
+    "투자 판단과 그 결과에 대한 책임은 본인에게 있습니다."
+)
+
 @app.post("/api/claude/it-post")
 def generate_claude_it_post(req: ITPostRequest):
-    """IT 원문을 Claude(웹)가 SEO에 맞게 다듬고 설명용 다이어그램을 그리면, 이미지로 바꿔 넣어 티스토리에 임시저장 (내 PC 로컬 전용)"""
+    """IT·재테크 원문을 Claude(웹)가 SEO에 맞게 다듬고 설명용 다이어그램을 그리면, 이미지로 바꿔 넣어 티스토리에 임시저장 (내 PC 로컬 전용)"""
     text = (req.original_text or "").strip()
     if len(text) < 100:
         raise HTTPException(status_code=400, detail="원문을 100자 이상 입력해 주세요.")
@@ -1873,7 +1881,8 @@ def generate_claude_it_post(req: ITPostRequest):
     try:
         automator = claude_bot.ClaudeWebAutomator(headless=False)
         print(f"\n[API] IT 글 SEO 수정 시작 (원문 {len(text):,}자, 키워드: {req.keyword or '자동'})")
-        chat = automator.generate_it_post(text, req.keyword or "", req.category or "IT")
+        topic_type = "finance" if (req.topic_type or "").lower() == "finance" else "it"
+        chat = automator.generate_it_post(text, req.keyword or "", req.category or ("재테크" if topic_type == "finance" else "IT"), topic_type)
         if not chat.get("success"):
             raise Exception(chat.get("error") or "Claude 웹에서 답변을 받지 못했습니다.")
 
@@ -1900,7 +1909,10 @@ def generate_claude_it_post(req: ITPostRequest):
         diagram_ok = sum(1 for img in images if img)
 
         title = parsed["title"]
-        tags = parsed["tags"] or ["IT", req.category or "IT"]
+        tags = parsed["tags"] or ["재테크" if topic_type == "finance" else "IT", req.category or "IT"]
+        if topic_type == "finance":
+            # 금융 글에는 면책 안내를 서버에서 항상 붙인다 (클로드의 답변에 의존하지 않음)
+            parsed["article_md"] = parsed["article_md"].rstrip() + "\n\n" + FINANCE_DISCLAIMER_MD + "\n"
         html_article = it_post.build_tistory_html(automator, parsed["article_md"], title, images)
 
         # 편집용 텍스트: 그림 자리는 설명 문구로 표시
@@ -1918,7 +1930,7 @@ def generate_claude_it_post(req: ITPostRequest):
                 "title": title,
                 "keyword": (req.keyword or title)[:100],
                 "related_keywords": ", ".join(tags),
-                "category": req.category or "IT",
+                "category": req.category or ("재테크" if topic_type == "finance" else "IT"),
                 "content": article_text,
                 "content_html": html_article,
                 "meta_description": parsed["meta_description"],

@@ -432,15 +432,15 @@ class ClaudeWebAutomator:
         return result
 
     # ------------------------------------------------------------------ IT 글 SEO 수정 (다이어그램 포함)
-    def generate_it_post(self, original_text: str, keyword: str = "", category: str = "IT") -> Dict[str, Any]:
+    def generate_it_post(self, original_text: str, keyword: str = "", category: str = "IT", topic_type: str = "it") -> Dict[str, Any]:
         """원문을 SEO에 맞게 다듬고 설명용 다이어그램(SVG)까지 클로드가 작성한 원본 답변을 돌려준다 (독립 스레드)"""
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            return executor.submit(self._run_it_post, original_text, keyword, category).result()
+            return executor.submit(self._run_it_post, original_text, keyword, category, topic_type).result()
 
-    def _run_it_post(self, original_text: str, keyword: str, category: str) -> Dict[str, Any]:
+    def _run_it_post(self, original_text: str, keyword: str, category: str, topic_type: str = "it") -> Dict[str, Any]:
         result: Dict[str, Any] = {"success": False, "raw": "", "error": None}
-        prompt = self._build_it_prompt(original_text, keyword, category)
+        prompt = self._build_it_prompt(original_text, keyword, category, topic_type)
 
         ensure_debug_chrome()
         with sync_playwright() as p:
@@ -550,10 +550,33 @@ class ClaudeWebAutomator:
             return raw
         return self._get_latest_assistant_message(page)
 
-    def _build_it_prompt(self, original_text: str, keyword: str, category: str) -> str:
-        """IT 글을 SEO에 맞게 다듬고 설명용 다이어그램(SVG)을 함께 쓰게 하는 프롬프트"""
+    def _build_it_prompt(self, original_text: str, keyword: str, category: str, topic_type: str = "it") -> str:
+        """IT·재테크 글을 SEO에 맞게 다듬고 설명용 다이어그램(SVG)을 함께 쓰게 하는 프롬프트"""
+        if topic_type == "finance":
+            persona = "재테크·금융 정보 블로그 에디터"
+            fact_rule = (
+                "원문의 금리, 수익률, 세율, 한도, 수수료, 날짜, 상품명, 계산 결과와 예시 수치는 그대로 유지하세요. "
+                "원문에 없는 수치·전망·추천 상품·세법/제도 내용을 절대 추가하지 마세요. 확신이 없는 내용은 만들지 말고 "
+                "\"기준일과 조건은 공식 안내(금융회사·금융감독원·국세청 등)에서 확인하세요\"처럼 안내하세요."
+            )
+            extra_rules = (
+                "4. 금융 글 주의: 특정 상품의 매수·매도·가입을 권유하는 문구를 새로 만들지 마세요. "
+                "\"무조건\", \"확정 수익\", \"반드시 오른다\", \"손실 없음\" 같은 단정·보장 표현은 원문 의미를 바꾸지 않는 범위에서 "
+                "\"~일 수 있습니다\", \"예시\" 등으로 완화하세요. 수치에는 가능하면 기준 시점(원문에 있는 경우)을 함께 쓰세요.\n"
+            )
+            diagram_kinds = "비교도, 계산 흐름도, 절차도, 상품·조건 비교 등"
+        else:
+            persona = "IT 전문 블로그 에디터"
+            fact_rule = (
+                "원문의 기술 내용, 수치, 버전, 날짜, 주장, 코드, 명령어는 그대로 유지하세요. "
+                "원문에 없는 기술 사실·수치·출시일·성능 비교·고유명사를 절대 추가하지 마세요. 확신이 없는 내용은 만들지 말고 "
+                "\"공식 문서에서 확인하세요\"처럼 안내하세요."
+            )
+            extra_rules = ""
+            diagram_kinds = "구조도, 처리 흐름도, 비교도, 단계도 등"
+
         return f"""
-당신은 IT 전문 블로그 에디터이자 검색엔진 최적화(SEO) 전문가입니다.
+당신은 {persona}이자 검색엔진 최적화(SEO) 전문가입니다.
 아래 [원문]을 티스토리 블로그에 올릴 수 있도록 SEO에 맞게 다듬고, 이해를 돕는 설명용 다이어그램을 직접 그려 주세요.
 
 [원문 정보]
@@ -561,10 +584,10 @@ class ClaudeWebAutomator:
 - 핵심 키워드(선택): {keyword.strip() if keyword and keyword.strip() else '없음 (원문에서 가장 중요한 검색어 1~2개를 직접 고를 것)'}
 
 [핵심 원칙 - 가장 중요]
-1. 사실 유지: 원문의 기술 내용, 수치, 버전, 날짜, 주장, 코드, 명령어는 그대로 유지하세요. 원문에 없는 기술 사실·수치·출시일·성능 비교·고유명사를 절대 추가하지 마세요. 확신이 없는 내용은 만들지 말고 "공식 문서에서 확인하세요"처럼 안내하세요.
+1. 사실 유지: {fact_rule}
 2. 고치는 범위: 제목, 메타설명, 도입부, 핵심 3줄 요약, 소제목 구조, 문단 가독성, 키워드 배치, 마무리 정리, FAQ만 개선하세요. 원문의 설명을 바꾸거나 줄이지 말고, 순서가 어색하면 재배치만 하세요.
 3. 코드 블록, 표, 목록은 원문 그대로 보존하세요(마크다운 코드 펜스 유지).
-
+{extra_rules}
 [SEO 지침]
 - 제목: 공백 포함 35자 이내, 핵심 키워드를 앞쪽에 배치, 클릭을 부르되 과장·낚시 표현 금지.
 - 메타설명: 80~120자, 핵심 키워드 포함.
@@ -575,7 +598,7 @@ class ClaudeWebAutomator:
 - 태그: 검색 유입용 단어형 태그 10~15개(# 없이, 쉼표로 구분).
 
 [다이어그램 지침]
-- 글 이해에 실제로 도움이 되는 설명 그림을 2~4개 직접 SVG로 그리세요(구조도, 처리 흐름도, 비교도, 단계도 등). 억지로 늘리지 말고 원문에 근거한 내용만 그리세요.
+- 글 이해에 실제로 도움이 되는 설명 그림을 2~4개 직접 SVG로 그리세요({diagram_kinds}). 억지로 늘리지 말고 원문에 근거한 내용만 그리세요.
 - 본문에서 그림이 들어갈 자리에 단독 줄로 <!-- [PHOTO_1_SLOT] --> , <!-- [PHOTO_2_SLOT] --> 처럼 번호 순서대로 표시하세요.
 - SVG 규칙: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 높이"> 로 시작(높이 300~520), 첫 요소는 흰색 배경 사각형, 글자는 font-family="Malgun Gothic, Apple SD Gothic Neo, Noto Sans KR, sans-serif", 글자 크기 16 이상, 한 칸에 들어가는 글자는 짧게(긴 문장은 text를 나누어 여러 줄로), 글자와 도형이 겹치지 않게 충분한 여백, 선과 화살표로 흐름을 분명하게(화살표는 marker 사용 가능), 색은 3~4가지 이내의 차분한 색. 스크립트·외부 이미지·외부 폰트·링크·애니메이션은 사용하지 마세요.
 
