@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Cpu,
   Sparkles,
@@ -16,6 +16,10 @@ import {
   Trash2,
 } from "lucide-react";
 import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
+import { AdSenseConfig, DEFAULT_ADSENSE, buildFinalHtml } from "@/utils/tistoryExport";
+import { applyInlineStyles } from "@/utils/tistoryInline";
+
+const AD_CFG_KEY = "exp_adsense_cfg"; // 체험후기·에디터 페이지와 동일한 키 공유 (ID/Slot은 한 번만 입력)
 
 const LOCAL_BACKEND = "http://localhost:8002";
 const MAX_CHARS = 30000;
@@ -34,6 +38,8 @@ interface ItPostResult {
   tags: string[];
   tags_string: string;
   meta_description: string;
+  slug?: string;
+  faq_schema?: string;
   diagram_total: number;
   diagram_ok: number;
   tistory_saved: boolean;
@@ -59,6 +65,38 @@ export default function ItPostPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
+
+  // 수익화(AdSense) / FAQ 스키마 설정
+  const [adsense, setAdsense] = useState<AdSenseConfig>(DEFAULT_ADSENSE);
+  const [adsLoaded, setAdsLoaded] = useState(false);
+  const [includeFaq, setIncludeFaq] = useState(true);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(AD_CFG_KEY) || "null");
+      if (saved && typeof saved === "object") setAdsense({ ...DEFAULT_ADSENSE, ...saved, enabled: localStorage.getItem("it_ads_on") === "1" });
+      else setAdsense({ ...DEFAULT_ADSENSE, enabled: localStorage.getItem("it_ads_on") === "1" });
+    } catch {}
+    setAdsLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!adsLoaded) return;
+    try {
+      const prev = JSON.parse(localStorage.getItem(AD_CFG_KEY) || "{}") || {};
+      // 다른 페이지의 '사용' 상태(enabled)는 건드리지 않고 ID/Slot만 갱신
+      localStorage.setItem(AD_CFG_KEY, JSON.stringify({ ...prev, clientId: adsense.clientId, midSlot: adsense.midSlot, endSlot: adsense.endSlot, includeLoader: adsense.includeLoader }));
+    } catch {}
+    localStorage.setItem("it_ads_on", adsense.enabled ? "1" : "0");
+  }, [adsense, adsLoaded]);
+
+  // 티스토리 복사/임시저장용 최종 HTML: 인라인 스타일 + (선택) 광고 + (선택) FAQ JSON-LD
+  const buildFinal = (r: ItPostResult) =>
+    buildFinalHtml({ html: r.html_article, article: r.article, photoSeo: [], adsense, includeFaqJsonLd: includeFaq });
+  const finalHtml = useMemo(
+    () => (result ? buildFinal(result) : ""),
+    [result, adsense, includeFaq] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const previewHtml = useMemo(() => (result ? applyInlineStyles(result.html_article) : ""), [result]);
 
   useEffect(() => {
     const host = window.location.hostname;
@@ -128,7 +166,8 @@ export default function ItPostPage() {
           category: category || (topicType === "finance" ? "재테크" : "IT"),
           topic_type: topicType,
           blog_name: tistoryBlog,
-          auto_tistory_save: autoSave,
+          // 임시저장은 인라인 스타일·광고·FAQ 스키마가 반영된 최종 HTML로 프론트에서 직접 호출한다
+          auto_tistory_save: false,
         }),
       });
       const raw = await res.text();
@@ -144,15 +183,18 @@ export default function ItPostPage() {
       setResult(done);
       setActiveTab("preview");
       setCurrentStep(4);
+      if (autoSave) {
+        const saved = await postToTistory(done, buildFinal(done));
+        setStatusMsg(
+          saved.ok
+            ? "✅ 티스토리 임시저장 완료. 티스토리 관리 > 글 관리 > 임시저장에서 확인하고 발행하세요."
+            : `⚠️ 글 수정은 완료됐지만 티스토리 임시저장에 실패했습니다: ${saved.err}`
+        );
+      } else {
+        setStatusMsg("글 수정이 완료됐습니다. 아래 결과를 확인하세요.");
+      }
       clearInterval(timer);
       setCompleted(true);
-      setStatusMsg(
-        autoSave
-          ? done.tistory_saved
-            ? `✅ 티스토리 임시저장 완료. 티스토리 관리 > 글 관리 > 임시저장에서 확인하고 발행하세요. (${done.tistory_message || ""})`
-            : `⚠️ 글 수정은 완료됐지만 티스토리 임시저장에 실패했습니다: ${done.tistory_message}`
-          : "글 수정이 완료됐습니다. 아래 결과를 확인하세요."
-      );
     } catch (err) {
       setStatusMsg(`⚠️ ${err instanceof Error ? err.message : "처리 중 문제가 발생했습니다."}`);
     } finally {
@@ -161,36 +203,42 @@ export default function ItPostPage() {
     }
   };
 
-  // 결과만 티스토리에 다시 임시저장 (이미 만든 글을 Claude 재호출 없이 저장)
-  const saveToTistory = async () => {
-    if (!result) return;
-    setSaving(true);
-    setStatusMsg("📝 티스토리 임시저장 진행 중... 크롬 창이 열립니다.");
+  // 티스토리 임시저장 호출 (최종 HTML 사용)
+  const postToTistory = async (r: ItPostResult, html: string): Promise<{ ok: boolean; err: string }> => {
     try {
       const res = await fetch(`${LOCAL_BACKEND}/api/tistory/auto-register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: result.title,
-          content_html: result.html_article,
-          tags: result.tags,
+          title: r.title,
+          content_html: html,
+          tags: r.tags,
           category: category || "IT",
           blog_name: tistoryBlog,
-          meta_description: result.meta_description,
+          meta_description: r.meta_description,
           action: "TEMP_SAVE",
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
-        setStatusMsg(`✅ 티스토리 임시저장 완료. 글 관리 > 임시저장에서 확인하고 발행하세요.`);
-      } else {
-        setStatusMsg(`⚠️ 티스토리 임시저장 실패: ${data.error || data.detail || data.message || `HTTP ${res.status}`}`);
-      }
+      if (res.ok && data.success) return { ok: true, err: "" };
+      return { ok: false, err: data.error || data.detail || data.message || `HTTP ${res.status}` };
     } catch {
-      setStatusMsg("⚠️ 로컬 백엔드(8002)에 연결할 수 없습니다. start.bat으로 서버를 켜 주세요.");
-    } finally {
-      setSaving(false);
+      return { ok: false, err: "로컬 백엔드(8002)에 연결할 수 없습니다. start.bat으로 서버를 켜 주세요." };
     }
+  };
+
+  // 결과만 티스토리에 다시 임시저장 (이미 만든 글을 Claude 재호출 없이 저장)
+  const saveToTistory = async () => {
+    if (!result) return;
+    setSaving(true);
+    setStatusMsg("📝 티스토리 임시저장 진행 중... 크롬 창이 열립니다.");
+    const r = await postToTistory(result, finalHtml);
+    setStatusMsg(
+      r.ok
+        ? "✅ 티스토리 임시저장 완료. 글 관리 > 임시저장에서 확인하고 발행하세요."
+        : `⚠️ 티스토리 임시저장 실패: ${r.err}`
+    );
+    setSaving(false);
   };
 
   const copy = async (text: string, key: string) => {
@@ -218,8 +266,11 @@ export default function ItPostPage() {
     ? [
         { ok: titleLen >= 15 && titleLen <= 38, text: `제목 길이 ${titleLen}자 (권장 35자 이내)` },
         { ok: result.diagram_ok >= 2, text: `다이어그램 ${result.diagram_ok}/${result.diagram_total}개 삽입` },
-        { ok: result.tags.length >= 8, text: `태그 ${result.tags.length}개 (권장 10~15개)` },
-        { ok: result.meta_description.length >= 60, text: `메타설명 ${result.meta_description.length}자 (권장 80~120자)` },
+        { ok: result.tags.length >= 8 && result.tags.length <= 10, text: `태그 ${result.tags.length}개 (권장 8~10개)` },
+        { ok: result.meta_description.length >= 140 && result.meta_description.length <= 160, text: `메타설명 ${result.meta_description.length}자 (권장 140~160자)` },
+        { ok: /^[a-z0-9]+(-[a-z0-9]+)+$/.test(result.slug || ""), text: `영문 슬러그 ${result.slug || "없음"}` },
+        { ok: /<table[\s>]/i.test(result.html_article), text: "비교표(Table) 포함" },
+        { ok: !!result.faq_schema, text: result.faq_schema ? "FAQ 스키마(JSON-LD) 생성 가능" : "FAQ(Q./A.)를 찾지 못함" },
       ]
     : [];
 
@@ -348,6 +399,55 @@ export default function ItPostPage() {
                 수정이 끝나면 <strong>티스토리 임시저장</strong>까지 자동 실행 (발행은 하지 않음)
               </span>
             </label>
+
+            {/* 수익화 / 구조화 데이터 */}
+            <div className="pt-3 border-t border-white/[0.06] space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={adsense.enabled}
+                  onChange={e => setAdsense({ ...adsense, enabled: e.target.checked })}
+                  className="w-4 h-4 rounded cursor-pointer"
+                />
+                <strong>본문 중간 AdSense 광고 자동 삽입</strong> (첫 표 아래 + FAQ 위)
+              </label>
+              {adsense.enabled && (
+                <div className="grid grid-cols-1 gap-2">
+                  <input
+                    value={adsense.clientId}
+                    onChange={e => setAdsense({ ...adsense, clientId: e.target.value })}
+                    placeholder="ca-pub-xxxxxxxxxxxxxxxx"
+                    className="px-3 py-2 rounded-xl bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={adsense.midSlot}
+                      onChange={e => setAdsense({ ...adsense, midSlot: e.target.value })}
+                      placeholder="본문 중간 Slot ID"
+                      className="px-3 py-2 rounded-xl bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                    <input
+                      value={adsense.endSlot}
+                      onChange={e => setAdsense({ ...adsense, endSlot: e.target.value })}
+                      placeholder="FAQ/결론 위 Slot ID"
+                      className="px-3 py-2 rounded-xl bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              )}
+              <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={includeFaq}
+                  onChange={e => setIncludeFaq(e.target.checked)}
+                  className="w-4 h-4 rounded cursor-pointer"
+                />
+                FAQ 스키마(JSON-LD)를 HTML 하단에 포함
+              </label>
+              <p className="text-[10px] text-slate-500 leading-relaxed">
+                HTML 복사·티스토리 임시저장 모두 인라인 스타일(모바일 표 가로 스크롤 포함)로 변환된 최종본이 사용됩니다. ID/Slot은 다른 글쓰기 페이지와 공유되며 이 브라우저에 저장됩니다.
+              </p>
+            </div>
           </div>
 
           <button
@@ -448,21 +548,26 @@ export default function ItPostPage() {
                         <p className="text-blue-200/70 mt-1">{result.meta_description}</p>
                       </div>
                       <div className="p-6 rounded-2xl bg-white text-slate-900">
-                        <div dangerouslySetInnerHTML={{ __html: result.html_article }} />
+                        <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
                       </div>
                     </div>
                   )}
                   {activeTab === "html" && (
                     <div className="space-y-2">
                       <button
-                        onClick={() => copy(result.html_article, "html")}
+                        onClick={() => {
+                          if (adsense.enabled && (!adsense.clientId.trim() || !adsense.midSlot.trim())) {
+                            alert("광고 자동 배치가 켜져 있지만 AdSense ID 또는 본문 중간 Slot이 비어 있어 광고 코드는 들어가지 않았습니다.");
+                          }
+                          copy(finalHtml, "html");
+                        }}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/[0.1] text-xs font-semibold"
                       >
                         {copied === "html" ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
                         {copied === "html" ? "복사완료" : "HTML 복사"}
                       </button>
                       <pre className="p-4 rounded-2xl bg-black/50 border border-white/[0.06] text-[11px] text-slate-300 overflow-x-auto whitespace-pre-wrap break-all max-h-[560px]">
-                        {result.html_article.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, "data:image/png;base64,…(이미지)")}
+                        {finalHtml.replace(/data:image\/png;base64,[A-Za-z0-9+/=]+/g, "data:image/png;base64,…(이미지)")}
                       </pre>
                     </div>
                   )}
@@ -485,6 +590,26 @@ export default function ItPostPage() {
                   )}
                   {activeTab === "seo" && (
                     <div className="space-y-5">
+                      <div className="space-y-2">
+                        {[
+                          { key: "slug", label: "영문 URL 슬러그", value: result.slug || "" },
+                          { key: "meta", label: `메타 디스크립션 (${result.meta_description.length}자)`, value: result.meta_description },
+                        ].map(f => (
+                          <div key={f.key} className="flex items-start gap-2 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[11px] font-bold text-slate-400 mb-0.5">{f.label}</div>
+                              <div className="text-xs text-slate-200 break-all">{f.value || "생성된 값이 없습니다"}</div>
+                            </div>
+                            <button
+                              onClick={() => copy(f.value, f.key)}
+                              disabled={!f.value}
+                              className="flex items-center gap-1 text-[11px] text-blue-300 hover:text-blue-200 disabled:opacity-30 shrink-0"
+                            >
+                              {copied === f.key ? <Check size={13} /> : <Copy size={13} />} 복사
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-xs font-bold text-slate-300">태그 ({result.tags.length}개)</h3>

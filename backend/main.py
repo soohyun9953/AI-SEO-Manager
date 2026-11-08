@@ -1965,6 +1965,8 @@ def generate_claude_it_post(req: ITPostRequest):
             "tags": tags,
             "tags_string": ", ".join(tags),
             "meta_description": parsed["meta_description"],
+            "slug": parsed.get("slug", ""),
+            "faq_schema": parsed.get("faq_schema", ""),
             "diagram_total": len(parsed["diagrams"]),
             "diagram_ok": diagram_ok,
             "content_id": content_id,

@@ -13,7 +13,9 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional
 
-LABEL_PATTERN = re.compile(r"^\[(제목|메타설명|본문|태그|다이어그램\s*(\d+))\][ \t]*(.*)$", re.MULTILINE)
+import review_seo
+
+LABEL_PATTERN = re.compile(r"^\[(제목|슬러그|메타설명|본문|태그|다이어그램\s*(\d+))\][ \t]*(.*)$", re.MULTILINE)
 MAX_SVG_CHARS = 60000
 PNG_WIDTH = 1600
 
@@ -62,6 +64,8 @@ def parse_it_response(raw: str) -> Dict[str, Any]:
     return {
         "title": title,
         "meta_description": " ".join(sections.get("메타설명", "").split()),
+        "slug": review_seo.normalize_slug((sections.get("슬러그", "").splitlines() or [""])[0]),
+        "faq_schema": review_seo.build_faq_schema(article_md),
         "article_md": article_md,
         "tags": tags[:20],
         "diagrams": parsed_diagrams,
