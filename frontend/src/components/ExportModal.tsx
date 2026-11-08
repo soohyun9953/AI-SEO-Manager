@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { applyInlineStyles } from "@/utils/tistoryInline";
 import { 
   X, 
   Copy, 
@@ -68,7 +69,8 @@ export default function ExportModal({ content, isOpen, onClose }: ExportModalPro
   };
 
   const getFullHtml = () => {
-    const rawHtml = content.content_html || content.content;
+    // HTML 본문은 티스토리 기본/HTML 모드·모바일에서도 유지되도록 인라인 스타일로 변환
+    const rawHtml = content.content_html ? applyInlineStyles(content.content_html) : content.content;
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "BlogPosting",

@@ -24,11 +24,13 @@ BANNED_PHRASES = [
     "도움이 되셨다면 공감과 댓글 부탁드립니다",
     "공감과 댓글 부탁드립니다",
     "구독과 좋아요",
+    "포스팅을 시작하겠습니다",
+    "시작하겠습니다",
 ]
 
 # 본문에 남아 있으면 제거할 AI 상투어 패턴
 _CLICHE_RE = re.compile(
-    r"안녕하세요|인플루언서입니다|에\s*대해\s*알아(보겠|보도록)|공감과?\s*댓글|구독과?\s*좋아요|도움이\s*되셨다면"
+    r"안녕하세요|인플루언서입니다|에\s*대해\s*알아(보겠|보도록)|공감과?\s*댓글|구독과?\s*좋아요|도움이\s*되셨다면|포스팅을?\s*시작"
 )
 
 _PRO_HINTS = ("IT", "기술", "재테크", "절세", "금융", "행정", "커리어", "취업", "세금", "투자")
@@ -86,17 +88,69 @@ def lead_and_summary_rules() -> str:
     )
 
 
+def table_rule() -> str:
+    return (
+        "[비교표(Table) 필수]\n"
+        "- 본문 중간에 핵심 스펙·가격·세금·장단점 등을 비교하는 마크다운 표(Table)를 최소 1개 반드시 포함하세요. "
+        "표는 헤더행과 구분선(|---|)을 갖춘 정식 마크다운 표여야 합니다."
+    )
+
+
 def photo_seo_rules(photo_count: int) -> str:
     if photo_count <= 0:
-        return "[이미지 Alt·캡션] 첨부된 사진이 없으므로 photo_seo는 빈 배열로 두세요."
+        return "[이미지 슬롯] 첨부된 사진이 없으므로 이미지 슬롯을 넣지 마세요."
     return (
-        f"[이미지 Alt·캡션 — 구글 이미지 검색 유입용, 사진 {photo_count}장 각각 작성]\n"
-        "- alt: 25~60자의 롱테일 검색 키워드형 명사구. 지역 + 상호명 + 메뉴/대상 + 특징을 담되 문장이 아니라 "
-        "키워드 나열형으로 쓰세요. 예) 도봉구 창동 송추가마골 인어반 수제칼집 돼지갈비 숯불구이 상차림\n"
-        "- caption: 사진이 본문에서 알려주는 정보를 한 문장(20~60자)으로. 이모지 금지. "
+        f"[이미지 슬롯 — 구글 이미지 검색 유입용, 사진 {photo_count}장]\n"
+        f"- 사진이 들어갈 자리마다 아래 형식의 슬롯을 단독 줄로 정확히 {photo_count}개, 사진 번호 순서대로 넣으세요:\n"
+        '[IMAGE_SLOT: alt="구체적인 검색 키워드 포함 설명" | caption="독자에게 유용한 상세 캡션"]\n'
+        "- alt: 25~60자의 롱테일 검색 키워드형 명사구(지역 + 상호명 + 메뉴/대상 + 특징). "
+        "예) 도봉구 창동 송추가마골 인어반 수제칼집 돼지갈비 숯불구이 상차림\n"
+        "- caption: 사진이 알려주는 정보를 한 문장(20~60자)으로, 이모지 금지. "
         "예) 송추가마골 인어반 창동점의 대표 메뉴인 수제칼집 돼지갈비와 기본 상차림 (콜키지 프리 가능)\n"
-        "- '현장 컷', '사진 1', '#1', '이미지' 같은 일련번호·일반명사만의 표현은 금지. 사진마다 서로 다르게 쓰세요.\n"
-        "- 사용자가 준 사진 설명(힌트)과 [방문 정보]에 있는 사실만 사용하고 없는 메뉴·가격을 지어내지 마세요."
+        "- '📷', '현장 컷', '사진 1', '#1' 같은 일련번호·기계적 표현은 전면 금지. 슬롯마다 내용이 달라야 합니다.\n"
+        "- alt·caption 값 안에는 큰따옴표와 '|' 문자를 쓰지 마세요.\n"
+        "- 사용자가 준 사진 설명(힌트)과 방문 정보에 있는 사실만 사용하고 없는 메뉴·가격을 지어내지 마세요."
+    )
+
+
+_SLOT_RE = re.compile(
+    r'\[IMAGE_SLOT:\s*alt\s*=\s*["“”](.*?)["“”]\s*\|\s*caption\s*=\s*["“”](.*?)["“”]\s*\]',
+    re.S,
+)
+
+
+def extract_image_slots(md: str, photo_count: int):
+    """[IMAGE_SLOT: alt=... | caption=...] 를 순서대로 읽어 alt/캡션을 뽑고, 본문에는 내부 사진 마커로 치환한다.
+    반환: (치환된 마크다운, [{alt, caption}...]) — 사진 수를 넘는 슬롯은 제거"""
+    seo: List[Dict[str, str]] = []
+    counter = {"n": 0}
+
+    def repl(m):
+        counter["n"] += 1
+        n = counter["n"]
+        if n > photo_count:
+            return ""
+        seo.append({"alt": m.group(1).strip(), "caption": m.group(2).strip()})
+        return f"<!-- [PHOTO_{n}_SLOT] -->"
+
+    out = _SLOT_RE.sub(repl, md or "")
+    return out, seo
+
+
+def build_faq_schema(md: str) -> str:
+    """본문의 Q./A. 항목을 FAQPage JSON-LD 문자열로 변환 (없으면 빈 문자열)"""
+    import json as _json
+    items = []
+    pat = re.compile(r"\*{0,2}Q\.\s*([^\n*]+?)\*{0,2}\s*(?:\n|/)\s*A\.\s*(.+?)(?=\n\s*\n|\n\s*\*{0,2}Q\.|$)", re.S)
+    for m in pat.finditer((md or "").replace("\r", "")):
+        q = re.sub(r"\*+", "", m.group(1)).strip()
+        a = re.sub(r"\s*\n\s*", " ", re.sub(r"\*+", "", m.group(2))).strip()
+        if q and a:
+            items.append({"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}})
+    if not items:
+        return ""
+    return _json.dumps(
+        {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": items}, ensure_ascii=False, indent=2
     )
 
 
@@ -143,7 +197,7 @@ def build_gemini_review_prompt(
     photo_count = len(photo_lines)
     slots = ""
     if photo_count >= 1:
-        slots += "     - 이 소제목 본문 중간에 다음 마커를 단독 라인으로 삽입: <!-- [PHOTO_1_SLOT] -->\n"
+        slots += "- 이미지 슬롯은 사진이 어울리는 단락(분위기·대표 메뉴 등) 중간에 배치.\n"
     place_label = place_name
     return f"""
 {persona_prompt(category)}
@@ -173,6 +227,8 @@ def build_gemini_review_prompt(
 
 {closing_rules()}
 
+{table_rule()}
+
 [사실성 원칙 — 매우 중요]
 - [방문 정보]에 없는 가격·영업시간·메뉴명·주차 여부는 지어내지 말고 '방문 전 확인을 추천해요'로 처리하세요.
 - 입력된 메모에 없는 구체적 경험(대화, 직원 이름 등)을 만들어내지 마세요.
@@ -186,19 +242,18 @@ def build_gemini_review_prompt(
 {slug_rules()}
 
 [메타 디스크립션]
-- 140~155자. 리드 문단의 핵심을 압축한 한 문단.
+- 150자 내외(140~160자). 리드 문단의 핵심을 압축한 한 문단.
 
-[검색 태그] 10~15개: 지역, 상호명, 메뉴, 추천 대상 등 유입 키워드.
+[검색 태그] 8~10개: 지역, 상호명, 메뉴, 추천 대상 등 유입 키워드.
 
 반드시 아래 JSON 포맷으로만 응답하세요:
 {{
-  "title_candidates": ["제목 후보1", "제목 후보2", "제목 후보3"],
-  "title": "제목 후보 중 가장 좋은 1개",
-  "slug": "english-seo-slug",
-  "meta_description": "140~155자 메타 설명",
-  "content_markdown": "리드 문단부터 마무리까지 전체 마크다운 본문 (<!-- [PHOTO_1_SLOT] --> 등과 <!-- [EXPERIENCE_BOX] --> 마커 포함)",
-  "photo_seo": [{{"alt": "롱테일 키워드형 alt", "caption": "정보를 담은 한 문장 캡션"}}],
-  "tags": ["키워드1", "키워드2"],
+  "titles": ["제목 후보1", "제목 후보2", "제목 후보3"],
+  "englishSlug": "english-seo-slug",
+  "metaDescription": "150자 내외 메타 설명",
+  "tags": ["키워드1", "키워드2", "...(8~10개)"],
+  "faqSchema": "본문 FAQ를 FAQPage JSON-LD로 직렬화한 문자열 (JSON 규칙대로 이스케이프)",
+  "contentMarkdown": "리드 문단부터 마무리까지 전체 마크다운 본문 ([IMAGE_SLOT: ...] 슬롯, 표, <!-- [EXPERIENCE_BOX] --> 마커 포함). 시스템이 이것을 htmlContent(본문 HTML)로 변환합니다",
   "primary_keyword": "{place_label}",
   "related_keywords": "{location or ''} {place_label}, {place_label} 후기"
 }}
@@ -299,6 +354,33 @@ def style_summary_callout(html_text: str) -> str:
         '<blockquote style="margin: 20px 0; padding: 16px 20px; background: #f8fafc; border-left: 4px solid #3b82f6; '
         'border-radius: 8px; color: #334155; font-size: 15px; line-height: 1.8;">',
     )
+
+
+_TRAILER_RE = re.compile(r"^(메타\s*설명|영문\s*슬러그|주요\s*키워드)\s*\**\s*[:：]\s*\**\s*(.*?)\**\s*$")
+
+
+def extract_trailer(text: str):
+    """원고 끝에 붙은 '메타 설명: / 영문 슬러그: / 주요 키워드:' 줄을 떼어 내고 값을 돌려준다.
+    반환: (본문, {"meta": str, "slug": str, "keywords": [str]})"""
+    lines = (text or "").rstrip().split("\n")
+    info: Dict[str, Any] = {"meta": "", "slug": "", "keywords": []}
+    keep = list(lines)
+    start = max(0, len(lines) - 8)
+    for i in range(len(lines) - 1, start - 1, -1):
+        stripped = lines[i].strip().lstrip("*->•# ").strip()
+        m = _TRAILER_RE.match(stripped)
+        if not m:
+            continue
+        label, value = m.group(1), m.group(2).strip()
+        if label.startswith("메타"):
+            info["meta"] = value
+        elif label.startswith("영문"):
+            info["slug"] = normalize_slug(value)
+        else:
+            info["keywords"] = [k.strip().lstrip("#") for k in re.split(r"[,，]", value) if k.strip()]
+        keep[i] = None
+    body = "\n".join(l for l in keep if l is not None).rstrip()
+    return body, info
 
 
 def normalize_slug(slug: Any, fallback: str = "") -> str:

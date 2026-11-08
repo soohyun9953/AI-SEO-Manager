@@ -1,6 +1,8 @@
 // 티스토리 복사용 HTML 조립 유틸: 이미지 Alt·캡션 반영, 애드센스 인아티클 자동 삽입,
 // FAQ JSON-LD, 내부 링크 카드, 실시간 SEO 점수판
 
+import { applyInlineStyles } from "./tistoryInline";
+
 export interface PhotoSeo {
   alt: string;
   caption: string;
@@ -86,7 +88,11 @@ export function insertAdSense(html: string, cfg: AdSenseConfig): string {
   // 위치 1: 첫 번째 표(Table) 직하단 → 없으면 두 번째 <h2> 바로 위
   let pos1 = -1;
   const tableEnd = html.indexOf("</table>");
-  if (tableEnd >= 0) pos1 = tableEnd + "</table>".length;
+  if (tableEnd >= 0) {
+    pos1 = tableEnd + "</table>".length;
+    // 표가 가로 스크롤 래퍼(<div>)로 감싸져 있으면 래퍼 밖(바로 아래)에 광고를 둔다
+    if (html.slice(pos1, pos1 + 6) === "</div>") pos1 += 6;
+  }
   else if (h2s.length >= 2) pos1 = h2s[1];
 
   // 위치 2: 자주 묻는 질문(FAQ) <h2> 바로 위 → 없으면 마지막 <h2>(결론) 위
@@ -175,6 +181,7 @@ export function buildFinalHtml(opts: {
   includeFaqJsonLd: boolean;
 }): string {
   let out = applyPhotoSeo(opts.html, opts.photoSeo);
+  out = applyInlineStyles(out); // 티스토리 기본/HTML 모드·모바일에서 깨지지 않도록 모든 요소를 인라인 스타일로
   out = insertAdSense(out, opts.adsense);
   if (opts.includeFaqJsonLd) out += buildFaqJsonLd(opts.article);
   return out;

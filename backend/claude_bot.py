@@ -592,11 +592,13 @@ class ClaudeWebAutomator:
 [SEO 지침]
 - 제목: 공백 포함 35자 이내, 핵심 키워드를 앞쪽에 배치, 클릭을 부르되 과장·낚시 표현 금지.
 - 메타설명: 80~120자, 핵심 키워드 포함.
-- 본문 구조: 도입(2~3문장) → 도입 바로 아래 "> **먼저 보고 가세요**" 인용문으로 핵심 3줄 요약 → "## 소제목" 4~7개(필요하면 "### 소제목") → "## 자주 묻는 질문"(원문 내용으로 답할 수 있는 질문 2~3개만, "**Q.** 질문 / A. 답변" 형식) → "## 정리" 마무리.
+- 본문 구조: 맨 처음은 박스·라벨 없는 140~160자 평문 리드 문단 1개(핵심 결론 포함, 인사말 금지) → 그 바로 아래 "> **핵심 요약**" 인용문 하나로 핵심 3줄 요약(요약 박스는 이 1개뿐, "먼저 보고 가세요"를 따로 만들지 말 것) → "## 소제목" 4~7개(필요하면 "### 소제목") → "## 자주 묻는 질문"(원문 내용으로 답할 수 있는 질문 2~3개만, "**Q. 질문**" 줄바꿈 "A. 답변" 형식) → "## 정리" 마무리.
+- 절대 금지: "안녕하세요", "인플루언서입니다", "오늘은 ~에 대해 알아보겠습니다", "포스팅을 시작하겠습니다", "도움이 되셨다면 공감과 댓글 부탁드립니다" 등 AI 인사말·맺음말.
+- 표(Table): 원문에 비교표가 없다면 원문에 있는 수치·사실만으로 핵심 비교표를 최소 1개 만들어 본문 중간에 넣으세요(원문에 없는 수치는 지어내지 말 것).
 - 소제목은 "소제목 1:" 같은 번호·라벨 없이 내용을 담은 문장으로 쓰세요.
 - 핵심 키워드는 제목, 도입부, 소제목 1~2개, 마무리에 자연스럽게 넣고 과도하게 반복하지 마세요.
 - 문단은 2~4줄로 끊고, 어려운 용어는 원문 범위 안에서 첫 등장 때 한 줄로 풀어 주세요.
-- 태그: 검색 유입용 단어형 태그 10~15개(# 없이, 쉼표로 구분).
+- 태그: 검색 유입용 단어형 태그 8~10개(# 없이, 쉼표로 구분).
 
 [다이어그램 지침]
 - 글 이해에 실제로 도움이 되는 설명 그림을 2~4개 직접 SVG로 그리세요({diagram_kinds}). 억지로 늘리지 말고 원문에 근거한 내용만 그리세요.
@@ -685,11 +687,8 @@ class ClaudeWebAutomator:
             for idx, c in enumerate(photo_captions):
                 captions_info += f"- 사진 {idx+1}: {c}\n"
 
-        photo_slots_guide = ""
-        for i in range(1, max(photo_count, 2) + 1):
-            photo_slots_guide += f"- 소제목 중간 적절한 위치에 '<!-- [PHOTO_{i}_SLOT] -->' 마커를 단독 줄로 삽입할 것\n"
-
-        photo_seo_guide = review_seo.photo_seo_rules(photo_count)
+        photo_slots_guide = review_seo.photo_seo_rules(photo_count)
+        photo_seo_guide = review_seo.table_rule()
         return f"""
 {review_seo.persona_prompt(category)}
 직접 다녀온 '내돈내산 방문/체험 후기'를 티스토리용 전문 블로그 포스팅으로 작성해주세요.
@@ -723,11 +722,7 @@ CTR을 높이는 제목 3개를 한 줄에 하나씩. 각각 공백 포함 35자
 영문 슬러그 한 줄
 
 [메타설명]
-140~155자. 리드 문단의 핵심을 압축한 한 문단.
-
-[사진SEO]
-사진 {photo_count}장 각각 한 줄씩 "사진N | alt | 캡션" 형식 (사진이 없으면 비워 둠).
-{photo_seo_guide}
+150자 내외(140~160자). 리드 문단의 핵심을 압축한 한 문단.
 
 [본문]
 1. 구성 (소제목은 마크다운 "## 소제목 문장", 번호·라벨 문구 금지):
@@ -740,7 +735,9 @@ CTR을 높이는 제목 3개를 한 줄에 하나씩. 각각 공백 포함 35자
    - 마무리 총평 (이런 분께 추천, 비추천, 재방문 의사, 최종 한 줄 평)
 2. 모바일 가독성: 2~3줄마다 빈 줄.
 3. 사실성 원칙: 위 [방문 장소 정보]에 없는 가격, 영업시간, 메뉴명, 주차 여부는 지어내지 말고 '방문 전 확인 추천'으로 처리.
-4. 사진 슬롯 마커 배치:
+
+{photo_seo_guide}
+
 {photo_slots_guide}
 
 {review_seo.faq_rules()}
@@ -748,7 +745,7 @@ CTR을 높이는 제목 3개를 한 줄에 하나씩. 각각 공백 포함 35자
 {review_seo.closing_rules()}
 
 [태그]
-#지역명, #장소명, #카테고리, #내돈내산 등 검색 유입용 태그 10~15개를 쉼표로 구분하여 작성 (예: #성수동맛집, #성수핫플, #내돈내산)
+#지역명, #장소명, #카테고리, #내돈내산 등 검색 유입용 태그 8~10개를 쉼표로 구분하여 작성 (예: #성수동맛집, #성수핫플, #내돈내산)
 
 [출력 형식 - 매우 중요]
 [제목후보]부터 [태그]까지 전체 결과물을 반드시 하나의 마크다운 코드블록(```markdown 으로 시작해서 ``` 로 끝남) 안에 작성하세요.
@@ -903,13 +900,9 @@ CTR을 높이는 제목 3개를 한 줄에 하나씩. 각각 공백 포함 35자
             cand_m = re.search(r'\[제목후보\]\s*(.*?)(?=\n\s*\[|$)', text, re.DOTALL)
             if cand_m:
                 title_candidates = [re.sub(r'^[\s\-\d.)]+', '', ln).strip() for ln in cand_m.group(1).splitlines() if ln.strip()]
-            seo_m = re.search(r'\[사진SEO\]\s*(.*?)(?=\n\s*\[본문\]|$)', text, re.DOTALL)
-            if seo_m:
-                for ln in seo_m.group(1).splitlines():
-                    parts = [x.strip() for x in ln.split("|")]
-                    if len(parts) >= 3 and re.match(r'사진\s*\d+', parts[0]):
-                        photo_seo_raw.append({"alt": parts[1], "caption": parts[2]})
             article = review_seo.strip_cliches(article)
+            # [IMAGE_SLOT: alt=... | caption=...] → 내부 사진 마커 + 슬롯별 Alt·캡션
+            article, photo_seo_raw = review_seo.extract_image_slots(article, len(photos or []))
 
         if platform == "naver":
             tags = tags[:30]
@@ -929,11 +922,19 @@ CTR을 높이는 제목 3개를 한 줄에 하나씩. 각각 공백 포함 35자
         html_article = self._markdown_to_tistory_html(article, place_name, photos=photos, photo_seo=photo_seo)
         title_candidates = review_seo.clean_title_candidates(title_candidates, title)
         article_for_editor = review_seo.EXPERIENCE_MARKER_RE.sub("\n\n[💡 실무/현장 경험 한 줄 추가 구간]\n\n", article)
+        for n, seo in enumerate(photo_seo, start=1):
+            article_for_editor = article_for_editor.replace(
+                f"<!-- [PHOTO_{n}_SLOT] -->", f"\n\n(사진 {n}) {seo['caption']}\n")
 
         return {
             "title": title,
             "title_candidates": title_candidates,
             "slug": slug,
+            "titles": title_candidates,
+            "englishSlug": slug,
+            "metaDescription": meta_desc,
+            "faqSchema": review_seo.build_faq_schema(article),
+            "htmlContent": html_article,
             "article": article_for_editor,
             "html_article": html_article,
             "tags": tags,

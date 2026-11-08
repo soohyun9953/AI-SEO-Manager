@@ -1,11 +1,35 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PenTool, Send, Copy, Eye, FileText, Loader2, CheckCircle, Zap, Layout, Hash, Trash2, Save, Download, FolderKanban } from "lucide-react";
+import { PenTool, Send, Copy, Eye, FileText, Loader2, CheckCircle, Zap, Layout, Hash, Trash2, Save, Download, Wallet, Link2, Gauge } from "lucide-react";
 import Link from "next/link";
-import ExportModal, { ContentItem } from "@/components/ExportModal";
+import ExportModal from "@/components/ExportModal";
+import { applyInlineStyles } from "@/utils/tistoryInline";
 import { APP_VERSION, APP_RELEASE_DATE } from "@/utils/appVersion";
+import {
+  EditorAdConfig,
+  adConfigReady,
+  buildCtaCard,
+  computeEditorScore,
+  countCtaCards,
+  insertCtaCardIntoMarkdown,
+  insertEditorAds,
+  markdownToHtml,
+  removeCtaCards,
+} from "@/utils/editorTools";
+
+const AD_CFG_KEY = "exp_adsense_cfg"; // 체험후기 페이지와 동일한 키를 공유 (ID/Slot은 한 번만 입력)
+
+// 본문 첫 문단(제목·박스 제외)을 메타 디스크립션 후보로 사용
+function firstParagraph(md: string): string {
+  for (const block of md.replace(/\r/g, "").split(/\n\s*\n/)) {
+    const t = block.trim();
+    if (!t || /^(#|>|\||!|<|-|\*|\d+\.)/.test(t)) continue;
+    return t.replace(/\*+/g, "").replace(/\s+/g, " ");
+  }
+  return "";
+}
 
 function EditorContent() {
   const searchParams = useSearchParams();
@@ -18,7 +42,8 @@ function EditorContent() {
   const [article, setArticle] = useState("");
   const [htmlArticle, setHtmlArticle] = useState("");
   const [jsonLd, setJsonLd] = useState<any>(null);
-  const [adsenseOptimize, setAdsenseOptimize] = useState(true); // 기본값 true로 애드센스 극대화 장려
+  // 예전 '황금 광고 배치' 자리표시자는 새 자동 배치(우측 사이드바)로 대체되어 서버에는 항상 끈 상태로 요청한다
+  const adsenseOptimize = false;
   const [affiliateOptimize, setAffiliateOptimize] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -28,6 +53,49 @@ function EditorContent() {
   const [savingToDB, setSavingToDB] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
+
+  // SEO 메타 바 (영문 슬러그 / 메타 디스크립션 / 추천 태그)
+  const [slug, setSlug] = useState("");
+  const [metaDesc, setMetaDesc] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // 수익화(AdSense) & 내부 링크 삽입기
+  const [adCfg, setAdCfg] = useState<EditorAdConfig>({ clientId: "", slot: "", endSlot: "" });
+  const [adsOn, setAdsOn] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [ctaTitle, setCtaTitle] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(AD_CFG_KEY) || "null");
+      if (saved && typeof saved === "object") {
+        setAdCfg({ clientId: saved.clientId || "", slot: saved.midSlot || "", endSlot: saved.endSlot || "" });
+      }
+    } catch {}
+    setAdsOn(localStorage.getItem("editor_ads_on") === "1");
+    setSlug(localStorage.getItem("seo_editor_slug") || "");
+    setMetaDesc(localStorage.getItem("seo_editor_meta") || "");
+    setTagsText(localStorage.getItem("seo_editor_tags") || "");
+    setSettingsLoaded(true);
+  }, []);
+
+  // 광고 설정은 변경 즉시 LocalStorage에 저장 (체험후기 페이지의 설정 객체를 덮어쓰지 않고 해당 필드만 갱신)
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    try {
+      const prev = JSON.parse(localStorage.getItem(AD_CFG_KEY) || "{}") || {};
+      localStorage.setItem(
+        AD_CFG_KEY,
+        JSON.stringify({ ...prev, clientId: adCfg.clientId, midSlot: adCfg.slot, endSlot: adCfg.endSlot })
+      );
+    } catch {}
+  }, [adCfg, settingsLoaded]);
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    localStorage.setItem("editor_ads_on", adsOn ? "1" : "0");
+  }, [adsOn, settingsLoaded]);
 
   useEffect(() => {
     const prevTopic = localStorage.getItem("seo_editor_topic");
@@ -51,6 +119,10 @@ function EditorContent() {
       localStorage.removeItem("seo_editor_article");
       localStorage.removeItem("seo_editor_html_article");
       localStorage.removeItem("seo_editor_json_ld");
+      ["slug", "meta", "tags"].forEach(k => localStorage.removeItem(`seo_editor_${k}`));
+      setSlug("");
+      setMetaDesc("");
+      setTagsText("");
       setArticle("");
       setHtmlArticle("");
       setJsonLd(null);
@@ -85,6 +157,61 @@ function EditorContent() {
     localStorage.removeItem("seo_editor_article");
     localStorage.removeItem("seo_editor_html_article");
     localStorage.removeItem("seo_editor_json_ld");
+    ["slug", "meta", "tags"].forEach(k => localStorage.removeItem(`seo_editor_${k}`));
+    setSlug("");
+    setMetaDesc("");
+    setTagsText("");
+  };
+
+  // 생성 응답의 슬러그/메타/태그를 SEO 메타 바에 반영 (없으면 본문 첫 문단·키워드로 대체)
+  const applySeoMeta = (data: { slug?: string; meta_description?: string; tags?: string[] }, articleText: string) => {
+    const nextSlug = data.slug || "";
+    const nextMeta = (data.meta_description || firstParagraph(articleText)).slice(0, 160);
+    const nextTags = (data.tags && data.tags.length > 0 ? data.tags : keyword.split(",").map(k => k.trim()).filter(Boolean)).join(", ");
+    setSlug(nextSlug);
+    setMetaDesc(nextMeta);
+    setTagsText(nextTags);
+    localStorage.setItem("seo_editor_slug", nextSlug);
+    localStorage.setItem("seo_editor_meta", nextMeta);
+    localStorage.setItem("seo_editor_tags", nextTags);
+  };
+
+  const copyField = async (key: string, text: string) => {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 1800);
+  };
+
+  // 마크다운 → HTML (+ 광고 자동 배치). badge=미리보기용 배지, code=실제 <ins> 코드
+  const buildHtmlFor = (md: string, mode: "badge" | "code") => {
+    // 복사용(code)은 티스토리에서 외부 CSS가 무시되므로 인라인 스타일로 변환, 화면 미리보기(badge)는 에디터 CSS 사용
+    const base = mode === "code" ? applyInlineStyles(markdownToHtml(md)) : markdownToHtml(md);
+    return adsOn ? insertEditorAds(base, adCfg, mode) : base;
+  };
+  const previewHtml = useMemo(() => buildHtmlFor(article, "badge"), [article, adsOn, adCfg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const exportHtml = useMemo(() => buildHtmlFor(article, "code"), [article, adsOn, adCfg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const jsonLdPrefix = jsonLd ? `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>\n\n` : "";
+  const adReady = adConfigReady(adCfg);
+  const score = useMemo(() => computeEditorScore({ article, adsOn, adReady }), [article, adsOn, adReady]);
+  const ctaCount = countCtaCards(article);
+
+  const insertCta = () => {
+    if (!ctaTitle.trim() || !/^https?:\/\//i.test(ctaUrl.trim())) {
+      alert("제목과 http(s):// 로 시작하는 URL을 입력해 주세요.");
+      return;
+    }
+    const next = insertCtaCardIntoMarkdown(article, buildCtaCard(ctaTitle, ctaUrl));
+    setArticle(next);
+    localStorage.setItem("seo_editor_article", next);
+    setCtaTitle("");
+    setCtaUrl("");
+  };
+
+  const clearCtas = () => {
+    const next = removeCtaCards(article);
+    setArticle(next);
+    localStorage.setItem("seo_editor_article", next);
   };
 
   const handleArticleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -121,6 +248,7 @@ function EditorContent() {
       setArticle(data.article || "");
       setHtmlArticle(data.html_article || "");
       setJsonLd(data.json_ld || null);
+      applySeoMeta(data, data.article || "");
       localStorage.setItem("seo_editor_topic", topic);
       localStorage.setItem("seo_editor_keyword", keyword);
       
@@ -175,6 +303,8 @@ function EditorContent() {
         setArticle(finalArticle);
         setHtmlArticle(finalHtml);
         setJsonLd(finalJsonLd);
+        applySeoMeta(data, finalArticle);
+        localStorage.setItem("seo_editor_article", finalArticle);
         setActiveTab("preview");
       } catch (error) {
         console.error(error);
@@ -187,8 +317,10 @@ function EditorContent() {
     try {
       // 1. 고수익 원고+JSON-LD 결합 클립보드 복사
       const jsonLdStr = finalJsonLd ? `<script type="application/ld+json">\n${JSON.stringify(finalJsonLd, null, 2)}\n</script>\n\n` : "";
-      const copyText = finalHtml ? (jsonLdStr + finalHtml) : finalArticle;
-      
+      // 에디터에서 수정한 마크다운을 그대로 HTML로 변환하고, 광고 자동 배치가 켜져 있으면 실제 <ins> 코드로 치환
+      const exportNow = finalArticle ? buildHtmlFor(finalArticle, "code") : "";
+      const copyText = exportNow ? (jsonLdStr + exportNow) : finalArticle;
+
       await navigator.clipboard.writeText(copyText);
       
       // 2. 사용자의 티스토리 글쓰기 URL 새 탭으로 열기
@@ -212,9 +344,11 @@ function EditorContent() {
     let copyText = article;
     if (activeTab === "seo" && jsonLd) {
       copyText = `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>`;
-    } else if (activeTab === "html" && htmlArticle) {
-      const jsonLdStr = jsonLd ? `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>\n\n` : "";
-      copyText = jsonLdStr + htmlArticle;
+    } else if (activeTab === "html" && exportHtml) {
+      if (adsOn && !adReady) {
+        alert("광고 자동 배치가 켜져 있지만 AdSense ID 또는 Slot ID가 비어 있어 광고 코드는 삽입되지 않았습니다.");
+      }
+      copyText = jsonLdPrefix + exportHtml;
     }
 
     navigator.clipboard.writeText(copyText);
@@ -238,9 +372,9 @@ function EditorContent() {
           keyword: keyword,
           category: "일반",
           content: article,
-          content_html: htmlArticle,
-          meta_description: article.slice(0, 150).replace(/\n/g, " ").trim() + "...",
-          tags: keyword,
+          content_html: exportHtml,
+          meta_description: metaDesc || article.slice(0, 150).replace(/\n/g, " ").trim() + "...",
+          tags: tagsText || keyword,
           status: "DRAFT",
           check_duplicate: false
         })
@@ -281,9 +415,9 @@ function EditorContent() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
+
         {/* Left: Enhanced Configuration Panel */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4 xl:col-span-3 flex flex-col gap-6">
           <div className="glass-card p-8 flex flex-col gap-8 neon-glow-purple relative overflow-hidden">
             <h2 className="text-lg font-bold text-white flex items-center gap-3 font-outfit">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
@@ -328,19 +462,9 @@ function EditorContent() {
                   수익 극대화 솔루션
                 </label>
                 
-                <div className="flex items-center justify-between bg-white/[0.02] border border-white/[0.03] p-3.5 rounded-2xl hover:border-purple-500/20 transition-all cursor-pointer select-none" onClick={() => setAdsenseOptimize(!adsenseOptimize)}>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-bold text-white">💰 애드센스 황금 광고 배치</span>
-                    <span className="text-[9px] text-gray-500 leading-normal">본문 소제목 아래 광고 삽입용 자동 지표 슬롯</span>
-                  </div>
-                  <input 
-                    type="checkbox" 
-                    checked={adsenseOptimize}
-                    onChange={(e) => setAdsenseOptimize(e.target.checked)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 accent-purple-500 cursor-pointer shrink-0"
-                  />
-                </div>
+                <p className="text-[10px] text-gray-500 leading-normal px-1">
+                  💰 애드센스 광고 배치는 이제 우측 사이드바의 <strong className="text-purple-300">수익화 설정</strong>에서 본인의 ID/Slot으로 자동 배치됩니다.
+                </p>
 
                 <div className="flex items-center justify-between bg-white/[0.02] border border-white/[0.03] p-3.5 rounded-2xl hover:border-purple-500/20 transition-all cursor-pointer select-none" onClick={() => setAffiliateOptimize(!affiliateOptimize)}>
                   <div className="flex flex-col gap-0.5">
@@ -406,7 +530,40 @@ function EditorContent() {
         </div>
 
         {/* Right: Premium Premium Editor/Preview Workspace */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
+        <div className="lg:col-span-8 xl:col-span-6 flex flex-col gap-6">
+          {/* 상단 SEO 메타 바: 영문 슬러그 / 메타 디스크립션 / 추천 태그 원클릭 복사 */}
+          <div className="glass-card p-5 flex flex-col gap-3">
+            <div className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">SEO 메타 바</div>
+            {[
+              { key: "slug", label: "영문 URL 슬러그", value: slug, set: (v: string) => { setSlug(v); localStorage.setItem("seo_editor_slug", v); }, ph: "예: overseas-stock-capital-gains-tax-2026", extra: "" },
+              { key: "meta", label: "메타 디스크립션", value: metaDesc, set: (v: string) => { setMetaDesc(v); localStorage.setItem("seo_editor_meta", v); }, ph: "140~155자 권장", extra: `${metaDesc.length}자` },
+              { key: "tags", label: "추천 태그 (쉼표 구분)", value: tagsText, set: (v: string) => { setTagsText(v); localStorage.setItem("seo_editor_tags", v); }, ph: "태그1, 태그2, 태그3", extra: "" },
+            ].map(f => (
+              <div key={f.key} className="flex items-center gap-2">
+                <span className="w-28 shrink-0 text-[11px] font-semibold text-gray-400">{f.label}</span>
+                <input
+                  type="text"
+                  value={f.value}
+                  onChange={e => f.set(e.target.value)}
+                  placeholder={f.ph}
+                  className="flex-1 min-w-0 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-gray-700"
+                />
+                {f.extra && (
+                  <span className={`text-[10px] font-bold shrink-0 ${metaDesc.length >= 140 && metaDesc.length <= 160 ? "text-emerald-400" : "text-amber-400"}`}>{f.extra}</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => copyField(f.key, f.value)}
+                  disabled={!f.value}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-[11px] font-bold text-gray-300 border border-white/[0.06] disabled:opacity-30 shrink-0"
+                >
+                  {copiedKey === f.key ? <CheckCircle size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                  {copiedKey === f.key ? "복사됨" : "복사"}
+                </button>
+              </div>
+            ))}
+          </div>
+
           <div className="flex justify-between items-center bg-[#0a0a0f]/40 backdrop-blur-xl p-2 rounded-2xl border border-white/[0.05]">
             <div className="flex p-1 gap-1 flex-wrap">
               <button 
@@ -430,7 +587,7 @@ function EditorContent() {
               </button>
               <button 
                 onClick={() => setActiveTab("html")}
-                disabled={!htmlArticle}
+                disabled={!article}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-20 disabled:pointer-events-none ${activeTab === 'html' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-gray-500 hover:text-gray-300'}`}
               >
                 HTML 최종 원고
@@ -492,10 +649,8 @@ function EditorContent() {
             
             <div className="h-full overflow-y-auto custom-scrollbar relative">
               {activeTab === "preview" && (
-                <div className="p-12 prose prose-invert max-w-none prose-headings:text-white prose-p:text-gray-300 prose-headings:font-outfit animate-in fade-in duration-700">
-                  <pre className="whitespace-pre-wrap font-sans text-gray-300 leading-relaxed text-base">
-                    {article}
-                  </pre>
+                <div className="p-12 animate-in fade-in duration-700">
+                  <div className="editor-preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
                 </div>
               )}
               {activeTab === "editor" && (
@@ -514,15 +669,114 @@ function EditorContent() {
                   </pre>
                 </div>
               )}
-              {activeTab === "html" && htmlArticle && (
+              {activeTab === "html" && article && (
                 <div className="p-12 animate-in fade-in duration-700">
-                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-4">SEO Optimized Article HTML Template (Including Ad Placeholder)</p>
+                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-4">
+                    최종 HTML (에디터 수정 내용 반영{adsOn ? " · AdSense <ins> 코드 포함" : ""})
+                  </p>
                   <pre className="p-6 bg-white/[0.02] border border-white/[0.05] rounded-2xl text-emerald-300 font-mono text-xs overflow-x-auto leading-relaxed max-w-full whitespace-pre-wrap">
-                    {`${jsonLd ? `<script type="application/ld+json">\n${JSON.stringify(jsonLd, null, 2)}\n</script>\n\n` : ""}${htmlArticle}`}
+                    {`${jsonLdPrefix}${exportHtml}`}
                   </pre>
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar: 수익화 & 내부 링크 삽입기 + 실시간 진단 스코어보드 */}
+        <div className="lg:col-span-12 xl:col-span-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-6 content-start">
+          {/* 실시간 SEO & 수익성 진단 */}
+          <div className="glass-card p-6 flex flex-col gap-4 md:col-span-2 xl:col-span-1">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Gauge size={16} className="text-purple-400" /> SEO·수익성 진단</h3>
+              <span className={`text-2xl font-extrabold font-outfit ${score.total >= 80 ? "text-emerald-400" : score.total >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                {article ? score.total : 0}<span className="text-xs text-gray-500 font-medium"> / 100</span>
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className={`h-full transition-all ${score.total >= 80 ? "bg-emerald-500" : score.total >= 50 ? "bg-amber-500" : "bg-red-500"}`}
+                style={{ width: `${article ? score.total : 0}%` }}
+              />
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {score.items.map(it => (
+                <div key={it.label} className="text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className={it.warn ? "text-amber-300 font-semibold" : "text-gray-300 font-semibold"}>{it.warn ? "⚠️" : "✅"} {it.label}</span>
+                    <span className="text-gray-500">{article ? it.score : 0}/{it.max}</span>
+                  </div>
+                  <div className="text-gray-500 mt-0.5 pl-5">{article ? it.detail : "원고를 생성하면 실시간으로 진단합니다"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 수익화(AdSense) 설정 */}
+          <div className="glass-card p-6 flex flex-col gap-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2"><Wallet size={16} className="text-emerald-400" /> 수익화 (AdSense)</h3>
+            <input
+              type="text"
+              value={adCfg.clientId}
+              onChange={e => setAdCfg({ ...adCfg, clientId: e.target.value })}
+              placeholder="ca-pub-xxxxxxxxxxxxxxxx"
+              className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-gray-700"
+            />
+            <input
+              type="text"
+              value={adCfg.slot}
+              onChange={e => setAdCfg({ ...adCfg, slot: e.target.value })}
+              placeholder="data-ad-slot 번호 (본문 중간)"
+              className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-gray-700"
+            />
+            <input
+              type="text"
+              value={adCfg.endSlot}
+              onChange={e => setAdCfg({ ...adCfg, endSlot: e.target.value })}
+              placeholder="마지막 H2 위 Slot (비우면 위와 동일)"
+              className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 placeholder:text-gray-700"
+            />
+            <label className="flex items-start gap-2 cursor-pointer text-xs text-gray-300">
+              <input type="checkbox" checked={adsOn} onChange={e => setAdsOn(e.target.checked)} className="mt-0.5 w-4 h-4 accent-emerald-500" />
+              <span>
+                본문 중간 광고 자동 배치
+                <span className="block text-[10px] text-gray-500 mt-0.5">두 번째 H2 위와 마지막 H2 위. 미리보기엔 배지로 표시되고 HTML 복사 시 실제 &lt;ins&gt; 코드로 치환됩니다. 입력값은 이 브라우저에 저장됩니다.</span>
+              </span>
+            </label>
+            {adsOn && !adReady && <p className="text-[10px] text-amber-300">ID와 Slot을 입력해야 복사본에 광고 코드가 들어갑니다.</p>}
+          </div>
+
+          {/* 내부 링크 카드 삽입기 */}
+          <div className="glass-card p-6 flex flex-col gap-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2"><Link2 size={16} className="text-blue-400" /> 내부 링크 카드 삽입</h3>
+            <input
+              type="text"
+              value={ctaTitle}
+              onChange={e => setCtaTitle(e.target.value)}
+              placeholder="카드 제목 (예: 조기재취업수당 후기)"
+              className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-gray-700"
+            />
+            <input
+              type="text"
+              value={ctaUrl}
+              onChange={e => setCtaUrl(e.target.value)}
+              placeholder="https://s-elegant.tistory.com/..."
+              className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-gray-700"
+            />
+            <button
+              type="button"
+              onClick={insertCta}
+              disabled={!article}
+              className="py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-xs font-bold text-blue-300 disabled:opacity-30"
+            >
+              본문 중간에 CTA 카드 삽입
+            </button>
+            {ctaCount > 0 && (
+              <div className="flex items-center justify-between text-[11px] text-gray-400">
+                <span>삽입된 카드 {ctaCount}개</span>
+                <button type="button" onClick={clearCtas} className="text-red-400 hover:text-red-300 underline">모두 제거</button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -536,9 +790,9 @@ function EditorContent() {
           keyword: keyword || "",
           category: "일반",
           content: article,
-          content_html: htmlArticle,
-          meta_description: article.slice(0, 150).replace(/\n/g, " ").trim(),
-          tags: keyword,
+          content_html: exportHtml,
+          meta_description: metaDesc || article.slice(0, 150).replace(/\n/g, " ").trim(),
+          tags: tagsText || keyword,
           status: "DRAFT",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()

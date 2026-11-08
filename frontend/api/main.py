@@ -385,16 +385,18 @@ class 자동_작성_관리자:
    - 지나친 권위 의식을 버리고, 일상에서 즉시 활용할 수 있는 풍부한 생활 밀착형 실용 팁 위주로 구성합니다.
 
 ■ 구조:
-   1. 도입부 (독자의 관심을 유도하며 빠르게 공감대를 형성하는 가볍고 흡입력 있는 도입)
-   2. 핵심 요약 (독자가 가장 궁금해할 내용 3줄 요약)
+   1. 도입 리드 문단 (제목·소제목·박스·라벨 없이 글의 맨 처음에 오는 140~160자 평문 한 문단. 독자의 검색 의도와 핵심 결론을 자연스러운 문장으로 담을 것)
+   2. 핵심 요약 (리드 문단 바로 뒤에 요약 콜아웃 박스 1개만. '먼저 보고 가세요' 등 요약 박스를 중복 생성하지 말 것. 3줄 요약)
    3. 본론 (핵심 정보와 개념을 일상적인 비유와 구체적인 예시로 풀어 누구나 쉽게 이해하도록 구성)
    4. 실전 팁 & 주의사항 (일상에서 바로 써먹을 수 있는 진짜 유용한 꿀팁과 꼭 챙겨야 할 주의점)
-   5. 마무리 (부드럽고 따뜻한 마무리 인사 및 상세 정보를 확인해볼 수 있는 신뢰도 높은 안내)
+   5. 마무리 (결론 요약과 상세 정보를 확인할 수 있는 신뢰도 높은 안내. 인사·공감·댓글 부탁 문구는 쓰지 않음)
 
 ■ 길이: 1,000~1,500자 내외 (문단을 짧고 간결하게 유지하여 모바일 환경 가독성을 극대화합니다)
 ■ 금지: 기계적이고 영혼 없는 'AI스러운' 문체, 오버하는 감성팔이, 지루하게 늘어지는 서론, 가상의 헛소리(할루시네이션) 지어내기 절대 금지.
 
 [추가 필수 규칙]
+- 절대 금지 문구: "안녕하세요", "인플루언서입니다", "오늘은 ~에 대해 알아보겠습니다", "포스팅을 시작하겠습니다", "도움이 되셨다면 공감과 댓글 부탁드립니다" 등 AI 인사말·맺음말. 첫 문장부터 곧바로 본론으로 시작하세요.
+- 본문 중간에 핵심 스펙·가격·세금·장단점 등을 비교하는 마크다운 표(Table)를 최소 1개 반드시 포함하세요.
 - 글 내용에 본인이 "30년 차 IT 전문가", "60대 아저씨", "IT 전문가", "IT 아저씨", "베테랑 IT 컨설턴트", "60대 지식 탐구자" 등 자신의 나이, 성별, 경력을 직접 언급하거나 암시하는 단어, 문구, 인사를 **절대 사용하지 마세요.**
 - 제시된 키워드 정보 외에 확실치 않은 혜택이나 수치를 임의로 지어내지 마세요.
 - 글 내용에서 "SEO", "SEO 최적화" 등의 단어는 절대 언급하지 마세요.
@@ -436,25 +438,37 @@ async def generate_article(req: ArticleRequest, x_gemini_key: Optional[str] = He
    - 지나친 권위 의식을 버리고, 일상에서 즉시 활용할 수 있는 풍부한 생활 밀착형 실용 팁 위주로 구성합니다.
 
 ■ 구조:
-   1. 도입부 (독자의 관심을 유도하며 빠르게 공감대를 형성하는 가볍고 흡입력 있는 도입)
-   2. 핵심 요약 (독자가 가장 궁금해할 내용 3줄 요약)
+   1. 도입 리드 문단 (제목·소제목·박스·라벨 없이 글의 맨 처음에 오는 140~160자 평문 한 문단. 독자의 검색 의도와 핵심 결론을 자연스러운 문장으로 담을 것)
+   2. 핵심 요약 (리드 문단 바로 뒤에 요약 콜아웃 박스 1개만. '먼저 보고 가세요' 등 요약 박스를 중복 생성하지 말 것. 3줄 요약)
    3. 본론 (핵심 정보와 개념을 일상적인 비유와 구체적인 예시로 풀어 누구나 쉽게 이해하도록 구성)
    4. 실전 팁 & 주의사항 (일상에서 바로 써먹을 수 있는 진짜 유용한 꿀팁과 꼭 챙겨야 할 주의점)
-   5. 마무리 (부드럽고 따뜻한 마무리 인사 및 상세 정보를 확인해볼 수 있는 신뢰도 높은 안내)
+   5. 마무리 (결론 요약과 상세 정보를 확인할 수 있는 신뢰도 높은 안내. 인사·공감·댓글 부탁 문구는 쓰지 않음)
 
 ■ 길이: 1,000~1,500자 내외 (문단을 짧고 간결하게 유지하여 모바일 환경 가독성을 극대화합니다)
 ■ 금지: 기계적이고 영혼 없는 'AI스러운' 문체, 오버하는 감성팔이, 지루하게 늘어지는 서론, 가상의 헛소리(할루시네이션) 지어내기 절대 금지.
 
 [추가 필수 규칙]
+- 절대 금지 문구: "안녕하세요", "인플루언서입니다", "오늘은 ~에 대해 알아보겠습니다", "포스팅을 시작하겠습니다", "도움이 되셨다면 공감과 댓글 부탁드립니다" 등 AI 인사말·맺음말. 첫 문장부터 곧바로 본론으로 시작하세요.
+- 본문 중간에 핵심 스펙·가격·세금·장단점 등을 비교하는 마크다운 표(Table)를 최소 1개 반드시 포함하세요.
 - 글 내용에 본인이 "30년 차 IT 전문가", "60대 아저씨", "IT 전문가", "IT 아저씨", "베테랑 IT 컨설턴트", "60대 지식 탐구자" 등 자신의 나이, 성별, 경력을 직접 언급하거나 암시하는 단어, 문구, 인사를 **절대 사용하지 마세요.**
 - 제시된 키워드 정보 외에 확실치 않은 혜택이나 수치를 임의로 지어내지 마세요.
 - 글 내용에서 "SEO", "SEO 최적화" 등의 단어는 절대 언급하지 마세요.
-- H1~H3 태그 구조를 갖추고 메타 설명도 포함하세요. 가독성을 위해 글머리 기호(-, *)를 적극 활용하세요.
-- 원고가 끝난 후 마지막 줄에 '주요 키워드: ' 다음에 해당 글과 관련된 핵심 키워드 10개를 쉼표(,)로 구분하여 추가해줘.
+- H1~H3 태그 구조를 갖추세요. 가독성을 위해 글머리 기호(-, *)를 적극 활용하세요.
+- 이미지를 넣는다면 마크다운 `![구체적인 검색 키워드 포함 설명](주소)` 형식으로 alt를 반드시 채우고 '#1' 같은 일련번호는 쓰지 마세요.
+- 원고가 끝난 후 맨 마지막에 아래 3줄을 각각 한 줄로 추가해줘 (본문 안에서는 이 줄들을 반복하지 마세요):
+메타 설명: (리드 문단을 압축한 150자 내외 설명)
+영문 슬러그: (소문자 영문과 하이픈만, 3~7단어, 예: overseas-stock-capital-gains-tax-2026)
+주요 키워드: (핵심 키워드 8~10개를 쉼표(,)로 구분)
 """
     try:
         response = await safe_generate_content_async(client, prompt)
-        return {"article": response.text}
+        article_text, trailer = review_seo.extract_trailer(response.text)
+        return {
+            "article": article_text,
+            "slug": trailer.get("slug", ""),
+            "meta_description": trailer.get("meta", ""),
+            "tags": trailer.get("keywords", []),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -665,16 +679,18 @@ async def publish_tistory(req: PublishRequest, x_gemini_key: Optional[str] = Hea
    - 지나친 권위 의식을 버리고, 일상에서 즉시 활용할 수 있는 풍부한 생활 밀착형 실용 팁 위주로 구성합니다.
 
 ■ 구조:
-   1. 도입부 (독자의 관심을 유도하며 빠르게 공감대를 형성하는 가볍고 흡입력 있는 도입)
-   2. 핵심 요약 (독자가 가장 궁금해할 내용 3줄 요약)
+   1. 도입 리드 문단 (제목·소제목·박스·라벨 없이 글의 맨 처음에 오는 140~160자 평문 한 문단. 독자의 검색 의도와 핵심 결론을 자연스러운 문장으로 담을 것)
+   2. 핵심 요약 (리드 문단 바로 뒤에 요약 콜아웃 박스 1개만. '먼저 보고 가세요' 등 요약 박스를 중복 생성하지 말 것. 3줄 요약)
    3. 본론 (핵심 정보와 개념을 일상적인 비유와 구체적인 예시로 풀어 누구나 쉽게 이해하도록 구성)
    4. 실전 팁 & 주의사항 (일상에서 바로 써먹을 수 있는 진짜 유용한 꿀팁과 꼭 챙겨야 할 주의점)
-   5. 마무리 (부드럽고 따뜻한 마무리 인사 및 상세 정보를 확인해볼 수 있는 신뢰도 높은 안내)
+   5. 마무리 (결론 요약과 상세 정보를 확인할 수 있는 신뢰도 높은 안내. 인사·공감·댓글 부탁 문구는 쓰지 않음)
 
 ■ 길이: 1,000~1,500자 내외 (문단을 짧고 간결하게 유지하여 모바일 환경 가독성을 극대화합니다)
 ■ 금지: 기계적이고 영혼 없는 'AI스러운' 문체, 오버하는 감성팔이, 지루하게 늘어지는 서론, 가상의 헛소리(할루시네이션) 지어내기 절대 금지.
 
 [추가 필수 규칙]
+- 절대 금지 문구: "안녕하세요", "인플루언서입니다", "오늘은 ~에 대해 알아보겠습니다", "포스팅을 시작하겠습니다", "도움이 되셨다면 공감과 댓글 부탁드립니다" 등 AI 인사말·맺음말. 첫 문장부터 곧바로 본론으로 시작하세요.
+- 본문 중간에 핵심 스펙·가격·세금·장단점 등을 비교하는 마크다운 표(Table)를 최소 1개 반드시 포함하세요.
 - 글 내용에 본인이 "30년 차 IT 전문가", "60대 아저씨", "IT 전문가", "IT 아저씨", "베테랑 IT 컨설턴트", "60대 지식 탐구자" 등 자신의 나이, 성별, 경력을 직접 언급하거나 암시하는 단어, 문구, 인사를 **절대 사용하지 마세요.**
 - 제시된 키워드 정보 외에 확실치 않은 혜택이나 수치를 임의로 지어내지 마세요.
 - 글 내용에서 "SEO", "SEO 최적화" 등의 단어는 절대 언급하지 마세요.
@@ -883,18 +899,38 @@ async def generate_review(
         response = await safe_generate_content_async(client, prompt, is_json=True)
         result_json = json.loads(response.text)
 
-        raw_title = result_json.get("title") or f"{req.restaurant_name} 방문 솔직 후기"
-        title_candidates = review_seo.clean_title_candidates(result_json.get("title_candidates"), raw_title)
+        # 확장 스키마(titles / englishSlug / metaDescription / tags / faqSchema / contentMarkdown) + 구버전 키 호환
+        raw_titles = result_json.get("titles") or result_json.get("title_candidates")
+        raw_title = (raw_titles[0] if isinstance(raw_titles, list) and raw_titles else None) \
+            or result_json.get("title") or f"{req.restaurant_name} 방문 솔직 후기"
+        title_candidates = review_seo.clean_title_candidates(raw_titles, raw_title)
         title = title_candidates[0] if title_candidates else raw_title
-        raw_markdown = review_seo.strip_cliches(result_json.get("content_markdown", ""))
-        meta_desc = result_json.get("meta_description", "")
-        tags_list = result_json.get("tags", [req.restaurant_name, "방문후기", "내돈내산"])
+        raw_markdown = review_seo.strip_cliches(
+            result_json.get("contentMarkdown") or result_json.get("content_markdown", ""))
+        meta_desc = result_json.get("metaDescription") or result_json.get("meta_description", "")
+        tags_list = result_json.get("tags") or [req.restaurant_name, "방문후기", "내돈내산"]
         primary_kw = result_json.get("primary_keyword", req.restaurant_name)
         related_kws = result_json.get("related_keywords", "")
-        slug = review_seo.normalize_slug(result_json.get("slug"))
+        slug = review_seo.normalize_slug(result_json.get("englishSlug") or result_json.get("slug"))
+
+        # [IMAGE_SLOT: alt=... | caption=...] → 내부 사진 마커 + 슬롯별 Alt·캡션 추출
+        raw_markdown, slot_seo = review_seo.extract_image_slots(raw_markdown, len(photos_for_seo))
         photo_seo = review_seo.resolve_photo_seo(
-            result_json.get("photo_seo"), photos_for_seo, req.restaurant_name, req.location or ""
+            slot_seo or result_json.get("photo_seo"), photos_for_seo, req.restaurant_name, req.location or ""
         )
+
+        # FAQ JSON-LD: 모델이 준 문자열이 유효하면 사용, 아니면 본문 Q&A에서 생성
+        faq_schema = ""
+        try:
+            cand = result_json.get("faqSchema")
+            if isinstance(cand, dict):
+                cand = json.dumps(cand, ensure_ascii=False, indent=2)
+            if isinstance(cand, str) and cand.strip() and json.loads(cand).get("@type") == "FAQPage":
+                faq_schema = cand
+        except Exception:
+            faq_schema = ""
+        if not faq_schema:
+            faq_schema = review_seo.build_faq_schema(raw_markdown)
 
         # 1. 에디터(마크다운)용 텍스트: 사진/경험 마커를 읽기 쉬운 문구로 치환
         markdown_for_editor = raw_markdown
@@ -977,6 +1013,12 @@ async def generate_review(
             "title": title,
             "title_candidates": title_candidates,
             "slug": slug,
+            # 확장 스키마 (camelCase)
+            "titles": title_candidates,
+            "englishSlug": slug,
+            "metaDescription": meta_desc,
+            "faqSchema": faq_schema,
+            "htmlContent": full_html_package,
             "article": markdown_for_editor,
             "html_article": full_html_package,
             "tags": tags_list,

@@ -116,3 +116,21 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* /editor 렌더링 미리보기 (티스토리에 붙여넣었을 때의 모양에 가깝게) */
+.editor-preview { color: #d1d5db; font-size: 15px; line-height: 1.85; }
+.editor-preview h1 { font-size: 26px; font-weight: 800; color: #fff; margin: 0 0 18px; }
+.editor-preview h2 { font-size: 21px; font-weight: 800; color: #fff; margin: 34px 0 14px; padding-left: 12px; border-left: 4px solid #a855f7; }
+.editor-preview h3 { font-size: 17px; font-weight: 700; color: #e5e7eb; margin: 24px 0 10px; }
+.editor-preview p { margin: 0 0 14px; }
+.editor-preview ul, .editor-preview ol { margin: 0 0 14px 22px; }
+.editor-preview ul { list-style: disc; }
+.editor-preview ol { list-style: decimal; }
+.editor-preview a { color: #93c5fd; text-decoration: underline; }
+.editor-preview blockquote { margin: 18px 0; padding: 14px 18px; border-left: 4px solid #3b82f6; background: rgba(59,130,246,0.08); border-radius: 8px; }
+.editor-preview table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+.editor-preview th, .editor-preview td { border: 1px solid rgba(255,255,255,0.12); padding: 10px 12px; text-align: left; }
+.editor-preview th { background: rgba(255,255,255,0.06); color: #fff; }
+.editor-preview img { max-width: 100%; border-radius: 12px; margin: 10px 0; }
+.editor-preview hr { border-color: rgba(255,255,255,0.1); margin: 24px 0; }
+.editor-preview code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px; font-size: 13px; }
