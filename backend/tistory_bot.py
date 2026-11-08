@@ -104,6 +104,9 @@ class TistoryAutomator:
 
     def _meta_summary_html(self, meta_description: str) -> str:
         """티스토리는 별도 검색 설명 입력란이 없어 본문 첫 부분이 검색 설명으로 쓰이므로, 메타 설명을 맨 위 요약 문단으로 삽입"""
+        # 본문 첫 문단(리드 문단, 140~160자)이 곧 검색 스니펫이므로, 그 앞에 '핵심 요약' 라벨 문단을 끼워 넣지 않는다.
+        # (예전에는 여기서 요약 박스를 맨 위에 붙여 스니펫이 라벨 텍스트로 시작하는 문제가 있었다.)
+        return ""
         meta = (meta_description or "").strip()
         if not meta:
             return ""

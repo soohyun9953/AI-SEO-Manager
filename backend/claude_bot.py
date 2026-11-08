@@ -19,6 +19,7 @@ import requests
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page
+import review_seo
 
 # Windows 콘솔 cp949 인코딩 문제 방지
 if hasattr(sys.stdout, 'reconfigure'):
@@ -688,9 +689,12 @@ class ClaudeWebAutomator:
         for i in range(1, max(photo_count, 2) + 1):
             photo_slots_guide += f"- 소제목 중간 적절한 위치에 '<!-- [PHOTO_{i}_SLOT] -->' 마커를 단독 줄로 삽입할 것\n"
 
+        photo_seo_guide = review_seo.photo_seo_rules(photo_count)
         return f"""
-당신은 네이버 블로그 스마트블록 및 다음/구글 검색 상위 노출 전문 '라이프스타일·여행·미식 인플루언서'입니다.
-직접 다녀온 솔직하고 생생한 '내돈내산 방문/체험 후기'를 티스토리 및 네이버에 적합한 전문 블로그 포스팅으로 작성해주세요.
+{review_seo.persona_prompt(category)}
+직접 다녀온 '내돈내산 방문/체험 후기'를 티스토리용 전문 블로그 포스팅으로 작성해주세요.
+
+{review_seo.negative_prompt()}
 
 [방문 장소 정보]
 - 장소/상호명: {place_name}
@@ -700,45 +704,54 @@ class ClaudeWebAutomator:
 - 주요 정보(메뉴/가격/입장료/시설 등): {key_info or '대표 정보'}
 - 방문 특이사항 및 솔직 메모: {special_notes or '제공되지 않음 (없는 사실은 지어내지 말 것)'}
 - 만족도/별점: {rating} / 5.0
-- 첨부된 사진 정보:
-{captions_info or f'총 {photo_count}장의 현장 사진 첨부됨'}
+- 첨부된 사진 정보(사용자가 적은 설명 힌트):
+{captions_info or f'총 {photo_count}장의 사진 첨부됨 (설명 없음)'}
+
+{review_seo.lead_and_summary_rules()}
 
 [필수 작성 지침 및 출력 형식]
 반드시 다음 구조로 작성하고, 각 태그 라벨을 정확하게 포함해주세요:
 
+[제목후보]
+CTR을 높이는 제목 3개를 한 줄에 하나씩. 각각 공백 포함 35자 이내(40자 초과 금지), 핵심 키워드(지역+상호명+대표 메뉴)를 앞쪽에 두고 숫자·비교·핵심 혜택 중 하나 이상 포함. "내돈내산 솔직 후기! ... 총정리" 같은 반복 틀 금지, 3개를 서로 다른 각도로 작성.
+
 [제목]
-클릭률(CTR)과 검색 노출을 극대화하는 제목.
-- 공백 포함 35자 이내로 짧게 쓸 것 (검색 결과에서 길면 잘림, 40자 초과 금지)
-- 핵심 키워드(지역 + 상호명 + 대표 메뉴)를 제목 앞쪽에 배치
-- "내돈내산 솔직 후기! ... 총정리" 같은 반복 틀은 피하고 글마다 다른 표현 사용
-- 예시: {location} {place_name} 후기 | 대표메뉴와 웨이팅·주차 팁
+위 후보 중 가장 좋은 1개
+
+{review_seo.slug_rules()}
+[슬러그]
+영문 슬러그 한 줄
 
 [메타설명]
-검색엔진 스니펫용 1~2줄 요약 (80~120자 내외)
+140~155자. 리드 문단의 핵심을 압축한 한 문단.
+
+[사진SEO]
+사진 {photo_count}장 각각 한 줄씩 "사진N | alt | 캡션" 형식 (사진이 없으면 비워 둠).
+{photo_seo_guide}
 
 [본문]
-1. 톤 앤 매너:
-   - 생생한 E-E-A-T 기반의 친근하고 다정한 어조(~했어요, ~더라고요, ~추천해요).
-   - 기계적인 AI 느낌 없이 손님/여행자의 입장에서 느낀 솔직한 장단점과 팁 기술.
-   - 모바일 가독성을 위해 2~3줄마다 빈 줄(줄바꿈) 적용.
-2. 구성:
-   - 도입부: 방문 동기와 첫인상 (바로 아래에 '> **먼저 보고 가세요**' 인용문으로 핵심 3줄 요약 포함)
-   - 첫 번째 소제목 (주제: 위치, 인테리어/분위기, 주차 및 웨이팅 꿀팁)
-   - 두 번째 소제목 (주제: 핵심 특징, 대표 메뉴/체험 솔직 평가)
-   - 세 번째 소제목 (주제: 한눈에 보는 핵심 요약 - 마크다운 표 Table로 정리: 장소명, 위치, 주요 가격/메뉴, 편의시설, 총점)
-   - 솔직히 아쉬웠던 점 소제목 (대기, 가격, 주차 등 실제 불편했던 점 1~2가지를 솔직하게)
-   - 자주 묻는 질문 소제목 (독자가 검색할 만한 질문 3개를 'Q. 질문 / A. 답변' 형식으로)
-   - 마무리 소제목 (이런 분께 추천, 비추천, 재방문 의사, 최종 한 줄 평)
-   - 사실성 원칙: 위 [방문 장소 정보]에 없는 가격, 영업시간, 메뉴명, 주차 여부는 지어내지 말고 '방문 전 확인 추천'으로 처리
-   - 각 소제목은 반드시 마크다운 "## 소제목 문장" 형식으로 쓰고, "소제목 1:" 같은 번호·라벨 문구는 쓰지 말고 주제를 담은 매력적인 제목 문장만 쓸 것
-3. 사진 슬롯 마커 배치:
+1. 구성 (소제목은 마크다운 "## 소제목 문장", 번호·라벨 문구 금지):
+   - (소제목 없이) 리드 문단 → 요약 박스 1개
+   - 위치, 인테리어/분위기, 주차 및 웨이팅 꿀팁
+   - 핵심 특징, 대표 메뉴/체험 솔직 평가
+   - 한눈에 보는 핵심 요약표 (마크다운 표: 장소명, 위치, 주요 가격/메뉴, 편의시설, 총점)
+   - 솔직히 아쉬웠던 점 (대기, 가격, 주차 등 1~2가지)
+   - 자주 묻는 질문
+   - 마무리 총평 (이런 분께 추천, 비추천, 재방문 의사, 최종 한 줄 평)
+2. 모바일 가독성: 2~3줄마다 빈 줄.
+3. 사실성 원칙: 위 [방문 장소 정보]에 없는 가격, 영업시간, 메뉴명, 주차 여부는 지어내지 말고 '방문 전 확인 추천'으로 처리.
+4. 사진 슬롯 마커 배치:
 {photo_slots_guide}
+
+{review_seo.faq_rules()}
+
+{review_seo.closing_rules()}
 
 [태그]
 #지역명, #장소명, #카테고리, #내돈내산 등 검색 유입용 태그 10~15개를 쉼표로 구분하여 작성 (예: #성수동맛집, #성수핫플, #내돈내산)
 
 [출력 형식 - 매우 중요]
-[제목]부터 [태그]까지 전체 결과물을 반드시 하나의 마크다운 코드블록(```markdown 으로 시작해서 ``` 로 끝남) 안에 작성하세요.
+[제목후보]부터 [태그]까지 전체 결과물을 반드시 하나의 마크다운 코드블록(```markdown 으로 시작해서 ``` 로 끝남) 안에 작성하세요.
 코드블록 밖에는 어떤 설명이나 인사말도 쓰지 마세요. 코드블록 안에서 소제목은 "## "로, 표는 마크다운 표로 쓰세요.
 
 이제 위 지침에 맞추어 전문 블로그 원고를 정성껏 작성해주세요!
@@ -852,7 +865,7 @@ class ClaudeWebAutomator:
         tags = []
         article = text
 
-        title_match = re.search(r'\[제목\]\s*(.*?)(?=\n\n|\[메타설명\]|\[본문\]|$)', text, re.DOTALL)
+        title_match = re.search(r'\[제목\]\s*(.*?)(?=\n\n|\[슬러그\]|\[메타설명\]|\[본문\]|$)', text, re.DOTALL)
         if title_match:
             title = title_match.group(1).strip().replace("#", "").strip()
 
@@ -880,6 +893,24 @@ class ClaudeWebAutomator:
                 cleaned = cleaned.replace(tags_match.group(0), "")
             article = cleaned.strip()
 
+        slug = ""
+        title_candidates: List[str] = []
+        photo_seo_raw: List[Dict[str, str]] = []
+        if platform != "naver":
+            slug_m = re.search(r'\[슬러그\]\s*(.*?)(?=\n\s*\[|$)', text, re.DOTALL)
+            if slug_m and slug_m.group(1).strip():
+                slug = review_seo.normalize_slug(slug_m.group(1).strip().splitlines()[0])
+            cand_m = re.search(r'\[제목후보\]\s*(.*?)(?=\n\s*\[|$)', text, re.DOTALL)
+            if cand_m:
+                title_candidates = [re.sub(r'^[\s\-\d.)]+', '', ln).strip() for ln in cand_m.group(1).splitlines() if ln.strip()]
+            seo_m = re.search(r'\[사진SEO\]\s*(.*?)(?=\n\s*\[본문\]|$)', text, re.DOTALL)
+            if seo_m:
+                for ln in seo_m.group(1).splitlines():
+                    parts = [x.strip() for x in ln.split("|")]
+                    if len(parts) >= 3 and re.match(r'사진\s*\d+', parts[0]):
+                        photo_seo_raw.append({"alt": parts[1], "caption": parts[2]})
+            article = review_seo.strip_cliches(article)
+
         if platform == "naver":
             tags = tags[:30]
             html_article, article_text, char_count, article_md = self._naver_html(article, photos)
@@ -894,18 +925,24 @@ class ClaudeWebAutomator:
                 "article_md": article_md
             }
 
-        html_article = self._markdown_to_tistory_html(article, place_name, photos=photos)
+        photo_seo = review_seo.resolve_photo_seo(photo_seo_raw, photos or [], place_name, "") if photos else []
+        html_article = self._markdown_to_tistory_html(article, place_name, photos=photos, photo_seo=photo_seo)
+        title_candidates = review_seo.clean_title_candidates(title_candidates, title)
+        article_for_editor = review_seo.EXPERIENCE_MARKER_RE.sub("\n\n[💡 실무/현장 경험 한 줄 추가 구간]\n\n", article)
 
         return {
             "title": title,
-            "article": article,
+            "title_candidates": title_candidates,
+            "slug": slug,
+            "article": article_for_editor,
             "html_article": html_article,
             "tags": tags,
             "tags_string": ", ".join(tags),
-            "meta_description": meta_desc
+            "meta_description": meta_desc,
+            "photo_seo": photo_seo
         }
 
-    def _markdown_to_tistory_html(self, md_content: str, place_name: str, photos: Optional[List[Dict[str, str]]] = None) -> str:
+    def _markdown_to_tistory_html(self, md_content: str, place_name: str, photos: Optional[List[Dict[str, str]]] = None, photo_seo: Optional[List[Dict[str, str]]] = None) -> str:
         """마크다운을 티스토리 맞춤형 프리미엄 모던 HTML로 변환 및 사진 슬롯 치환"""
         import markdown
         html = markdown.markdown(md_content, extensions=['tables', 'fenced_code', 'nl2br'])
@@ -916,20 +953,18 @@ class ClaudeWebAutomator:
         html = html.replace('<th>', '<th style="background-color: #f1f5f9; padding: 12px; font-weight: 600; border-bottom: 1px solid #cbd5e1; color: #334155;">')
         html = html.replace('<td>', '<td style="padding: 12px; border-bottom: 1px solid #e2e8f0; color: #475569;">')
         html = html.replace('<p>', '<p style="line-height: 1.85; margin-bottom: 16px; color: #334155; font-size: 15px;">')
+        html = review_seo.style_summary_callout(html)
 
         if photos and len(photos) > 0:
             for idx, p in enumerate(photos):
                 slot_marker = f"<!-- [PHOTO_{idx+1}_SLOT] -->"
                 data_url = p.get("data_url") or ""
-                caption = p.get("caption") or f"{place_name} 현장 사진 {idx+1}"
-                
+                seo = photo_seo[idx] if photo_seo and idx < len(photo_seo) else {}
+                alt_text = seo.get("alt") or f"{place_name} {p.get('caption') or ''}".strip()
+                caption = seo.get("caption") or p.get("caption") or place_name
+
                 if data_url:
-                    img_card = f"""
-<div style="margin: 25px 0; text-align: center;">
-  <img src="{data_url}" alt="{caption}" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
-  <p style="font-size: 13px; color: #64748b; margin-top: 8px;">📷 {caption}</p>
-</div>
-"""
+                    img_card = review_seo.render_figure(idx + 1, data_url, alt_text, caption)
                     if slot_marker in html:
                         html = html.replace(slot_marker, img_card)
                     else:
@@ -944,4 +979,5 @@ class ClaudeWebAutomator:
                     html = html.replace(slot_marker, "")
         
         html = re.sub(r'<!--\s*\[PHOTO_\d+_SLOT\]\s*-->', '', html)
+        html = review_seo.EXPERIENCE_MARKER_RE.sub(review_seo.EXPERIENCE_BOX_HTML, html, count=1)
         return html

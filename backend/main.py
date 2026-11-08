@@ -24,6 +24,7 @@ import json
 from datetime import datetime
 import database
 import auth_guard
+import review_seo
 
 load_dotenv()
 
@@ -1138,114 +1139,63 @@ async def generate_review(
         raise HTTPException(status_code=400, detail="식당 또는 매장 이름을 입력해주세요.")
 
     try:
-        photos_info = []
-        for idx, p in enumerate(req.photos[:2]):
-            caption = p.caption.strip() if p.caption else f"방문 사진 {idx+1}"
-            photos_info.append(f"- 사진 {idx+1}: {caption}")
-        photos_desc = "\n".join(photos_info) if photos_info else "첨부된 사진 없음"
+        photo_lines = []
+        photos_for_seo = []
+        for idx, p in enumerate((req.photos or [])[:2]):
+            hint = (p.caption or "").strip()
+            photo_lines.append(f"- 사진 {idx+1}: {hint or '(설명 없음)'}")
+            photos_for_seo.append({"caption": hint})
 
-        prompt = f"""
-당신은 네이버 블로그 스마트블록 및 다음/구글 검색 상위 노출 전문 '미식·여행 인플루언서'입니다.
-실제 직접 방문하여 맛보고 경험한 생생한 '내돈내산 솔직 방문 후기'를 전문 블로그 포스팅으로 작성해주세요.
-
-[방문 매장 정보]
-- 식당/장소명: {req.restaurant_name}
-- 위치/지역: {req.location or '해당 지역 중심가'}
-- 지도/사이트 링크: {req.place_url or '제공되지 않음'}
-- 대표 메뉴 및 가격: {req.menu_info or '대표 시그니처 메뉴'}
-- 방문 특이사항 및 솔직 메모: {req.special_notes or '제공되지 않음 (없는 사실은 지어내지 말 것)'}
-- 만족도/별점: {req.rating or '5.0'} / 5.0
-- 등록된 사진 정보:
-{photos_desc}
-
-[필수 작성 지침 및 포맷]
-1. 제목:
-   - 검색 사용자의 클릭률(CTR)을 극대화하는 SEO 최적화 제목을 지어주세요.
-   - 제목은 공백 포함 35자 이내로 짧게 쓰세요(검색 결과에서 길면 잘립니다). 40자를 넘기지 마세요.
-   - 핵심 키워드(지역 + 상호명 + 대표 메뉴)를 제목 앞쪽에 배치하세요.
-   - "내돈내산 솔직 후기! ... 총정리" 같은 반복적인 틀은 피하고 글마다 다른 표현을 쓰세요.
-   - 예시: {req.location or '핫플'} {req.restaurant_name} 후기 | 대표메뉴와 웨이팅·주차 팁
-2. 톤 앤 매너:
-   - 직접 다녀온 경험을 풀어내는 생생한 E-E-A-T 기반의 친근하고 다정한 블로그 어조(~했어요, ~있더라고요, ~추천해요)를 유지하세요.
-   - 뻔하고 기계적인 AI 말투나 과도한 미사여구를 배제하고, 실제 손님의 입장에서 느낀 장단점과 팁을 솔직하게 기술하세요.
-   - 모바일에서 읽기 편하게 2~3줄 단위로 줄바꿈을 적용하세요.
-3. 본문 구성 및 사진 슬롯 마커 배치:
-   - 각 소제목은 마크다운 "## 제목" 형식으로 쓰되, "소제목 1:", "[소제목]" 같은 번호·라벨 문구는 절대 쓰지 말고 매력적인 제목 문장만 쓰세요. (예: ## 광교 호수공원 뷰가 좋은 로스터리 카페, 위치와 주차 꿀팁)
-   - 아래 괄호 안의 "주제"는 내용 방향일 뿐이므로 제목에 그대로 복사하지 마세요.
-   - [도입부 직후 3줄 요약]: 도입부 바로 아래에 '> **먼저 보고 가세요**' 인용문으로 핵심 3줄(위치/가격대/한 줄 평)을 요약해 체류시간과 클릭 후 이탈을 줄이세요.
-   - [도입부]: 방문하게 된 계기와 첫인상, 매장 외관
-   - 첫 번째 소제목 (주제: 위치 & 매장 분위기, 웨이팅/주차 꿀팁):
-     - 인테리어 분위기, 테이블 간격, 예약/웨이팅 방법, 주차장 정보 등 현실적인 팁.
-     - 본문 중간 적절한 위치에 반드시 다음 마커를 단독 라인으로 삽입하세요:
-       <!-- [PHOTO_1_SLOT] -->
-   - 두 번째 소제목 (주제: 대표 메뉴 솔직 맛 평가):
-     - 주문한 메뉴들의 비주얼, 향, 식감, 양, 가격 대비 만족도(가성비)를 상세히 묘사.
-     - 사진이 2장 등록되어 있다면, 이 단락 중간 적절한 위치에 다음 마커를 단독 라인으로 삽입하세요:
-       <!-- [PHOTO_2_SLOT] -->
-   - 세 번째 소제목 (주제: 방문 전 필독! 핵심 요약표):
-     - 상호명, 위치, 주요 메뉴/가격, 웨이팅 팁, 주차 여부, 총점 등을 깔끔한 마크다운 표(Table)로 정리.
-   - 네 번째 소제목 (주제: 위치 안내 및 지도 정보):
-     - 식당 위치와 지도 링크 안내
-   - 다섯 번째 소제목 (주제: 솔직히 아쉬웠던 점):
-     - 장점만 나열하지 말고 대기시간, 가격, 주차 등 실제 불편했거나 아쉬웠던 점을 1~2가지 솔직하게 쓰세요. (신뢰도와 재방문·공유 확률을 높입니다)
-   - 여섯 번째 소제목 (주제: 방문 전 자주 묻는 질문):
-     - 독자가 실제로 검색할 만한 질문 3개를 '**Q.** 질문 / A. 답변' 형식으로 정리하세요. (예: 주차 되나요? 예약 필요한가요? 아이와 가도 되나요?)
-   - [마무리 총평]:
-     - 이런 분들께 추천합니다 (데이트, 가족모임, 친구 모임 등), 이런 분들께는 비추천, 최종 한 줄 평.
-5. 사실성 원칙 (매우 중요):
-   - 위 [방문 매장 정보]에 없는 가격, 영업시간, 메뉴명, 주차 여부 등은 절대 지어내지 마세요. 정보가 없으면 '방문 전 확인을 추천해요'처럼 쓰세요.
-   - 입력된 메모에 없는 구체적 경험(맛 묘사 외의 대화, 직원 이름 등)을 만들어내지 마세요.
-4. 검색 태그 (10~15개):
-   - 해당 지역, 식당명, 메뉴명, 추천 대상, 내돈내산 등 유입 키워드를 다각도로 선정.
-
-반드시 아래 JSON 포맷으로만 응답해야 합니다:
-{{
-  "title": "클릭률 높은 블로그 제목",
-  "content_markdown": "작성된 전체 마크다운 본문 (<!-- [PHOTO_1_SLOT] --> 등 포함)",
-  "meta_description": "검색엔진 노출용 120자 내외의 흥미로운 메타 설명",
-  "tags": ["키워드1", "키워드2", "키워드3", "키워드4", "키워드5", "키워드6", "키워드7", "키워드8", "키워드9", "키워드10"],
-  "primary_keyword": "{req.restaurant_name}",
-  "related_keywords": "{req.location or ''} {req.restaurant_name}, {req.restaurant_name} 후기"
-}}
-"""
+        category_label = req.category or "맛집/카페"
+        prompt = review_seo.build_gemini_review_prompt(
+            place_name=req.restaurant_name,
+            category=category_label,
+            location=req.location or "",
+            place_url=req.place_url or "",
+            key_info=req.menu_info or "",
+            special_notes=req.special_notes or "",
+            rating=req.rating or "5.0",
+            photo_lines=photo_lines,
+        )
 
         response = safe_generate_content(api_key, prompt, is_json=True, target_model=req.model_name)
         result_json = json.loads(response.text)
 
-        title = result_json.get("title", f"{req.restaurant_name} 방문 솔직 후기")
-        raw_markdown = result_json.get("content_markdown", "")
+        raw_title = result_json.get("title") or f"{req.restaurant_name} 방문 솔직 후기"
+        title_candidates = review_seo.clean_title_candidates(result_json.get("title_candidates"), raw_title)
+        title = title_candidates[0] if title_candidates else raw_title
+        raw_markdown = review_seo.strip_cliches(result_json.get("content_markdown", ""))
         meta_desc = result_json.get("meta_description", "")
-        tags_list = result_json.get("tags", [req.restaurant_name, "맛집후기", "내돈내산"])
+        tags_list = result_json.get("tags", [req.restaurant_name, "방문후기", "내돈내산"])
         primary_kw = result_json.get("primary_keyword", req.restaurant_name)
         related_kws = result_json.get("related_keywords", "")
+        slug = review_seo.normalize_slug(result_json.get("slug"))
+        photo_seo = review_seo.resolve_photo_seo(
+            result_json.get("photo_seo"), photos_for_seo, req.restaurant_name, req.location or ""
+        )
 
-        # 1. 마크다운 내 사진 슬롯 처리
+        # 1. 에디터(마크다운)용 텍스트: 사진/경험 마커를 읽기 쉬운 문구로 치환
         markdown_for_editor = raw_markdown
         for idx in range(2):
             slot = f"<!-- [PHOTO_{idx+1}_SLOT] -->"
-            if idx < len(req.photos) and req.photos[idx]:
-                cap = req.photos[idx].caption or f"사진 {idx+1}"
-                img_md = f"\n\n> 📸 **[사진 {idx+1}: {cap}]**\n"
-                markdown_for_editor = markdown_for_editor.replace(slot, img_md)
+            if idx < len(photo_seo):
+                markdown_for_editor = markdown_for_editor.replace(
+                    slot, f"\n\n(사진 {idx+1}) {photo_seo[idx]['caption']}\n")
             else:
                 markdown_for_editor = markdown_for_editor.replace(slot, "")
+        markdown_for_editor = review_seo.EXPERIENCE_MARKER_RE.sub(
+            "\n\n[💡 실무/현장 경험 한 줄 추가 구간]\n\n", markdown_for_editor)
 
         # 2. 티스토리 완벽 지원 HTML 렌더링
-        html_body = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code'])
+        html_body = markdown.markdown(raw_markdown, extensions=['tables', 'fenced_code', 'nl2br'])
+        html_body = review_seo.style_summary_callout(html_body)
 
         for idx in range(2):
             slot = f"<!-- [PHOTO_{idx+1}_SLOT] -->"
-            if idx < len(req.photos) and req.photos[idx]:
+            if idx < len(photo_seo):
                 photo = req.photos[idx]
-                cap = photo.caption or f"{req.restaurant_name} 방문 사진 {idx+1}"
-                img_src = photo.data_url if photo.data_url else "https://via.placeholder.com/800x500?text=Food+Review+Photo"
-                
-                figure_html = f"""
-<figure class="tistory-review-image" style="margin: 28px 0; text-align: center; display: block;">
-  <img src="{img_src}" alt="{cap}" style="max-width: 100%; height: auto; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); margin: 0 auto; display: inline-block;" />
-  <figcaption style="font-size: 13px; color: #71717a; margin-top: 10px; font-weight: 500; text-align: center;">📷 {cap}</figcaption>
-</figure>
-"""
+                img_src = photo.data_url if photo.data_url else "https://via.placeholder.com/800x500?text=Review+Photo"
+                figure_html = review_seo.render_figure(idx + 1, img_src, photo_seo[idx]["alt"], photo_seo[idx]["caption"])
                 if slot in html_body:
                     html_body = html_body.replace(slot, figure_html)
                 else:
@@ -1259,6 +1209,9 @@ async def generate_review(
             else:
                 html_body = html_body.replace(slot, "")
 
+        # 결론 앞 '직접 경험 추가' 가이드 박스
+        html_body = review_seo.render_experience_box(html_body)
+
         if req.place_url:
             link_box = f"""
 <div style="margin: 30px 0; padding: 18px 22px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; line-height: 1.6; color: #334155;">
@@ -1268,8 +1221,6 @@ async def generate_review(
 </div>
 """
             html_body += link_box
-
-        # 사용자의 요청에 따라 본문 내 광고 플레이스홀더 영역은 완전히 제거 (삽입하지 않음)
 
         json_ld_schema = {
             "@context": "https://schema.org",
@@ -1300,9 +1251,10 @@ async def generate_review(
         json_ld_str = f'\n\n<!-- [구글 SEO 검색 최적화 구조화 데이터 - 방문자 화면에는 보이지 않음] -->\n<script type="application/ld+json">\n{json.dumps(json_ld_schema, ensure_ascii=False, indent=2)}\n</script>'
         full_html_package = html_body + json_ld_str
 
-
         return {
             "title": title,
+            "title_candidates": title_candidates,
+            "slug": slug,
             "article": markdown_for_editor,
             "html_article": full_html_package,
             "tags": tags_list,
@@ -1312,10 +1264,11 @@ async def generate_review(
             "primary_keyword": primary_kw,
             "related_keywords": related_kws,
             "json_ld": json_ld_schema,
+            "photo_seo": photo_seo,
             "restaurant_name": req.restaurant_name,
             "location": req.location,
-            "category": req.category or "맛집/카페",
-            "photos_count": len(req.photos)
+            "category": category_label,
+            "photos_count": len(req.photos or [])
         }
     except Exception as e:
         traceback.print_exc()
@@ -2126,6 +2079,9 @@ def generate_claude_review(req: ClaudeReviewRequest):
             "tags": tags,
             "tags_string": tags_string,
             "meta_description": meta_description,
+            "title_candidates": claude_result.get("title_candidates", []),
+            "slug": claude_result.get("slug", ""),
+            "photo_seo": claude_result.get("photo_seo", []),
             "tistory_saved": tistory_saved,
             "tistory_message": tistory_msg
         }

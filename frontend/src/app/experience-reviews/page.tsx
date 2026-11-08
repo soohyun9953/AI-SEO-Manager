@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { 
   Compass, 
   MapPin, 
@@ -20,8 +20,26 @@ import {
   AlertCircle,
   Bot,
   Globe,
-  Check
+  Check,
+  Link2,
+  Wallet,
+  Gauge,
+  Plus
 } from "lucide-react";
+import {
+  AdSenseConfig,
+  DEFAULT_ADSENSE,
+  DEFAULT_INTERNAL_LINKS,
+  InternalLink,
+  PhotoSeo,
+  applyPhotoSeo,
+  buildFinalHtml,
+  buildInternalLinkCard,
+  computeSeoChecks,
+  hasExperiencePlaceholder,
+  insertInternalLinkCard,
+  parseFaq,
+} from "@/utils/tistoryExport";
 import AutoRegisterModal from "@/components/AutoRegisterModal";
 import StepProgressIndicator, { 단계_정보 } from "@/components/StepProgressIndicator";
 
@@ -95,12 +113,17 @@ interface ReviewResponse {
   content_id?: string;
   tistory_saved?: boolean;
   tistory_message?: string;
+  title_candidates?: string[];
+  slug?: string;
+  photo_seo?: PhotoSeo[];
 }
 
 interface PhotoItem {
   id: string;
   dataUrl: string;
-  caption: string;
+  caption: string; // AI에게 주는 사진 설명 힌트
+  seoAlt: string; // 발행용 Alt 텍스트 (AI 추천 후 직접 수정 가능)
+  seoCaption: string; // 발행용 <figcaption> (AI 추천 후 직접 수정 가능)
   fileName: string;
   fileSize?: string;
 }
@@ -146,6 +169,15 @@ export default function ExperienceReviewWriterPage() {
   const [tagsString, setTagsString] = useState("");
   const [metaDesc, setMetaDesc] = useState("");
   const [savedContentId, setSavedContentId] = useState<string | null>(null);
+  const [slug, setSlug] = useState("");
+  const [titleCandidates, setTitleCandidates] = useState<string[]>([]);
+
+  // 수익화(애드센스) / SEO 패키지 / 내부 링크 설정
+  const [adsense, setAdsense] = useState<AdSenseConfig>(DEFAULT_ADSENSE);
+  const [includeFaqJsonLd, setIncludeFaqJsonLd] = useState(true);
+  const [internalLinks, setInternalLinks] = useState<InternalLink[]>(DEFAULT_INTERNAL_LINKS);
+  const [selectedLinkIds, setSelectedLinkIds] = useState<string[]>([]);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // 진행 단계별 표시 상태 관리 (스네이크 케이스 준수)
   const [current_step, set_current_step] = useState<number>(1);
@@ -211,7 +243,33 @@ export default function ExperienceReviewWriterPage() {
         setTagsString(parsed.join(", "));
       } catch {}
     }
+
+    const savedSlug = localStorage.getItem("exp_review_res_slug");
+    if (savedSlug) setSlug(savedSlug);
+    try {
+      const t = JSON.parse(localStorage.getItem("exp_review_res_titles") || "[]");
+      if (Array.isArray(t)) setTitleCandidates(t);
+    } catch {}
+    try {
+      const ad = JSON.parse(localStorage.getItem("exp_adsense_cfg") || "null");
+      if (ad && typeof ad === "object") setAdsense({ ...DEFAULT_ADSENSE, ...ad });
+    } catch {}
+    try {
+      const links = JSON.parse(localStorage.getItem("exp_internal_links") || "null");
+      if (Array.isArray(links) && links.length > 0) setInternalLinks(links);
+    } catch {}
+    setSettingsLoaded(true);
   }, []);
+
+  // 수익화·내부 링크 설정은 변경 즉시 LocalStorage에 보관 (초기 복원 전에는 덮어쓰지 않음)
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    localStorage.setItem("exp_adsense_cfg", JSON.stringify(adsense));
+  }, [adsense, settingsLoaded]);
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    localStorage.setItem("exp_internal_links", JSON.stringify(internalLinks));
+  }, [internalLinks, settingsLoaded]);
 
   // 공통 사진 파일 처리 핸들러 (Vercel 413 방지를 위한 스마트 자동 압축 적용)
   const processFiles = async (fileList: FileList | File[]) => {
@@ -235,7 +293,9 @@ export default function ExperienceReviewWriterPage() {
         const newPhoto: PhotoItem = {
           id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}_${index}`,
           dataUrl: data_url,
-          caption: `${placeName || '방문 장소'} 현장 컷 #${photos.length + index + 1}`,
+          caption: "",
+          seoAlt: "",
+          seoCaption: "",
           fileName: file.name,
           fileSize: file_size_str,
         };
@@ -300,6 +360,10 @@ export default function ExperienceReviewWriterPage() {
       setTagsString("");
       setMetaDesc("");
       setSavedContentId(null);
+      setSlug("");
+      setTitleCandidates([]);
+      localStorage.removeItem("exp_review_res_slug");
+      localStorage.removeItem("exp_review_res_titles");
 
       localStorage.removeItem("exp_review_place");
       localStorage.removeItem("exp_review_category");
@@ -320,6 +384,142 @@ export default function ExperienceReviewWriterPage() {
       return `http://localhost:8002${endpoint}`;
     }
     return endpoint;
+  };
+
+  // 발행용 Alt·캡션 목록 (사진 슬롯 순서대로)
+  const photoSeoList: PhotoSeo[] = useMemo(
+    () => photos.map(p => ({ alt: p.seoAlt, caption: p.seoCaption })),
+    [photos]
+  );
+
+  // 티스토리 복사/임시저장에 쓰이는 최종 HTML (Alt·캡션 반영 + 애드센스 + FAQ JSON-LD)
+  const finalHtml = useMemo(
+    () => buildFinalHtml({ html: htmlArticle, article, photoSeo: photoSeoList, adsense, includeFaqJsonLd }),
+    [htmlArticle, article, photoSeoList, adsense, includeFaqJsonLd]
+  );
+
+  // 화면 미리보기: 광고/스크립트 없이 Alt·캡션만 반영
+  const previewHtml = useMemo(() => applyPhotoSeo(htmlArticle, photoSeoList), [htmlArticle, photoSeoList]);
+
+  const hasInternalLink = htmlArticle.includes('data-internal-links="1"');
+
+  const seoChecks = useMemo(
+    () =>
+      generatedTitle
+        ? computeSeoChecks({
+            title: generatedTitle,
+            metaDesc,
+            slug,
+            html: previewHtml,
+            article,
+            photoSeo: photoSeoList,
+            hasInternalLink,
+          })
+        : [],
+    [generatedTitle, metaDesc, slug, previewHtml, article, photoSeoList, hasInternalLink]
+  );
+  const seoScore = seoChecks.length ? Math.round((seoChecks.filter(c => c.ok).length / seoChecks.length) * 100) : 0;
+
+  const updatePhotoSeo = (id: string, field: "seoAlt" | "seoCaption", value: string) => {
+    setPhotos(prev => prev.map(p => (p.id === id ? { ...p, [field]: value } : p)));
+  };
+
+  // 선택한 프리셋으로 내부 링크 카드 삽입 (본문 중간, 이미 있으면 교체)
+  const handleInsertInternalLinks = () => {
+    const chosen = internalLinks.filter(l => selectedLinkIds.includes(l.id));
+    const card = buildInternalLinkCard(chosen);
+    if (!card) {
+      alert("삽입할 링크를 선택하고, URL이 입력된 항목이 1개 이상 있어야 합니다.");
+      return;
+    }
+    const next = insertInternalLinkCard(htmlArticle, card);
+    setHtmlArticle(next);
+    localStorage.setItem("exp_review_res_html", next);
+    showCopiedToast("links");
+  };
+
+  const updateLink = (id: string, patch: Partial<InternalLink>) =>
+    setInternalLinks(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
+  const addLink = () =>
+    setInternalLinks(prev => [...prev, { id: `link-${Date.now()}`, title: "", url: "", desc: "" }]);
+  const removeLink = (id: string) => {
+    setInternalLinks(prev => prev.filter(l => l.id !== id));
+    setSelectedLinkIds(prev => prev.filter(x => x !== id));
+  };
+
+  // 발행 직전 HTML 복사 (경험 박스가 남아 있으면 한 번 확인)
+  const handleCopyHtml = () => {
+    if (hasExperiencePlaceholder(htmlArticle) &&
+        !confirm("[💡 실무/현장 경험 한 줄 추가 구간] 안내 박스가 아직 남아 있습니다.\n직접 겪은 경험을 적지 않고 그대로 복사할까요?")) {
+      return;
+    }
+    copyToClipboard(finalHtml || article, "html");
+  };
+
+  // 티스토리 임시저장 호출 (Gemini/Claude 공통, 최종 HTML 사용)
+  const saveToTistory = async (title: string, html: string, tagList: string[], meta: string) => {
+    try {
+      const autoRes = await fetch(getApiUrl("/api/tistory/auto-register"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          content_html: html,
+          tags: tagList,
+          category: category || "맛집/카페",
+          blog_name: tistoryBlog || "s-elegant",
+          meta_description: meta,
+          action: "TEMP_SAVE"
+        })
+      });
+      const autoData = await autoRes.json().catch(() => ({}));
+      if (autoData.success) return { ok: true, err: "" };
+      return {
+        ok: false,
+        err: autoRes.status === 404
+          ? "이 서버(Vercel)에는 티스토리 자동 임시저장 기능이 없습니다. 아래 결과의 HTML을 복사해 티스토리에 붙여넣거나, 내 PC에서 실행(localhost:3000)해 주세요."
+          : autoData.error || autoData.detail || autoData.message || `HTTP ${autoRes.status}`
+      };
+    } catch (tErr) {
+      console.warn("티스토리 임시저장 연계 알림:", tErr);
+      return { ok: false, err: "로컬 백엔드(8002)에 연결할 수 없습니다. 로컬 서버를 실행해 주세요." };
+    }
+  };
+
+  // 생성 결과를 상태·로컬스토리지에 반영하고, AI가 추천한 Alt·캡션을 사진 슬롯에 채운다
+  const applyGeneratedResult = (data: ReviewResponse, fallbackTitle: string) => {
+    const contentTitle = data.title || fallbackTitle;
+    const contentTags = data.tags || [];
+    setGeneratedTitle(contentTitle);
+    setArticle(data.article || "");
+    setHtmlArticle(data.html_article || "");
+    setTags(contentTags);
+    setTagsString(data.tags_string || contentTags.join(", "));
+    setMetaDesc(data.meta_description || "");
+    setSavedContentId(data.content_id || null);
+    setSlug(data.slug || "");
+    setTitleCandidates(data.title_candidates || []);
+    if (data.photo_seo && data.photo_seo.length > 0) {
+      setPhotos(prev => prev.map((p, i) => {
+        const s = data.photo_seo![i];
+        return s ? { ...p, seoAlt: s.alt || "", seoCaption: s.caption || "" } : p;
+      }));
+    }
+
+    localStorage.setItem("exp_review_place", placeName);
+    localStorage.setItem("exp_review_category", category);
+    localStorage.setItem("exp_review_loc", location);
+    localStorage.setItem("exp_review_url", placeUrl);
+    localStorage.setItem("exp_review_keyinfo", keyInfo);
+    localStorage.setItem("exp_review_notes", specialNotes);
+    localStorage.setItem("exp_review_res_title", contentTitle);
+    localStorage.setItem("exp_review_res_article", data.article || "");
+    localStorage.setItem("exp_review_res_html", data.html_article || "");
+    localStorage.setItem("exp_review_res_tags", JSON.stringify(contentTags));
+    localStorage.setItem("exp_review_res_slug", data.slug || "");
+    localStorage.setItem("exp_review_res_titles", JSON.stringify(data.title_candidates || []));
+    localStorage.setItem("tistory_blog", tistoryBlog);
+    return { contentTitle, contentTags };
   };
 
   // Claude.ai 로그인용 브라우저 실행
@@ -439,71 +639,31 @@ export default function ExperienceReviewWriterPage() {
           throw new Error(errData.detail || `Gemini 후기 생성 실패 (${res.status}) - 서버가 사유 없이 응답했습니다. 백엔드 창(SEO Backend)의 오류 로그를 확인해 주세요.`);
         }
 
-        const data = await res.json();
-        const contentTitle = data.title || `${placeName} 솔직 방문 후기`;
-        const contentArticle = data.article || "";
-        const contentHtml = data.html_article || "";
-        const contentTags = data.tags || [];
+        const data: ReviewResponse = await res.json();
+        const { contentTitle, contentTags } = applyGeneratedResult(data, `${placeName} 솔직 방문 후기`);
 
-        setGeneratedTitle(contentTitle);
-        setArticle(contentArticle);
-        setHtmlArticle(contentHtml);
-        setTags(contentTags);
-        setTagsString(data.tags_string || contentTags.join(", "));
-        setMetaDesc(data.meta_description || "");
-        setSavedContentId(data.content_id || null);
-
-        // 티스토리 자동 임시저장 연계 (옵션 활성화 시)
+        // 티스토리 자동 임시저장 연계 (옵션 활성화 시) - Alt·캡션/애드센스가 반영된 최종 HTML 사용
         let tistoryOk = false;
         let tistoryErr = "";
         if (autoTistorySave) {
           set_current_step(4);
           setProgressStep("📝 티스토리 에디터 자동 임시저장 진행 중...");
-          try {
-            const blogTarget = tistoryBlog || "s-elegant";
-            const autoRes = await fetch(getApiUrl("/api/tistory/auto-register"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                title: contentTitle,
-                content_html: contentHtml,
-                tags: contentTags,
-                category: category || "맛집/카페",
-                blog_name: blogTarget,
-                meta_description: data.meta_description || "",
-                action: "TEMP_SAVE"
-              })
-            });
-            const autoData = await autoRes.json().catch(() => ({}));
-            tistoryOk = !!autoData.success;
-            if (!tistoryOk) {
-              tistoryErr = autoRes.status === 404
-                ? "이 서버(Vercel)에는 티스토리 자동 임시저장 기능이 없습니다. 아래 결과의 HTML을 복사해 티스토리에 붙여넣거나, 내 PC에서 실행(localhost:3000)해 주세요."
-                : autoData.error || autoData.detail || autoData.message || `HTTP ${autoRes.status}`;
-            }
-          } catch (tErr) {
-            console.warn("티스토리 임시저장 연계 알림:", tErr);
-            tistoryErr = "로컬 백엔드(8002)에 연결할 수 없습니다. 로컬 서버를 실행해 주세요.";
-          }
+          const finalForSave = buildFinalHtml({
+            html: data.html_article || "",
+            article: data.article || "",
+            photoSeo: data.photo_seo || photoSeoList,
+            adsense,
+            includeFaqJsonLd,
+          });
+          const r = await saveToTistory(contentTitle, finalForSave, contentTags, data.meta_description || "");
+          tistoryOk = r.ok;
+          tistoryErr = r.err;
         }
 
         clearInterval(timer_interval);
         set_current_step(5);
         set_is_step_completed(true);
         setProgressStep("🎉 Gemini 2.5 Flash 고속 원고 작성이 성공적으로 완료되었습니다!");
-
-        // 로컬 스토리지 저장
-        localStorage.setItem("exp_review_place", placeName);
-        localStorage.setItem("exp_review_category", category);
-        localStorage.setItem("exp_review_loc", location);
-        localStorage.setItem("exp_review_url", placeUrl);
-        localStorage.setItem("exp_review_keyinfo", keyInfo);
-        localStorage.setItem("exp_review_notes", specialNotes);
-        localStorage.setItem("exp_review_res_title", contentTitle);
-        localStorage.setItem("exp_review_res_article", contentArticle);
-        localStorage.setItem("exp_review_res_html", contentHtml);
-        localStorage.setItem("exp_review_res_tags", JSON.stringify(contentTags));
-        localStorage.setItem("tistory_blog", tistoryBlog);
 
         setActiveTab("preview");
 
@@ -538,7 +698,8 @@ export default function ExperienceReviewWriterPage() {
             special_notes: specialNotes,
             rating: rating,
             photos: photosPayload,
-            auto_tistory_save: autoTistorySave,
+            // 임시저장은 Alt·캡션/애드센스가 반영된 최종 HTML로 프론트에서 직접 호출한다
+            auto_tistory_save: false,
             tistory_blog: tistoryBlog
           }),
         });
@@ -556,38 +717,36 @@ export default function ExperienceReviewWriterPage() {
         if (!res.ok) {
           throw new Error(data.detail || `원고 생성 실패 (${res.status}): ${rawText.slice(0, 200)}`);
         }
+        const { contentTitle, contentTags } = applyGeneratedResult(data, `${placeName} 솔직 방문 후기`);
+
+        let claudeTistoryOk = false;
+        let claudeTistoryErr = "";
+        if (autoTistorySave) {
+          set_current_step(4);
+          setProgressStep("📝 티스토리 에디터 자동 임시저장 진행 중...");
+          const finalForSave = buildFinalHtml({
+            html: data.html_article || "",
+            article: data.article || "",
+            photoSeo: data.photo_seo || photoSeoList,
+            adsense,
+            includeFaqJsonLd,
+          });
+          const r = await saveToTistory(contentTitle, finalForSave, contentTags, data.meta_description || "");
+          claudeTistoryOk = r.ok;
+          claudeTistoryErr = r.err;
+        }
+
         clearInterval(timer_interval);
         set_current_step(5);
         set_is_step_completed(true);
         setProgressStep("🎉 원고 작성 및 최적화가 성공적으로 완료되었습니다!");
 
-        setGeneratedTitle(data.title || `${placeName} 솔직 방문 후기`);
-        setArticle(data.article || "");
-        setHtmlArticle(data.html_article || "");
-        setTags(data.tags || []);
-        setTagsString(data.tags_string || (data.tags || []).join(", "));
-        setMetaDesc(data.meta_description || "");
-        setSavedContentId(data.content_id || null);
-
-        // 로컬 스토리지 저장
-        localStorage.setItem("exp_review_place", placeName);
-        localStorage.setItem("exp_review_category", category);
-        localStorage.setItem("exp_review_loc", location);
-        localStorage.setItem("exp_review_url", placeUrl);
-        localStorage.setItem("exp_review_keyinfo", keyInfo);
-        localStorage.setItem("exp_review_notes", specialNotes);
-        localStorage.setItem("exp_review_res_title", data.title || "");
-        localStorage.setItem("exp_review_res_article", data.article || "");
-        localStorage.setItem("exp_review_res_html", data.html_article || "");
-        localStorage.setItem("exp_review_res_tags", JSON.stringify(data.tags || []));
-        localStorage.setItem("tistory_blog", tistoryBlog);
-
         setActiveTab("preview");
 
-        if (data.tistory_saved) {
-          alert(`🎉 Claude 원고 생성 및 티스토리 임시저장이 모두 성공적으로 완료되었습니다!\n\n블로그: ${tistoryBlog}\n제목: ${data.title}`);
-        } else if (autoTistorySave && !data.tistory_saved) {
-          alert(`⚠️ Claude 원고 생성은 완료되었으나, 티스토리 저장 중 알림이 있습니다:\n${data.tistory_message || '임시저장을 수동으로 실행해주세요.'}`);
+        if (claudeTistoryOk) {
+          alert(`🎉 Claude 원고 생성 및 티스토리 임시저장이 모두 성공적으로 완료되었습니다!\n\n블로그: ${tistoryBlog}\n제목: ${contentTitle}`);
+        } else if (autoTistorySave) {
+          alert(`⚠️ Claude 원고 생성은 완료되었으나, 티스토리 저장 중 알림이 있습니다:\n${claudeTistoryErr || '임시저장을 수동으로 실행해주세요.'}`);
         } else {
           alert("✨ Claude 웹에서 고품질 방문 후기 원고가 성공적으로 완성되었습니다! 아래 결과를 확인해보세요.");
         }
@@ -876,8 +1035,8 @@ export default function ExperienceReviewWriterPage() {
                   >
                     <img
                       src={photo.dataUrl}
-                      alt={photo.caption}
-                      className="w-14 h-14 object-cover rounded-xl border border-white/[0.1] flex-shrink-0"
+                      alt={photo.seoAlt || photo.caption || `사진 ${index + 1}`}
+                      className="w-14 h-14 object-cover rounded-xl border border-white/[0.1] flex-shrink-0 self-start"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
@@ -888,8 +1047,22 @@ export default function ExperienceReviewWriterPage() {
                         type="text"
                         value={photo.caption}
                         onChange={e => updateCaption(photo.id, e.target.value)}
-                        placeholder="사진 설명 (예: 매장 외관, 대표 메뉴 시식 등)"
+                        placeholder="AI 힌트: 이 사진이 무엇인지 (예: 수제칼집 돼지갈비 상차림)"
                         className="w-full px-2.5 py-1 rounded-lg bg-black/40 border border-white/[0.06] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                      />
+                      <input
+                        type="text"
+                        value={photo.seoAlt}
+                        onChange={e => updatePhotoSeo(photo.id, "seoAlt", e.target.value)}
+                        placeholder="Alt 텍스트 (생성 후 AI 추천값이 채워지며 직접 수정 가능)"
+                        className="w-full mt-1 px-2.5 py-1 rounded-lg bg-black/40 border border-emerald-500/20 text-xs text-emerald-200 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                      />
+                      <input
+                        type="text"
+                        value={photo.seoCaption}
+                        onChange={e => updatePhotoSeo(photo.id, "seoCaption", e.target.value)}
+                        placeholder="캡션 (figcaption, 직접 수정 가능)"
+                        className="w-full mt-1 px-2.5 py-1 rounded-lg bg-black/40 border border-sky-500/20 text-xs text-sky-200 placeholder-slate-600 focus:outline-none focus:border-sky-500"
                       />
                     </div>
                     <button
@@ -981,6 +1154,64 @@ export default function ExperienceReviewWriterPage() {
                 </p>
               </button>
             </div>
+          </div>
+
+          {/* 수익화 설정 (AdSense 인아티클 자동 삽입) */}
+          <div className="bg-[#0b0c14] border border-white/[0.08] rounded-3xl p-6 shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Wallet size={18} className="text-emerald-400" />
+                수익화 설정 (AdSense 자동 삽입)
+              </h2>
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={adsense.enabled}
+                  onChange={e => setAdsense({ ...adsense, enabled: e.target.checked })}
+                  className="w-4 h-4 rounded cursor-pointer"
+                />
+                사용
+              </label>
+            </div>
+            {adsense.enabled && (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={adsense.clientId}
+                  onChange={e => setAdsense({ ...adsense, clientId: e.target.value })}
+                  placeholder="AdSense Client ID (ca-pub-xxxxxxxx)"
+                  className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={adsense.midSlot}
+                    onChange={e => setAdsense({ ...adsense, midSlot: e.target.value })}
+                    placeholder="본문 중간 광고 Slot ID"
+                    className="px-3 py-2 rounded-xl bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <input
+                    type="text"
+                    value={adsense.endSlot}
+                    onChange={e => setAdsense({ ...adsense, endSlot: e.target.value })}
+                    placeholder="결론 상단 광고 Slot ID"
+                    className="px-3 py-2 rounded-xl bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-[11px] text-slate-400 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={adsense.includeLoader}
+                    onChange={e => setAdsense({ ...adsense, includeLoader: e.target.checked })}
+                    className="w-3.5 h-3.5 rounded cursor-pointer"
+                  />
+                  adsbygoogle.js 로더도 광고 앞에 포함 (스킨에 이미 있으면 끄세요)
+                </label>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  HTML 복사·티스토리 임시저장 시 ① 첫 번째 표 아래(없으면 두 번째 소제목 위) ② 자주 묻는 질문(없으면 결론) 소제목 위에 반응형 인아티클 광고가 자동 삽입됩니다. 값은 이 브라우저에 저장됩니다.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* 원스톱 자동화 및 티스토리 연동 옵션 */}
@@ -1120,7 +1351,7 @@ export default function ExperienceReviewWriterPage() {
                       티스토리 임시저장
                     </button>
                     <button
-                      onClick={() => copyToClipboard(htmlArticle || article, "html")}
+                      onClick={handleCopyHtml}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white border border-white/[0.1] text-xs font-semibold transition-all"
                     >
                       {copiedType === "html" ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
@@ -1170,12 +1401,126 @@ export default function ExperienceReviewWriterPage() {
                     <h2 className="text-lg font-bold text-white leading-snug">{generatedTitle}</h2>
                   </div>
 
+                  {/* 티스토리 발행 보조 패키지 */}
+                  <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">발행 보조 패키지</span>
+                      <span className={`flex items-center gap-1.5 text-xs font-bold ${seoScore >= 80 ? "text-emerald-400" : seoScore >= 60 ? "text-amber-400" : "text-red-400"}`}>
+                        <Gauge size={14} /> SEO 점수 {seoScore}
+                      </span>
+                    </div>
+
+                    {/* CTR 제목 후보 3개 */}
+                    {titleCandidates.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-semibold text-slate-400">CTR 제목 후보 (클릭하면 제목으로 선택)</div>
+                        {titleCandidates.map((t, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => { setGeneratedTitle(t); localStorage.setItem("exp_review_res_title", t); }}
+                              className={`flex-1 text-left px-3 py-1.5 rounded-lg border text-xs transition-all ${
+                                t === generatedTitle ? "bg-blue-600/20 border-blue-500 text-blue-200" : "bg-white/[0.02] border-white/[0.08] text-slate-300 hover:border-white/[0.2]"
+                              }`}
+                            >
+                              {t} <span className="text-slate-500">({t.length}자)</span>
+                            </button>
+                            <button type="button" onClick={() => copyToClipboard(t, `title${i}`)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10" title="복사">
+                              {copiedType === `title${i}` ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 영문 슬러그 / 메타 디스크립션 */}
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <div className="text-xs font-semibold text-slate-400 mb-1">영문 URL 슬러그</div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={slug}
+                            onChange={e => { setSlug(e.target.value); localStorage.setItem("exp_review_res_slug", e.target.value); }}
+                            placeholder="예: changdong-songchu-gamagol-review"
+                            className="flex-1 px-3 py-1.5 rounded-lg bg-black/40 border border-white/[0.08] text-xs font-mono text-emerald-300 focus:outline-none focus:border-emerald-500"
+                          />
+                          <button type="button" onClick={() => copyToClipboard(slug, "slug")} disabled={!slug} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs text-slate-300 disabled:opacity-40">
+                            {copiedType === "slug" ? <Check size={13} className="text-green-400" /> : <Copy size={13} />} 복사
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-slate-400">메타 디스크립션 ({metaDesc.length}자 / 권장 140~155)</span>
+                          <button type="button" onClick={() => copyToClipboard(metaDesc, "meta")} disabled={!metaDesc} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs text-slate-300 disabled:opacity-40">
+                            {copiedType === "meta" ? <Check size={13} className="text-green-400" /> : <Copy size={13} />} 복사
+                          </button>
+                        </div>
+                        <textarea
+                          value={metaDesc}
+                          onChange={e => setMetaDesc(e.target.value)}
+                          rows={2}
+                          className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/[0.08] text-xs text-slate-200 focus:outline-none focus:border-emerald-500 resize-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* FAQ JSON-LD */}
+                    <label className="flex items-start gap-2 cursor-pointer text-xs text-slate-300">
+                      <input type="checkbox" checked={includeFaqJsonLd} onChange={e => setIncludeFaqJsonLd(e.target.checked)} className="mt-0.5 w-4 h-4 rounded cursor-pointer" />
+                      <span>
+                        FAQ 스키마(JSON-LD) 하단 포함 <span className="text-slate-500">· 본문 Q&amp;A {parseFaq(article).length}개 감지</span>
+                      </span>
+                    </label>
+
+                    {/* 내부 링크 카드 */}
+                    <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-400 flex items-center gap-1.5"><Link2 size={13} className="text-blue-400" /> 함께 읽으면 돈이 되는 글 (내부 링크 카드)</span>
+                        <button type="button" onClick={addLink} className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"><Plus size={12} /> 추가</button>
+                      </div>
+                      {internalLinks.map(l => (
+                        <div key={l.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedLinkIds.includes(l.id)}
+                            onChange={e => setSelectedLinkIds(prev => e.target.checked ? [...prev, l.id] : prev.filter(x => x !== l.id))}
+                            className="w-4 h-4 rounded cursor-pointer flex-shrink-0"
+                          />
+                          <input type="text" value={l.title} onChange={e => updateLink(l.id, { title: e.target.value })} placeholder="글 제목" className="w-1/3 px-2 py-1 rounded-lg bg-black/40 border border-white/[0.08] text-xs text-white placeholder-slate-600 focus:outline-none focus:border-blue-500" />
+                          <input type="text" value={l.url} onChange={e => updateLink(l.id, { url: e.target.value })} placeholder="https://s-elegant.tistory.com/..." className="flex-1 px-2 py-1 rounded-lg bg-black/40 border border-white/[0.08] text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-blue-500" />
+                          <button type="button" onClick={() => removeLink(l.id)} className="p-1 text-slate-500 hover:text-red-400"><Trash2 size={13} /></button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={handleInsertInternalLinks} className="px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-xs font-bold text-blue-300">
+                          {copiedType === "links" ? "✔ 본문에 삽입됨" : "선택 항목 카드로 본문 중간에 삽입"}
+                        </button>
+                        <span className="text-[11px] text-slate-500">URL이 비어 있는 항목은 제외됩니다. 다시 누르면 기존 카드를 교체합니다.</span>
+                      </div>
+                    </div>
+
+                    {/* 실시간 SEO 점수판 */}
+                    <div className="pt-3 border-t border-white/[0.06]">
+                      <div className="text-xs font-semibold text-slate-400 mb-2">실시간 SEO 체크리스트</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                        {seoChecks.map(c => (
+                          <div key={c.label} className="flex items-center justify-between gap-2 text-[11px]">
+                            <span className={c.ok ? "text-slate-300" : "text-amber-300"}>{c.ok ? "✅" : "⚠️"} {c.label}</span>
+                            <span className="text-slate-500 truncate">{c.detail}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* 탭별 내용 */}
                   {activeTab === "preview" && (
                     <div className="p-6 rounded-2xl bg-[#08090f] border border-white/[0.06] text-slate-200">
                       <div 
                         className="tistory-preview-content space-y-4 leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: htmlArticle }} 
+                        dangerouslySetInnerHTML={{ __html: previewHtml }}
                       />
                     </div>
                   )}
@@ -1184,11 +1529,11 @@ export default function ExperienceReviewWriterPage() {
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-xs text-slate-400 px-1">
                         <span>티스토리 에디터 [HTML 모드] 전용 코드</span>
-                        <span>{htmlArticle.length} 자</span>
+                        <span>{finalHtml.length} 자 (Alt·캡션{adsense.enabled ? "·광고" : ""}{includeFaqJsonLd ? "·FAQ JSON-LD" : ""} 반영본)</span>
                       </div>
                       <textarea
                         readOnly
-                        value={htmlArticle}
+                        value={finalHtml}
                         rows={22}
                         className="w-full p-4 rounded-2xl bg-black/60 border border-white/[0.08] text-xs font-mono text-emerald-400 focus:outline-none resize-none leading-relaxed"
                       />
