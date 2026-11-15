@@ -184,6 +184,25 @@ class AnalyticsRecommendRequest(BaseModel):
 class WeeklyReportRequest(BaseModel):
     days: Optional[int] = 28
 
+class GoogleAuthExchangeRequest(BaseModel):
+    code: str
+    redirect_uri: Optional[str] = "http://localhost:8765/"
+
+class AutoOptimizeRequest(BaseModel):
+    url: str
+    title: Optional[str] = ""
+    scenario: Optional[str] = "HIGH_IMP_LOW_CTR"
+    scenario_label: Optional[str] = "노출 대비 클릭률 저조"
+    diagnosis: Optional[str] = ""
+    content_text: Optional[str] = None
+    queries: Optional[List[dict]] = None
+
+class AutoOptimizeSaveRequest(BaseModel):
+    title: str
+    html_content: str
+    tags: Optional[List[str]] = []
+    blog_name: Optional[str] = "s-elegant"
+
 
 
 
@@ -1646,6 +1665,55 @@ async def update_analytics_settings(req: AnalyticsSettingsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"설정 저장 실패: {str(e)}")
 
+@app.get("/api/analytics/auth/google/url")
+async def get_google_auth_url_endpoint(redirect_uri: Optional[str] = "http://localhost:8765/"):
+    try:
+        import analytics
+        url = analytics.get_google_auth_url(redirect_uri=redirect_uri or "http://localhost:8765/")
+        return {"success": True, "auth_url": url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/analytics/auth/google/exchange")
+async def exchange_google_code_endpoint(req: GoogleAuthExchangeRequest):
+    try:
+        import analytics
+        res = analytics.exchange_code_for_token(req.code, redirect_uri=req.redirect_uri or "http://localhost:8765/")
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/analytics/auth/google/start-local-flow")
+async def start_google_local_flow_endpoint():
+    try:
+        import analytics
+        import asyncio
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(None, analytics.run_local_oauth_flow)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/analytics/auth/google/test-live")
+async def test_google_live_endpoint():
+    try:
+        import analytics
+        engine = analytics.AnalyticsEngine()
+        status = engine.get_connection_status()
+        metrics = engine.fetch_metrics(days=7)
+        error = getattr(engine, "last_error", None)
+        mode = metrics.get("period", {}).get("data_source_mode", "UNKNOWN")
+        is_live = "LIVE" in mode
+        return {
+            "success": is_live,
+            "mode": mode,
+            "is_live": is_live,
+            "connection": status,
+            "error": error
+        }
+    except Exception as e:
+        return {"success": False, "is_live": False, "error": str(e)}
+
 @app.post("/api/analytics/recommend")
 async def get_ai_recommendation(req: AnalyticsRecommendRequest, x_gemini_api_key: Optional[str] = Header(None)):
     api_key = x_gemini_api_key or GEMINI_API_KEY or ""
@@ -1657,6 +1725,71 @@ async def get_ai_recommendation(req: AnalyticsRecommendRequest, x_gemini_api_key
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"AI 최적화 처방전 생성 실패: {str(e)}")
+
+@app.post("/api/analytics/auto-optimize/fetch-and-rewrite")
+async def auto_optimize_fetch_and_rewrite(req: AutoOptimizeRequest, x_gemini_api_key: Optional[str] = Header(None)):
+    api_key = x_gemini_api_key or GEMINI_API_KEY or ""
+    try:
+        import auto_optimizer
+        # 1. 본문이 없으면 URL 크롤링으로 자동 수집
+        content_text = req.content_text
+        original_title = req.title
+        
+        if not content_text and req.url:
+            scraped = auto_optimizer.scrape_tistory_article(req.url)
+            content_text = scraped.get("content_text", "")
+            if not original_title:
+                original_title = scraped.get("title", "")
+            
+        if not content_text:
+            # 본문을 크롤링하지 못한 경우(404 또는 비공개 글), 제목과 검색어, 진단 정보를 바탕으로 시드 텍스트 자동 구성
+            query_hints = ", ".join([q.get("query", "") for q in (req.queries or []) if q.get("query")])
+            content_text = f"주제: {original_title or req.title}\n핵심 검색어: {query_hints}\n진단 분석: {req.diagnosis}\n이 포스팅은 {original_title or req.title}에 관한 핵심 정보, 실전 활용법 및 가이드라인을 다룹니다."
+            
+        # 2. AI SEO 리라이팅 수행
+        rewrite_res = auto_optimizer.rewrite_article_with_ai(
+            title=original_title or req.title or "블로그 포스팅",
+            content_text=content_text,
+            scenario=req.scenario or "HIGH_IMP_LOW_CTR",
+            scenario_label=req.scenario_label or "노출 대비 클릭률 저조",
+            diagnosis=req.diagnosis or "",
+            queries=req.queries,
+            api_key=api_key
+        )
+        
+        return {
+            "success": True,
+            "original_title": original_title,
+            "original_url": req.url,
+            "original_length": len(content_text),
+            "optimized": rewrite_res.get("data", {}),
+            "model_used": rewrite_res.get("model_used", "")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"자동 최적화 리라이팅 실패: {str(e)}")
+
+@app.post("/api/analytics/auto-optimize/save-tistory")
+async def auto_optimize_save_tistory(req: AutoOptimizeSaveRequest):
+    try:
+        import tistory_bot
+        blog = req.blog_name or "s-elegant"
+        tags = req.tags or []
+        
+        # 티스토리 임시저장 실행
+        automator = tistory_bot.TistoryAutomator(blog_name=blog, headless=False)
+        result = automator.post_content(
+            title=req.title,
+            content_html=req.html_content,
+            tags=tags,
+            action="TEMP_SAVE"
+        )
+        return result
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"티스토리 임시저장 실패: {str(e)}")
 
 class ClaudePhotoItem(BaseModel):
     data_url: Optional[str] = None
@@ -1687,6 +1820,29 @@ def launch_claude_browser():
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"브라우저 실행 실패: {str(e)}")
+
+@app.post("/api/tistory/launch-browser")
+def launch_tistory_browser_endpoint(blog_name: Optional[str] = "s-elegant"):
+    """
+    티스토리 로그인용 브라우저 창을 백그라운드로 띄워 사용자가 미리 로그인할 수 있도록 지원 (즉시 리턴)
+    """
+    try:
+        import tistory_bot
+        return tistory_bot.launch_login_browser_background(blog_name or "s-elegant")
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"티스토리 브라우저 실행 실패: {str(e)}")
+
+@app.get("/api/tistory/login-status")
+def get_tistory_login_status():
+    """
+    현재 티스토리 카카오 로그인 진행 상태 및 세션 쿠키 보유 여부 반환
+    """
+    try:
+        import tistory_bot
+        return tistory_bot.get_login_state()
+    except Exception as e:
+        return {"status": "error", "message": str(e), "has_cookie": False}
 
 class NaverClaudeReviewRequest(BaseModel):
     place_name: str

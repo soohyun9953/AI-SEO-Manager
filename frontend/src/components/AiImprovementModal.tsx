@@ -9,6 +9,7 @@ interface AiImprovementModalProps {
   onClose: () => void;
   pageItem: any | null;
   days?: number;
+  onTriggerAutoOpt?: (page: any) => void;
 }
 
 // 링크 주소는 그대로 두고, 화면에는 인코딩된 한글 주소를 풀어서 보여준다
@@ -20,7 +21,7 @@ function readableUrl(url: string): string {
   }
 }
 
-export default function AiImprovementModal({ isOpen, onClose, pageItem, days = 28 }: AiImprovementModalProps) {
+export default function AiImprovementModal({ isOpen, onClose, pageItem, days = 28, onTriggerAutoOpt }: AiImprovementModalProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
@@ -136,11 +137,33 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem, days = 2
         </div>
 
         {/* 콘텐츠 분석 진단 원문 */}
-        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-5">
+        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-4">
           <p className="text-xs text-amber-200/90 leading-relaxed">
             <span className="font-semibold text-white">진단 결과:</span> {pageItem.diagnosis}
           </p>
         </div>
+
+        {/* 원클릭 자동 최적화 액션 배너 */}
+        {onTriggerAutoOpt && (
+          <div className="mb-5 p-3.5 bg-gradient-to-r from-blue-900/35 via-purple-900/35 to-[#151522] border border-blue-500/30 rounded-xl flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <Sparkles size={13} className="text-blue-400" />
+                원클릭 AI 자동 수정 & 티스토리 저장
+              </span>
+              <p className="text-[11px] text-gray-400">
+                기존 글을 자동으로 불러와 클릭률 2배 제목·메타설명·요약박스로 리라이팅합니다.
+              </p>
+            </div>
+            <button
+              onClick={() => onTriggerAutoOpt(pageItem)}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-lg text-xs transition-all shadow-md shadow-blue-600/30 flex items-center gap-1.5 whitespace-nowrap flex-shrink-0"
+            >
+              <Sparkles size={13} />
+              <span>⚡ 지금 즉시 자동 수정하기</span>
+            </button>
+          </div>
+        )}
 
         {/* 로딩 상태 */}
         {loading && (
@@ -279,14 +302,24 @@ export default function AiImprovementModal({ isOpen, onClose, pageItem, days = 2
           </div>
         )}
 
-        {/* 닫기 버튼 */}
-        <div className="flex justify-end pt-5 mt-6 border-t border-white/10">
+        {/* 푸터 버튼 */}
+        <div className="flex items-center justify-between pt-5 mt-6 border-t border-white/10">
           <button
             onClick={onClose}
             className="px-5 py-2 text-xs font-medium text-white bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
           >
             닫기
           </button>
+
+          {onTriggerAutoOpt && (
+            <button
+              onClick={() => onTriggerAutoOpt(pageItem)}
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl text-xs transition-all shadow-lg shadow-blue-600/25 flex items-center gap-1.5"
+            >
+              <Sparkles size={14} />
+              <span>⚡ 이 글 AI 자동 리라이팅 실행하기</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

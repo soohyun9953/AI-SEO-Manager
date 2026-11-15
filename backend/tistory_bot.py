@@ -14,6 +14,8 @@ import html as html_lib
 import tempfile
 import time
 import json
+import subprocess
+import requests
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from playwright.sync_api import sync_playwright, BrowserContext, Page
@@ -38,8 +40,106 @@ def log(msg: str):
 # 기본 설정
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROFILE_DIR = os.path.join(BASE_DIR, "tistory_browser_profile")
-COOKIE_FILE = os.path.join(BASE_DIR, "tistory_cookies.json")  # 세션 쿠키는 브라우저 종료 시 사라지므로 별도 보관
+COOKIE_FILE = os.path.join(BASE_DIR, "tistory_cookies.json")  # 세션 쿠키 보관
 DEFAULT_BLOG = "s-elegant"
+TISTORY_DEBUG_PORT = 9223
+TISTORY_CDP_URL = f"http://127.0.0.1:{TISTORY_DEBUG_PORT}"
+
+def find_chrome_exe() -> str:
+    """시스템에 설치된 정식 Google Chrome 경로 탐색"""
+    candidates = [
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return "chrome.exe"
+
+def ensure_tistory_chrome(blog_name: str = DEFAULT_BLOG) -> Optional[subprocess.Popen]:
+    """티스토리 전용 디버깅 크롬 브라우저가 실행 중인지 확인하고, 없으면 정식 크롬으로 화면에 팝업 실행"""
+    write_url = f"https://{blog_name}.tistory.com/manage/post"
+    try:
+        res = requests.get(f"{TISTORY_CDP_URL}/json/version", timeout=1.5)
+        if res.status_code == 200:
+            log("[OK] [Tistory Bot] 기존에 열려있는 티스토리 전용 크롬(CDP 9223)에 연결합니다.")
+            force_foreground_window()
+            return None
+    except Exception:
+        pass
+
+    chrome_path = find_chrome_exe()
+    os.makedirs(PROFILE_DIR, exist_ok=True)
+    
+    cmd = [
+        chrome_path,
+        f"--remote-debugging-port={TISTORY_DEBUG_PORT}",
+        f"--user-data-dir={PROFILE_DIR}",
+        "--start-maximized",
+        "--no-first-run",
+        "--no-default-browser-check",
+        write_url
+    ]
+    log(f"[START] [Tistory Bot] 정식 Google Chrome을 화면에 실행합니다... ({chrome_path})")
+    proc = subprocess.Popen(cmd)
+    
+    # 포트 9223 응답 대기 (최대 15초)
+    for _ in range(30):
+        time.sleep(0.5)
+        try:
+            res = requests.get(f"{TISTORY_CDP_URL}/json/version", timeout=1)
+            if res.status_code == 200:
+                log("[OK] [Tistory Bot] 크롬 디버깅 포트(9223) 연결 준비 완료!")
+                force_foreground_window()
+                return proc
+        except Exception:
+            pass
+            
+    force_foreground_window()
+    return proc
+
+def force_foreground_window():
+    """Windows에서 티스토리 및 카카오 로그인 브라우저 창을 강제로 화면 맨 앞으로 활성화"""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            EnumWindows = user32.EnumWindows
+            EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+            GetWindowText = user32.GetWindowTextW
+            GetWindowTextLength = user32.GetWindowTextLengthW
+            SetForegroundWindow = user32.SetForegroundWindow
+            ShowWindow = user32.ShowWindow
+            BringWindowToTop = user32.BringWindowToTop
+            SetWindowPos = user32.SetWindowPos
+
+            HWND_TOPMOST = -1
+            HWND_NOTOPMOST = -2
+            SWP_NOMOVE = 0x0002
+            SWP_NOSIZE = 0x0001
+            SW_RESTORE = 9
+
+            def foreach_window(hwnd, lParam):
+                length = GetWindowTextLength(hwnd)
+                if length == 0:
+                    return True
+                buff = ctypes.create_unicode_buffer(length + 1)
+                GetWindowText(hwnd, buff, length + 1)
+                title = buff.value
+                # 티스토리, 카카오, 로그인 관련 창 맨 앞으로
+                if any(k in title for k in ("티스토리", "카카오", "Tistory", "Kakao", "Daum", "로그인", "Chrome")):
+                    ShowWindow(hwnd, SW_RESTORE)
+                    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                    SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                    BringWindowToTop(hwnd)
+                    SetForegroundWindow(hwnd)
+                    return False
+                return True
+
+            EnumWindows(EnumWindowsProc(foreach_window), 0)
+        except Exception:
+            pass
 
 class TistoryAutomator:
     def __init__(self, blog_name: str = DEFAULT_BLOG, headless: bool = False):
@@ -54,10 +154,21 @@ class TistoryAutomator:
 
     def _wait_for_user_login(self, page: Page, timeout_seconds: int = 300) -> Optional[Page]:
         """사용자가 카카오 로그인을 완료할 때까지 대기. 열린 모든 탭을 확인하고, 로그인 완료된 탭(Page)을 반환"""
-        log("[LOGIN] 카카오 로그인이 필요합니다. 열린 브라우저 창에서 로그인을 진행해주세요...")
+        log("[LOGIN] 카카오 로그인이 필요합니다. 화면에 열린 브라우저 창에서 카카오 로그인을 진행해주세요...")
+        force_foreground_window()
+        try:
+            page.bring_to_front()
+        except Exception:
+            pass
+
         start_time = time.time()
+        last_fg_time = time.time()
         while time.time() - start_time < timeout_seconds:
-            # time.sleep은 Playwright 이벤트(주소 변경 등)를 처리하지 못하므로 wait_for_timeout 사용
+            # 5초마다 창 앞으로 복원 시도
+            if time.time() - last_fg_time > 5:
+                force_foreground_window()
+                last_fg_time = time.time()
+
             page.wait_for_timeout(2000)
             try:
                 urls = []
@@ -72,6 +183,13 @@ class TistoryAutomator:
                     # 블로그 도메인(관리/에디터 화면)에 도달했다면 로그인 완료
                     if f"{self.blog_name}.tistory.com/manage" in curr_url:
                         log("[OK] 로그인 확인 완료! 글쓰기 편집기로 진입합니다.")
+                        # 쿠키 즉시 영구 저장
+                        try:
+                            with open(COOKIE_FILE, "w", encoding="utf-8") as f:
+                                json.dump(page.context.cookies(), f, ensure_ascii=False)
+                            log("[OK] 로그인 세션 쿠키를 tistory_cookies.json에 즉시 보존했습니다.")
+                        except Exception:
+                            pass
                         return pg
                     # 그 외 주소(티스토리 메인 등)라면 글쓰기 화면으로 이동해 다시 확인
                     if "tistory.com" in curr_url:
@@ -282,19 +400,29 @@ class TistoryAutomator:
         }
 
         with sync_playwright() as p:
-            log(f"\n[START] [Tistory Bot] 크롬 브라우저를 시작합니다... (프로필: {self.profile_dir})")
+            browser = None
+            context = None
             
-            # 사용자 로그인 세션을 유지하는 Persistent Context 실행
-            context: BrowserContext = p.chromium.launch_persistent_context(
-                user_data_dir=self.profile_dir,
-                headless=self.headless,
-                viewport={"width": 1280, "height": 900},
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--start-maximized"
-                ],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-            )
+            # 1. 9223 디버깅 크롬 포트가 열려 있다면 CDP로 우선 연결
+            try:
+                res = requests.get(f"{TISTORY_CDP_URL}/json/version", timeout=1)
+                if res.status_code == 200:
+                    log(f"[CONNECT] [Tistory Bot] 열려있는 디버깅 크롬({TISTORY_CDP_URL})에 연결합니다...")
+                    browser = p.chromium.connect_over_cdp(TISTORY_CDP_URL)
+                    context = browser.contexts[0] if browser.contexts else browser.new_context()
+            except Exception:
+                pass
+
+            # 2. 열려있지 않다면 직접 정식 크롬 Context 실행
+            if not context:
+                log(f"[START] [Tistory Bot] 정식 Google Chrome 브라우저를 실행합니다... (프로필: {self.profile_dir})")
+                context = p.chromium.launch_persistent_context(
+                    user_data_dir=self.profile_dir,
+                    channel="chrome",
+                    headless=self.headless,
+                    viewport={"width": 1280, "height": 900},
+                    args=["--disable-blink-features=AutomationControlled", "--start-maximized"]
+                )
 
             # 이전에 저장해 둔 로그인 쿠키 복원
             try:
@@ -305,7 +433,14 @@ class TistoryAutomator:
             except Exception as ck_err:
                 log(f"[WARN] 로그인 세션 복원 실패(무시): {ck_err}")
 
-            page = context.pages[0] if context.pages else context.new_page()
+            # 티스토리 관련 탭 탐색 또는 새 페이지
+            page = None
+            for pg in context.pages:
+                if "tistory.com" in pg.url or "kakao.com" in pg.url:
+                    page = pg
+                    break
+            if not page:
+                page = context.pages[0] if context.pages else context.new_page()
 
             # 다이얼로그(alert, confirm) 자동 수락 설정 (모드 변경 시 확인창 등)
             def _accept_dialog(dialog):
@@ -597,14 +732,144 @@ class TistoryAutomator:
                     pass
                 if action != "CONFIRM_BEFORE_PUBLISH":
                     try:
-                        context.close()
+                        if browser:
+                            browser.close()
+                        elif context:
+                            context.close()
                     except Exception:
                         pass
-                    log("[OK] 브라우저 세션이 안전하게 닫혔습니다.")
+                    log("[OK] 브라우저 세션이 안전하게 종료되었습니다.")
 
         return result
 
+# 로그인 진행 상태 추적 변수
+_LOGIN_STATE: Dict[str, Any] = {
+    "status": "idle",  # "idle" | "in_progress" | "success" | "timeout" | "error"
+    "message": "",
+    "updated_at": 0
+}
+
+def get_login_state() -> Dict[str, Any]:
+    """현재 티스토리 로그인 상태 반환"""
+    has_cookie = os.path.exists(COOKIE_FILE)
+    cookie_mtime = os.path.getmtime(COOKIE_FILE) if has_cookie else 0
+    # 최근 5분 이내에 쿠키 파일이 새로 저장되었다면 자동으로 success 전환
+    if has_cookie and (time.time() - cookie_mtime < 300) and _LOGIN_STATE.get("status") == "in_progress":
+        _LOGIN_STATE["status"] = "success"
+        _LOGIN_STATE["message"] = "카카오 로그인이 완료되어 세션이 저장되었습니다!"
+
+    return {
+        **_LOGIN_STATE,
+        "has_cookie": has_cookie,
+        "cookie_mtime": cookie_mtime
+    }
+
+def launch_login_browser_background(blog_name: str = DEFAULT_BLOG) -> Dict[str, Any]:
+    """웹 대시보드 버튼 클릭 시 BAT 파일 없이 모니터 화면에 크롬 로그인 창을 즉시 팝업 실행"""
+    global _LOGIN_STATE
+    _LOGIN_STATE["status"] = "in_progress"
+    _LOGIN_STATE["message"] = "모니터 화면에 크롬 로그인 창을 열었습니다. 카카오 로그인을 진행해 주세요..."
+    _LOGIN_STATE["updated_at"] = time.time()
+
+    # 1. 이전 잔여 락 정리
+    try:
+        from login_helper import cleanup_profile_locks
+        cleanup_profile_locks()
+    except Exception:
+        pass
+
+    # 2. Windows 대화형 셸을 통해 모니터 화면에 즉시 팝업 실행
+    helper_script = os.path.join(BASE_DIR, "login_helper.py")
+    subprocess.Popen(["cmd.exe", "/c", "start", "python", helper_script], shell=False)
+
+    return {
+        "success": True,
+        "status": "in_progress",
+        "message": "카카오 로그인 브라우저를 모니터 화면에 실행했습니다. 열린 창에서 로그인해 주세요."
+    }
+
 # CLI 테스트용 실행 함수
+def launch_login_browser(blog_name: str = DEFAULT_BLOG) -> Dict[str, Any]:
+    """사용자가 사전에 카카오 로그인을 진행할 수 있도록 정식 크롬을 화면에 띄우고 로그인 완료 시 세션 쿠키 저장"""
+    # 1. 정식 크롬을 화면 전면에 띄움 (CDP 9223)
+    ensure_tistory_chrome(blog_name)
+    
+    logged_in = False
+    try:
+        with sync_playwright() as p:
+            log(f"[CONNECT] [Tistory Bot] Chrome DevTools Protocol로 연결합니다 ({TISTORY_CDP_URL})...")
+            browser = p.chromium.connect_over_cdp(TISTORY_CDP_URL)
+            context = browser.contexts[0] if browser.contexts else browser.new_context()
+
+            # 이전에 저장해 둔 로그인 쿠키 복원
+            if os.path.exists(COOKIE_FILE):
+                try:
+                    with open(COOKIE_FILE, "r", encoding="utf-8") as f:
+                        context.add_cookies(json.load(f))
+                except Exception:
+                    pass
+
+            force_foreground_window()
+
+            # 5분 동안 사용자 로그인 완료 대기
+            start_time = time.time()
+            last_fg_time = time.time()
+            while time.time() - start_time < 300:
+                if time.time() - last_fg_time > 4:
+                    force_foreground_window()
+                    last_fg_time = time.time()
+
+                time.sleep(2)
+                for pg in context.pages:
+                    try:
+                        curr_url = pg.url
+                    except Exception:
+                        continue
+                    if f"{blog_name}.tistory.com/manage" in curr_url:
+                        logged_in = True
+                        try:
+                            with open(COOKIE_FILE, "w", encoding="utf-8") as f:
+                                json.dump(context.cookies(), f, ensure_ascii=False)
+                            log("[OK] 티스토리 사전 로그인 세션 쿠키가 저장되었습니다.")
+                        except Exception:
+                            pass
+                        break
+                if logged_in:
+                    break
+
+            try:
+                browser.close()
+            except Exception:
+                pass
+    except Exception as err:
+        log(f"[WARN] 로그인 모니터링 중 예외(무시): {err}")
+
+    return {
+        "success": logged_in,
+        "message": "카카오 로그인이 완료되어 세션이 저장되었습니다." if logged_in else "로그인 대기 시간이 초과되었습니다."
+    }
+
+def post_content(
+    blog_name: str = DEFAULT_BLOG,
+    title: str = "",
+    content_html: str = "",
+    tags: Optional[List[str]] = None,
+    category: Optional[str] = None,
+    action: str = "TEMP_SAVE",
+    meta_description: str = "",
+    headless: bool = False
+) -> Dict[str, Any]:
+    """모듈 레벨 편의 함수: TistoryAutomator 인스턴스를 생성하여 post_content 호출"""
+    automator = TistoryAutomator(blog_name=blog_name, headless=headless)
+    return automator.post_content(
+        title=title,
+        content_html=content_html,
+        tags=tags,
+        category=category,
+        action=action,
+        meta_description=meta_description
+    )
+
 if __name__ == "__main__":
     print("=" * 60)
     print("🤖 티스토리 브라우저 자동 등록 봇 테스트 러너")

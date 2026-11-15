@@ -1,15 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Copy, Check, FileDown, RefreshCw, BarChart3 } from "lucide-react";
+import { X, Copy, Check, FileDown, RefreshCw, BarChart3, Sparkles, ArrowRight } from "lucide-react";
 
 interface WeeklyReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   days?: number;
+  pages?: any[];
+  onTriggerAutoOpt?: (page: any) => void;
 }
 
-export default function WeeklyReportModal({ isOpen, onClose, days = 28 }: WeeklyReportModalProps) {
+export default function WeeklyReportModal({ isOpen, onClose, days = 28, pages = [], onTriggerAutoOpt }: WeeklyReportModalProps) {
   const [loading, setLoading] = useState(false);
   const [reportMarkdown, setReportMarkdown] = useState<string>("");
   const [copied, setCopied] = useState(false);
@@ -20,6 +22,10 @@ export default function WeeklyReportModal({ isOpen, onClose, days = 28 }: Weekly
       generateReport();
     }
   }, [isOpen, days]);
+
+  const topPages = [...(pages || [])]
+    .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0))
+    .slice(0, 3);
 
   const generateReport = async () => {
     setLoading(true);
@@ -101,6 +107,81 @@ export default function WeeklyReportModal({ isOpen, onClose, days = 28 }: Weekly
             </button>
           </div>
         </div>
+
+        {/* 보고서 진단 1순위 ~ 3순위 추천 액션 카드 목록 */}
+        {topPages.length > 0 && onTriggerAutoOpt && (
+          <div className="my-3 p-3.5 bg-gradient-to-br from-[#131322] via-[#0f101d] to-[#0c0d18] border border-blue-500/25 rounded-2xl shadow-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-500/10 rounded-lg text-blue-400">
+                  <Sparkles size={14} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
+                    <span>⚡ AI 진단 최적화 추천 액션 TOP 3</span>
+                    <span className="text-[11px] font-normal text-gray-400">
+                      (원클릭으로 제목·메타설명·서두 요약 박스 자동 완성)
+                    </span>
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {topPages.map((page: any, idx: number) => {
+                const rank = idx + 1;
+                const rankBadge = rank === 1
+                  ? { label: "🥇 1순위", color: "bg-amber-500/15 text-amber-300 border-amber-500/30" }
+                  : rank === 2
+                  ? { label: "🥈 2순위", color: "bg-blue-500/15 text-blue-300 border-blue-500/30" }
+                  : { label: "🥉 3순위", color: "bg-purple-500/15 text-purple-300 border-purple-500/30" };
+
+                return (
+                  <div
+                    key={idx}
+                    className="p-2.5 bg-[#171728]/80 hover:bg-[#1c1c32] border border-white/5 hover:border-white/15 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all text-xs group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md border ${rankBadge.color}`}>
+                          {rankBadge.label}
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-400">
+                          {page.priority_score || 80}점
+                        </span>
+                        {page.scenario_label && (
+                          <span className="text-[10px] text-gray-300 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                            {page.scenario_label}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-gray-400">
+                          노출 {page.impressions?.toLocaleString() || 0}회 · 클릭 {page.clicks?.toLocaleString() || 0}회 · CTR {page.ctr ? Number(page.ctr).toFixed(2) : 0}%
+                        </span>
+                      </div>
+                      <p className="font-semibold text-gray-200 group-hover:text-white line-clamp-1 text-xs">
+                        {page.title}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => onTriggerAutoOpt(page)}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        rank === 1
+                          ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-blue-600/25"
+                          : rank === 2
+                          ? "bg-gradient-to-r from-blue-600/80 to-indigo-600/80 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/20"
+                          : "bg-white/10 hover:bg-white/20 text-gray-200 border border-white/10"
+                      }`}
+                    >
+                      <Sparkles size={12} className={rank === 1 ? "text-amber-300" : "text-blue-300"} />
+                      <span>원클릭 자동 수정</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 보고서 본문 영역 */}
         <div className="flex-1 overflow-y-auto my-4 pr-1">

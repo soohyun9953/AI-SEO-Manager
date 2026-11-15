@@ -24,6 +24,7 @@ import {
 import AnalyticsSettingsModal from "@/components/AnalyticsSettingsModal";
 import WeeklyReportModal from "@/components/WeeklyReportModal";
 import AiImprovementModal from "@/components/AiImprovementModal";
+import AutoSeoModal from "@/components/AutoSeoModal";
 
 export default function AnalyticsPage() {
   const [days, setDays] = useState<number>(28);
@@ -41,7 +42,15 @@ export default function AnalyticsPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [selectedPageForAi, setSelectedPageForAi] = useState<any | null>(null);
+  const [selectedPageForAutoOpt, setSelectedPageForAutoOpt] = useState<any | null>(null);
   const [hoveredDay, setHoveredDay] = useState<any | null>(null);
+
+  const getApiUrl = (endpoint: string) => {
+    if (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+      return `http://localhost:8002${endpoint}`;
+    }
+    return endpoint;
+  };
 
   useEffect(() => {
     fetchAnalyticsData(days);
@@ -50,7 +59,7 @@ export default function AnalyticsPage() {
   const fetchAnalyticsData = async (targetDays: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/analytics/overview?days=${targetDays}`);
+      const res = await fetch(getApiUrl(`/api/analytics/overview?days=${targetDays}`));
       if (res.ok) {
         const json = await res.json();
         const conn = json.connection || {};
@@ -509,13 +518,22 @@ export default function AnalyticsPage() {
 
                     {/* AI 최적화 처방 버튼 */}
                     <td className="py-4 px-4 text-center align-top">
-                      <button
-                        onClick={() => setSelectedPageForAi(page)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-md shadow-blue-600/20 active:scale-95"
-                      >
-                        <Sparkles size={12} />
-                        <span>AI 개선안 보기</span>
-                      </button>
+                      <div className="flex items-center justify-center gap-1.5 flex-col sm:flex-row">
+                        <button
+                          onClick={() => setSelectedPageForAutoOpt(page)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg transition-all shadow-md shadow-blue-600/25 active:scale-95 whitespace-nowrap"
+                          title="글 본문을 자동으로 가져와 클릭률 2배 제목·메타설명·요약박스로 리라이팅"
+                        >
+                          <Sparkles size={12} />
+                          <span>⚡ 원클릭 자동 수정</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedPageForAi(page)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-300 bg-white/5 hover:bg-white/10 rounded-lg transition-all border border-white/5 whitespace-nowrap"
+                        >
+                          <span>처방전 보기</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -536,6 +554,11 @@ export default function AnalyticsPage() {
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
         days={days}
+        pages={pages}
+        onTriggerAutoOpt={(p) => {
+          setIsReportOpen(false);
+          setSelectedPageForAutoOpt(p);
+        }}
       />
 
       <AiImprovementModal
@@ -543,6 +566,17 @@ export default function AnalyticsPage() {
         onClose={() => setSelectedPageForAi(null)}
         pageItem={selectedPageForAi}
         days={days}
+        onTriggerAutoOpt={(p) => {
+          setSelectedPageForAi(null);
+          setSelectedPageForAutoOpt(p);
+        }}
+      />
+
+      <AutoSeoModal
+        isOpen={Boolean(selectedPageForAutoOpt)}
+        onClose={() => setSelectedPageForAutoOpt(null)}
+        pageItem={selectedPageForAutoOpt}
+        onSavedSuccess={() => fetchAnalyticsData(days)}
       />
     </div>
   );

@@ -9,6 +9,7 @@ AI SEO Manager - Google Search Console & AdSense 분석 및 AI 최적화 엔진
 
 import os
 import json
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import requests
@@ -58,7 +59,6 @@ def _adsense_account() -> str:
 
 
 def _access_token() -> str:
-    import time
     if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
         return _token_cache["token"]
     creds = _oauth_env()
@@ -71,6 +71,181 @@ def _access_token() -> str:
     _token_cache["token"] = body["access_token"]
     _token_cache["expires_at"] = time.time() + int(body.get("expires_in", 3600))
     return _token_cache["token"]
+
+
+def update_env_value(key: str, value: str) -> bool:
+    """backend/.env 파일에 키-값을 업데이트하거나 추가하고 os.environ 및 캐시에 즉시 반영"""
+    os.environ[key] = value
+    env_paths = [
+        os.path.join(BASE_DIR, ".env"),
+        os.path.join(BASE_DIR, "..", "backend", ".env"),
+        os.path.join(os.path.dirname(BASE_DIR), "backend", ".env")
+    ]
+    updated = False
+    for p in env_paths:
+        p = os.path.abspath(p)
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                found = False
+                new_lines = []
+                for line in lines:
+                    if line.strip().startswith(f"{key}="):
+                        new_lines.append(f"{key}={value}\n")
+                        found = True
+                    else:
+                        new_lines.append(line)
+                if not found:
+                    new_lines.append(f"{key}={value}\n")
+                with open(p, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+                updated = True
+            except Exception as e:
+                print(f"[Analytics] .env 업데이트 오류 ({p}): {e}")
+    if key == "GOOGLE_REFRESH_TOKEN":
+        _token_cache["token"] = None
+        _token_cache["expires_at"] = 0.0
+    return updated
+
+
+def get_google_auth_url(redirect_uri: str = "http://localhost:8765/") -> str:
+    """Search Console 및 AdSense 읽기 권한을 요청하는 OAuth 인증 URL 생성"""
+    from urllib.parse import urlencode
+    cid = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    if not cid:
+        raise GoogleApiError("GOOGLE_CLIENT_ID가 설정되지 않았습니다.")
+    scopes = [
+        "https://www.googleapis.com/auth/webmasters.readonly",
+        "https://www.googleapis.com/auth/adsense.readonly",
+    ]
+    params = {
+        "client_id": cid,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(scopes),
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
+
+
+def exchange_code_for_token(code: str, redirect_uri: str = "http://localhost:8765/") -> Dict[str, Any]:
+    """Google 인증 코드로 리프레시 토큰을 교환하고 .env에 즉시 반영"""
+    cid = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+    if not cid or not secret:
+        raise GoogleApiError("GOOGLE_CLIENT_ID 또는 GOOGLE_CLIENT_SECRET이 설정되지 않았습니다.")
+
+    res = requests.post(
+        TOKEN_URL,
+        data={
+            "code": code.strip(),
+            "client_id": cid,
+            "client_secret": secret,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        },
+        timeout=25,
+    )
+    if res.status_code != 200:
+        raise GoogleApiError(f"토큰 교환 실패({res.status_code}): {res.text[:300]}")
+    body = res.json()
+    refresh_token = body.get("refresh_token")
+    if not refresh_token:
+        # prompt=consent가 전달되었음에도 드물게 안 오는 경우 대비
+        raise GoogleApiError("Google에서 refresh_token을 반환하지 않았습니다. Google 계정 설정에서 앱 권한을 취소한 후 다시 시도해주세요.")
+
+    update_env_value("GOOGLE_REFRESH_TOKEN", refresh_token)
+    if body.get("access_token"):
+        _token_cache["token"] = body["access_token"]
+        _token_cache["expires_at"] = time.time() + int(body.get("expires_in", 3600))
+
+    return {
+        "success": True,
+        "message": "새 Google 리프레시 토큰이 정상적으로 저장되었습니다. 이제 LIVE 모드로 동작합니다.",
+        "refresh_token_preview": refresh_token[:10] + "..." + refresh_token[-5:] if len(refresh_token) > 15 else "***",
+    }
+
+
+def run_local_oauth_flow(timeout: int = 180) -> Dict[str, Any]:
+    """로컬 HTTP 서버(포트 8765)를 대기시키고 브라우저를 띄워 원클릭으로 인증 및 토큰 저장"""
+    import webbrowser
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import parse_qs, urlparse
+
+    port = 8765
+    redirect_uri = f"http://localhost:{port}/"
+    captured = {"code": None, "error": None}
+
+    class _LocalHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            parsed = parse_qs(urlparse(self.path).query)
+            if "error" in parsed:
+                captured["error"] = parsed["error"][0]
+                msg = f"인증이 거부되었습니다: {captured['error']}"
+                color = "#ef4444"
+            elif "code" in parsed:
+                captured["code"] = parsed["code"][0]
+                msg = "Google 인증이 성공적으로 완료되었습니다! 이제 이 창을 닫고 AI SEO Manager로 돌아가세요."
+                color = "#10b981"
+            else:
+                msg = "요청 파라미터를 확인할 수 없습니다."
+                color = "#f59e0b"
+
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            html = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>Google 인증 완료 - AI SEO Manager</title>
+  <style>
+    body {{ background: #0b0b12; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }}
+    .card {{ background: #13131f; border: 1px solid rgba(255,255,255,0.1); padding: 40px; border-radius: 20px; text-align: center; max-width: 440px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }}
+    h2 {{ color: {color}; margin-top: 0; font-size: 22px; }}
+    p {{ color: #9ca3af; font-size: 14px; line-height: 1.6; margin: 16px 0 24px; }}
+    .btn {{ display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 10px 24px; border-radius: 10px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Google 인증 처리 완료</h2>
+    <p>{msg}</p>
+    <button class="btn" onclick="window.close()">창 닫기</button>
+  </div>
+</body>
+</html>"""
+            self.wfile.write(html.encode("utf-8"))
+
+        def log_message(self, *args):
+            pass
+
+    try:
+        server = HTTPServer(("localhost", port), _LocalHandler)
+        server.timeout = timeout
+    except Exception as e:
+        raise GoogleApiError(f"로컬 인증 포트({port}) 열기 실패 (이미 실행 중일 수 있습니다): {str(e)}")
+
+    auth_url = get_google_auth_url(redirect_uri=redirect_uri)
+    try:
+        webbrowser.open(auth_url)
+    except Exception:
+        pass
+
+    server.handle_request()
+    try:
+        server.server_close()
+    except Exception:
+        pass
+
+    if captured["error"]:
+        raise GoogleApiError(f"사용자가 인증을 취소했거나 오류가 발생했습니다: {captured['error']}")
+    if not captured["code"]:
+        raise GoogleApiError("인증 대기 시간이 초과되었거나 인증 코드를 수신하지 못했습니다.")
+
+    return exchange_code_for_token(captured["code"], redirect_uri=redirect_uri)
 
 
 def _gsc_query(site: str, start: str, end: str, dimension: str, row_limit: int) -> List[Dict[str, Any]]:
