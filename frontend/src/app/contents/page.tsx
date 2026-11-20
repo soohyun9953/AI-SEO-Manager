@@ -204,7 +204,7 @@ export default function ContentsManagementPage() {
 
         <div className="flex items-center gap-3">
           <Link
-            href="/editor"
+            href="/experience-reviews"
             className="px-4 py-2.5 rounded-xl bg-purple-600/10 hover:bg-purple-600/20 text-purple-300 border border-purple-500/30 text-xs font-bold flex items-center gap-2 transition-all"
           >
             <PenTool size={14} /> 새 원고 쓰기
@@ -387,7 +387,7 @@ export default function ContentsManagementPage() {
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-gray-500">
                     <p className="text-sm font-medium mb-2">등록된 콘텐츠가 없습니다.</p>
-                    <p className="text-xs text-gray-600">SEO 라이터 또는 자동 글작성에서 새 글을 작성한 후 저장해보세요.</p>
+                    <p className="text-xs text-gray-600">체험·방문 후기나 IT·재테크 글에서 새 글을 작성한 후 저장해보세요.</p>
                   </td>
                 </tr>
               ) : (
